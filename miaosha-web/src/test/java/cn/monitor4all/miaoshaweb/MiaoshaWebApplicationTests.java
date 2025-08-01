@@ -11,6 +11,6 @@ class MiaoshaWebApplicationTests {
 
     private static Logger logger = LoggerFactory.getLogger(MiaoshaWebApplicationTests.class);
     private static ExecutorService executorServicePool;
-    private static String url = "http://127.0.0.1:8080/createOptimisticLimitOrder/1" ;
+    private static String url = "http://127.0.0.1:8081/createOptimisticLimitOrder/1" ;
 
 }
