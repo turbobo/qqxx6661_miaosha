@@ -69,4 +69,20 @@ public interface StockService {
      */
     public int updateStockByOptimistic(Stock stock);
 
+    /**
+     * 管理员更新库存
+     * @param sid 商品ID
+     * @param count 新的库存数量
+     * @return 是否更新成功
+     */
+    boolean adminUpdateStock(int sid, int count);
+
+    /**
+     * 管理员更新库存（悲观锁+事务控制）
+     * @param sid 商品ID
+     * @param count 新的库存数量
+     * @return 是否更新成功
+     */
+    boolean adminUpdateStockWithPessimistic(int sid, int count);
+
 }

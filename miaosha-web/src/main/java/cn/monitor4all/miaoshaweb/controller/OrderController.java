@@ -8,7 +8,7 @@ import com.google.common.util.concurrent.RateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.AmqpTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
+import javax.annotation.Resource;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,20 +17,21 @@ import java.util.List;
 import java.util.concurrent.*;
 
 @Controller
+@CrossOrigin // 添加跨域支持
 public class OrderController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OrderController.class);
 
-    @Autowired
+    @Resource
     private OrderService orderService;
 
-    @Autowired
+    @Resource
     private UserService userService;
 
-    @Autowired
+    @Resource
     private StockService stockService;
 
-    @Autowired
+    @Resource
     private AmqpTemplate rabbitTemplate;
 
     // Guava令牌桶：每秒放行10个请求
@@ -49,6 +50,9 @@ public class OrderController {
      *
      * 测试：500张票 1000个线程，循环10次
      * 产生 10000个订单，但是只售卖了69个 数据不一致
+     *
+     *
+     * 缺少事务、锁控制、原子性操作
      */
     @RequestMapping("/createWrongOrder/{sid}")
     @ResponseBody
@@ -71,13 +75,16 @@ public class OrderController {
      * 卖出50 - 60 个，3次测试，都未卖完
      * 其余部分数据被限流，或者购买失败
      * 吞吐量 5336 5437  4605 每秒
+     *
+     * 主流秒杀技术：前端限流 → 接入层控频 → 应用层消息队列削峰 + Redis 预扣减 → 数据层乐观锁最终校验，配合服务降级 / 熔断保障稳定性。
+     * 锁的选择：乐观锁是秒杀场景的绝对主流，通过版本号机制实现防超卖，兼顾性能与一致性；悲观锁因性能问题仅在低并发场景使用。
      */
     @RequestMapping("/createOptimisticOrder/{sid}")
     @ResponseBody
     public String createOptimisticOrder(@PathVariable int sid) {
-        // 1. 阻塞式获取令牌
+//         1. 阻塞式获取令牌
 //        LOGGER.info("等待时间" + rateLimiter.acquire());
-        // 2. 非阻塞式获取令牌
+//         2. 非阻塞式获取令牌
         if (!rateLimiter.tryAcquire(1000, TimeUnit.MILLISECONDS)) {
             LOGGER.warn("你被限流了，真不幸，直接返回失败");
             return "你被限流了，真不幸，直接返回失败";
@@ -127,7 +134,7 @@ public class OrderController {
     @RequestMapping(value = "/getVerifyHash", method = {RequestMethod.GET})
     @ResponseBody
     public String getVerifyHash(@RequestParam(value = "sid") Integer sid,
-                                @RequestParam(value = "userId") Integer userId) {
+                                @RequestParam(value = "userId") Long userId) {
         String hash;
         try {
             byte[] a = new byte[1024*1024*100];
@@ -174,7 +181,7 @@ public class OrderController {
     @RequestMapping(value = "/createOrderWithVerifiedUrlAndLimit", method = {RequestMethod.GET})
     @ResponseBody
     public String createOrderWithVerifiedUrlAndLimit(@RequestParam(value = "sid") Integer sid,
-                                                     @RequestParam(value = "userId") Integer userId,
+                                                     @RequestParam(value = "userId") Long userId,
                                                      @RequestParam(value = "verifyHash") String verifyHash) {
         int stockLeft;
         try {
@@ -294,7 +301,7 @@ public class OrderController {
     }
 
     /**
-     *
+     * V1 版本：同步下单
      * 设计：
      * 查询缓存的用户访问次数是否超过限制，没有则继续---一分钟6次
      * 校验用户hash合法
@@ -323,7 +330,7 @@ public class OrderController {
     @RequestMapping("/createOrderWithCacheV5")
     @ResponseBody
     public String createOrderWithCacheV5(@RequestParam(value = "sid") Integer sid,
-                                         @RequestParam(value = "userId") Integer userId) {
+                                         @RequestParam(value = "userId") Long userId) {
         int count;
         try {
             // TODO 校验用户hash值
@@ -382,14 +389,16 @@ public class OrderController {
     }
 
     /**
-     * 下单接口：异步处理订单
+     * V2 版本：异步
+     * 下单接口：异步处理订单: 先判断用户是否有订单，再通过消息异步抢购，页面轮询查询抢购结果
+     *
      * @param sid
      * @return
      */
     @RequestMapping(value = "/createUserOrderWithMq", method = {RequestMethod.GET})
     @ResponseBody
     public String createUserOrderWithMq(@RequestParam(value = "sid") Integer sid,
-                                  @RequestParam(value = "userId") Integer userId) {
+                                  @RequestParam(value = "userId") Long userId) {
         try {
             // 检查缓存中该用户是否已经下单过
             Boolean hasOrder = orderService.checkUserOrderInfoInCache(sid, userId);
@@ -426,7 +435,7 @@ public class OrderController {
     @RequestMapping(value = "/checkOrderByUserIdInCache", method = {RequestMethod.GET})
     @ResponseBody
     public String checkOrderByUserIdInCache(@RequestParam(value = "sid") Integer sid,
-                                  @RequestParam(value = "userId") Integer userId) {
+                                  @RequestParam(value = "userId") Long userId) {
         // 检查缓存中该用户是否已经下单过
         try {
             Boolean hasOrder = orderService.checkUserOrderInfoInCache(sid, userId);
@@ -439,6 +448,17 @@ public class OrderController {
         return "很抱歉，你的订单尚未生成，继续排队。";
     }
 
+
+    /**
+     * 管理员修改余票的完整流程：
+     *
+     * 管理员发起修改请求（带权限校验）；
+     * 系统暂停秒杀服务（可选，视业务紧急程度）；
+     * 用悲观锁锁定库存记录，执行修改（同时更新版本号）；
+     * 记录操作日志，校验库存合法性；
+     * 同步更新 Redis 缓存，恢复秒杀服务；
+     * 前端刷新库存显示，用户可继续抢购。
+     */
 
     /**
      * 缓存再删除线程

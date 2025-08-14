@@ -21,4 +21,11 @@ public interface StockMapper {
     int updateByPrimaryKey(Stock record);
 
     int updateByOptimistic(Stock record);
+
+    /**
+     * 管理员更新库存（悲观锁）
+     * @param record
+     * @return
+     */
+    int updateByAdminWithPessimistic(Stock record);
 }

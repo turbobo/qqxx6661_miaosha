@@ -74,17 +74,60 @@
             <div class="container mx-auto px-4 py-4 flex justify-between items-center">
                 <div class="flex items-center space-x-2">
                     <i class="fa fa-ticket text-primary text-2xl"></i>
-                    <h1 class="text-xl font-bold text-dark">票券抢购系统</h1>
+                    <h1 class="text-xl font-bold text-dark">票券抢购系统 V1</h1>
+                </div>
+                
+                <!-- 秒杀活动状态显示 -->
+                <div v-if="miaoshaStatus.paused" class="flex items-center space-x-2 px-4 py-2 bg-yellow-100 border border-yellow-300 rounded-lg">
+                    <i class="fa fa-exclamation-triangle text-yellow-600"></i>
+                    <span class="text-yellow-800 font-medium">秒杀活动正在维护中</span>
                 </div>
                 
                 <div class="flex items-center space-x-4">
-                    <div class="flex items-center space-x-2 text-gray-600">
+                    <!-- 注释掉用户信息显示和登录相关按钮 -->
+                    <!-- <div v-if="currentUser" class="flex items-center space-x-2 text-gray-600">
                         <i class="fa fa-user-circle-o text-xl"></i>
                         <span>{{ currentUser }}</span>
+                    </div>
+                    <div v-if="!currentUser" class="text-gray-500">
+                        <span>未登录</span>
+                    </div>
+                    <button v-if="currentUser" @click="logout" 
+                            class="text-gray-500 hover:text-gray-700 transition-colors">
+                        <i class="fa fa-sign-out mr-1"></i>
+                        退出登录
+                    </button>
+                    <button v-if="!currentUser" @click="goToLogin" 
+                            class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                        <i class="fa fa-sign-in mr-1"></i>
+                        登录
+                    </button> -->
+                    
+                    <!-- 显示匿名用户信息 -->
+                    <div class="flex items-center space-x-2 text-gray-600">
+                        <i class="fa fa-user-circle-o text-xl"></i>
+                        <span>匿名用户</span>
                     </div>
                 </div>
             </div>
         </header>
+        
+        <!-- 管理功能导航 -->
+        <div class="bg-white shadow-sm rounded-lg mb-6">
+            <div class="container mx-auto px-4 py-3">
+                <div class="flex flex-wrap gap-3 justify-center">
+                    <a href="admin-ticket-update.html" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm">
+                        <i class="fa fa-edit mr-2"></i>票券管理
+                    </a>
+                    <a href="ticket-validation.html" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm">
+                        <i class="fa fa-check-circle mr-2"></i>票数检查
+                    </a>
+                    <a href="admin-miaosha-control.html" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm">
+                        <i class="fa fa-cogs mr-2"></i>秒杀控制
+                    </a>
+                </div>
+            </div>
+        </div>
         
         <!-- 页面标题 -->
         <div class="text-center mb-10">
@@ -280,10 +323,14 @@
         createApp({
             data() {
                 return {
+                    // 秒杀活动状态
+                    miaoshaStatus: {},
+                    
                     tickets: [],
                     loading: true,
                     error: '',
-                    currentUser: 'user_' + Math.floor(Math.random() * 10000), // 随机生成用户ID
+                    currentUser: '', // 当前登录用户昵称
+                    currentUserId: '', // 当前用户ID
                     selectedTicket: null,
                     showConfirmModal: false,
                     showSuccessModal: false,
@@ -295,15 +342,83 @@
                 }
             },
             mounted() {
-                // 加载票券数据
+                // 注释掉登录状态检查，直接加载票券数据
+                // 先检查登录状态，然后加载票券数据
+                // this.checkLoginStatus().then(() => {
+                //     this.loadTickets();
+                // });
+                
+                // 直接加载票券数据，不检查登录状态
                 this.loadTickets();
+                
+                // 获取秒杀活动状态
+                this.loadMiaoshaStatus();
             },
             methods: {
+                // 注释掉登录状态检查方法
+                // 检查登录状态
+                // async checkLoginStatus() {
+                //     const token = localStorage.getItem('token');
+                //     if (!token) {
+                //         // 没有token，设置用户为未登录状态
+                //         this.currentUser = '';
+                //         this.currentUserId = '';
+                //         return Promise.resolve();
+                //     }
+                //     
+                //     try {
+                //         // 验证token并获取用户信息
+                //         const response = await axios.get('http://localhost:8081/api/auth/me', {
+                //             headers: {
+                //                 'Authorization': 'Bearer ' + token
+                //             }
+                //         });
+                //         
+                //         if (response.data.code === 200) {
+                //             const user = response.data.data;
+                //             this.currentUser = user.nickname || user.username;
+                //             this.currentUserId = user.id;
+                //             
+                //             // 设置全局axios默认header
+                //             axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+                //         } else {
+                //             // token无效，清除并设置为未登录
+                //             localStorage.removeItem('token');
+                //             localStorage.removeItem('user');
+                //             this.currentUser = '';
+                //             this.currentUserId = '';
+                //         }
+                //     } catch (err) {
+                //         console.error('验证登录状态失败:', err);
+                //         // 网络错误或token无效，设置为未登录
+                //         localStorage.removeItem('token');
+                //         localStorage.removeItem('user');
+                //         this.currentUser = '';
+                //         this.currentUserId = '';
+                //     }
+                //     
+                //     return Promise.resolve();
+                // },
+                
+                // 获取秒杀活动状态
+                async loadMiaoshaStatus() {
+                    try {
+                        const response = await axios.get('http://localhost:8081/api/tickets/miaosha/status');
+                        if (response.data.code === 200) {
+                            this.miaoshaStatus = response.data.data;
+                        }
+                    } catch (error) {
+                        console.error('获取秒杀状态失败:', error);
+                    }
+                },
+                
                 // 从后端加载票券数据
                 async loadTickets() {
                     try {
                         this.loading = true;
-                        const response = await axios.get('http://127.0.0.1:8081/api/tickets');
+                        // 注释掉认证相关代码，直接调用API
+                        // 使用全局设置的axios默认header，无需手动添加token
+                        const response = await axios.get('http://localhost:8081/api/tickets/list');
                         
                         if (response.data.code === 200) {
                             this.tickets = response.data.data;
@@ -312,6 +427,16 @@
                             this.error = response.data.message || '加载票券失败';
                         }
                     } catch (err) {
+                        // 注释掉401错误处理，简化错误处理逻辑
+                        // if (err.response && err.response.status === 401) {
+                        //     // 未授权，需要登录
+                        //     this.error = '请先登录后再查看票券信息';
+                        //     console.error('票券列表访问失败:', err);
+                        // } else {
+                        //     this.error = '网络错误，无法加载票券信息';
+                        //     console.error(err);
+                        // }
+                        
                         this.error = '网络错误，无法加载票券信息';
                         console.error(err);
                     } finally {
@@ -321,6 +446,21 @@
                 
                 // 处理抢购点击事件
                 handlePurchase(ticket) {
+                    // 检查秒杀活动状态
+                    if (this.miaoshaStatus.paused) {
+                        this.failMessage = '秒杀活动正在维护中，请稍后再试';
+                        this.showFailModal = true;
+                        return;
+                    }
+                    
+                    // 注释掉登录检查，允许未登录用户抢购
+                    // 检查是否已登录
+                    // if (!this.currentUser) {
+                    //     this.failMessage = '请先登录后再抢购票券';
+                    //     this.showFailModal = true;
+                    //     return;
+                    // }
+                    
                     this.selectedTicket = ticket;
                     this.showConfirmModal = true;
                 },
@@ -333,9 +473,11 @@
                         // 隐藏确认弹窗
                         this.showConfirmModal = false;
                         
-                        // 发送抢购请求
-                        const response = await axios.post('http://127.0.0.1:8081/api/tickets/purchase', {
-                            userId: this.currentUser,
+                        // 发送抢购请求，使用全局设置的axios默认header
+                        // 注释掉用户ID，使用默认用户或匿名用户
+                        const response = await axios.post('http://localhost:8081/api/tickets/purchase', {
+                            // userId: this.currentUserId,
+                            userId: 'anonymous', // 使用匿名用户ID
                             date: this.selectedTicket.date
                         });
                         
@@ -361,7 +503,30 @@
                         this.showFailModal = true;
                         console.error(err);
                     }
-                }
+                },
+                
+                // 注释掉退出登录和跳转登录页面方法
+                // 退出登录
+                // async logout() {
+                //     try {
+                //         // 调用后端退出接口
+                //         await axios.post('http://localhost:8081/api/auth/logout');
+                //     } catch (err) {
+                //         console.error('退出登录失败:', err);
+                //     } finally {
+                //         // 无论是否成功，都清除本地数据
+                //         localStorage.removeItem('token');
+                //         localStorage.removeItem('user');
+                //         delete axios.defaults.headers.common['Authorization'];
+                //         // 重新加载当前页面，显示未登录状态
+                //         window.location.reload();
+                //     }
+                // },
+                
+                // 跳转到登录页面
+                // goToLogin() {
+                //     window.location.href = 'login.html';
+                // }
             }
         }).mount('#app');
     </script>

@@ -9,7 +9,7 @@ public class StockOrder {
 
     private String name;
 
-    private Integer userId;
+    private Long userId;
 
     private Date createTime;
 
@@ -47,11 +47,11 @@ public class StockOrder {
         this.createTime = createTime;
     }
 
-    public Integer getUserId() {
+    public Long getUserId() {
         return userId;
     }
 
-    public void setUserId(Integer userId) {
+    public void setUserId(Long userId) {
         this.userId = userId;
     }
 

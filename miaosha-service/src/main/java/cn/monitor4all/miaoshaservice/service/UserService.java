@@ -9,7 +9,16 @@ public interface UserService {
      * @return
      * @throws Exception
      */
-    public String getVerifyHash(Integer sid, Integer userId) throws Exception;
+    public String getVerifyHash(Integer sid, Long userId) throws Exception;
+
+    /**
+     * 获取用户验证Hash
+     * @param date 票券日期
+     * @param userId
+     * @return
+     * @throws Exception
+     */
+    public String getVerifyHash4Ticket(String date, Long userId) throws Exception;
 
     /**
      * 添加用户访问次数
@@ -17,13 +26,15 @@ public interface UserService {
      * @return
      * @throws Exception
      */
-    public int addUserCount(Integer userId) throws Exception;
+    public int addUserCount(Long userId) throws Exception;
 
     /**
      * 检查用户是否被禁
      * @param userId
      * @return
      */
-    public boolean getUserIsBanned(Integer userId);
+    public boolean getUserIsBanned(Long userId);
 
+
+    public void validUser(Long userId) throws Exception;
 }

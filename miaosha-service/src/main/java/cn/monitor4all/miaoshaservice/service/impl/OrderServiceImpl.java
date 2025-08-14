@@ -1,4 +1,4 @@
-package cn.monitor4all.miaoshaservice.service;
+package cn.monitor4all.miaoshaservice.service.impl;
 
 import cn.monitor4all.miaoshadao.dao.OrderRecord;
 import cn.monitor4all.miaoshadao.dao.Stock;
@@ -8,42 +8,44 @@ import cn.monitor4all.miaoshadao.mapper.StockOrderMapper;
 import cn.monitor4all.miaoshadao.mapper.UserMapper;
 import cn.monitor4all.miaoshadao.utils.CacheKey;
 import cn.monitor4all.miaoshaservice.constant.OrderRecordStatus;
+import cn.monitor4all.miaoshaservice.service.OrderService;
+import cn.monitor4all.miaoshaservice.service.StockService;
 import com.alibaba.fastjson.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.AmqpTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.annotation.Order;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class OrderServiceImpl implements OrderService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OrderServiceImpl.class);
 
-    @Autowired
+    @Resource
     private StringRedisTemplate stringRedisTemplate;
 
-    @Autowired
+    @Resource
     private StockService stockService;
 
-    @Autowired
+    @Resource
     private OrderService orderService;
 
-    @Autowired
+    @Resource
     private StockOrderMapper orderMapper;
 
-    @Autowired
+    @Resource
     private UserMapper userMapper;
 
-    @Autowired
+    @Resource
     private AmqpTemplate rabbitTemplate;
 
     @Override
@@ -81,7 +83,7 @@ public class OrderServiceImpl implements OrderService {
      */
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     @Override
-    public int createOptimisticOrder(int sid, int userId) {
+    public int createOptimisticOrder(int sid, Long userId) {
         // 检查用户合法性
         User user = userMapper.selectByPrimaryKey((long) userId);
         if (user == null) {
@@ -120,6 +122,20 @@ public class OrderServiceImpl implements OrderService {
         return stock.getCount() - (stock.getSale() + 1);
     }
 
+    /**
+     * 关键点：同一个事务内的锁共享
+     * 事务隔离性：
+     * 整个方法在一个事务中执行
+     * 事务内的所有操作共享同一个锁
+     * 锁的粒度：
+     * 锁的是行级别，不是方法级别
+     * 同一个事务内的多个操作可以访问同一行
+     * 锁的持续时间：
+     * 从 SELECT ... FOR UPDATE 开始
+     * 到事务提交或回滚结束
+     * @param sid
+     * @return
+     */
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     @Override
     public int createPessimisticOrder(int sid) {
@@ -137,7 +153,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public int createVerifiedOrder(Integer sid, Integer userId, String verifyHash) throws Exception {
+    public int createVerifiedOrder(Integer sid, Long userId, String verifyHash) throws Exception {
 
         // 验证是否在抢购时间内
         LOGGER.info("请自行验证是否在抢购时间内,假设此处验证成功");
@@ -180,7 +196,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public void createOrderByMq(Integer sid, Integer userId) throws Exception {
+    public void createOrderByMq(Integer sid, Long userId) throws Exception {
 
         // 模拟多个用户同时抢购，导致消息队列排队等候10秒
         Thread.sleep(10000);
@@ -216,7 +232,7 @@ public class OrderServiceImpl implements OrderService {
     // 默认开启一个事务
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     @Override
-    public void createOrderByMq(String orderId, Integer sid, Integer userId) throws Exception {
+    public void createOrderByMq(String orderId, Integer sid, Long userId) throws Exception {
         //创建订单
         LOGGER.info("写入订单至数据库");
         Stock stock = checkStock(sid);
@@ -241,7 +257,7 @@ public class OrderServiceImpl implements OrderService {
      * @param userId
      * @throws Exception
      */
-    public void createOnlyOrderByMq(String orderId, Integer sid, Integer userId) throws Exception {
+    public void createOnlyOrderByMq(String orderId, Integer sid, Long userId) throws Exception {
 
         // 模拟多个用户同时抢购，导致消息队列排队等候10秒
         Thread.sleep(10000);
@@ -277,7 +293,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Boolean checkUserOrderInfoInCache(Integer sid, Integer userId) throws Exception {
+    public Boolean checkUserOrderInfoInCache(Integer sid, Long userId) throws Exception {
         String key = CacheKey.USER_HAS_ORDER.getKey() + "_" + sid;
         LOGGER.info("检查用户Id：[{}] 是否抢购过商品Id：[{}] 检查Key：[{}]", userId, sid, key);
         return stringRedisTemplate.opsForSet().isMember(key, userId.toString());
@@ -356,7 +372,7 @@ public class OrderServiceImpl implements OrderService {
      * @param stock
      * @return
      */
-    private int createOrderWithUserInfoInDB(Stock stock, Integer userId) {
+    private int createOrderWithUserInfoInDB(Stock stock, Long userId) {
         StockOrder order = new StockOrder();
         order.setSid(stock.getId());
         order.setName(stock.getName());
@@ -364,7 +380,7 @@ public class OrderServiceImpl implements OrderService {
         return orderMapper.insertSelective(order);
     }
 
-    private int createOrderWithUserInfoInDB(String orderId, Stock stock, Integer userId) {
+    private int createOrderWithUserInfoInDB(String orderId, Stock stock, Long userId) {
         StockOrder order = new StockOrder();
         order.setOrderId(orderId);
         order.setSid(stock.getId());
@@ -376,14 +392,26 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 创建订单：保存用户订单信息到缓存
      *
+     *         // 为key设置8小时过期时间
+     *         // 用户离开，则删除缓存
+     *         // 定时任务删除
      * @param stock
      * @return 返回添加的个数
      */
-    private Long createOrderWithUserInfoInCache(Stock stock, Integer userId) {
+    private Long createOrderWithUserInfoInCache(Stock stock, Long userId) {
         String key = CacheKey.USER_HAS_ORDER.getKey() + "_" + stock.getId().toString();
         LOGGER.info("写入用户订单数据Set：[{}] [{}]", key, userId.toString());
-        return stringRedisTemplate.opsForSet().add(key, userId.toString());
+//        return stringRedisTemplate.opsForSet().add(key, userId.toString());
+
+        Long result = stringRedisTemplate.opsForSet().add(key, userId.toString());
+        // 为key设置8小时过期时间
+        // 用户离开，则删除缓存
+        // 定时任务删除
+        stringRedisTemplate.expire(key, 12, TimeUnit.HOURS);
+        return result;
     }
+
+    // 每天定时删除CacheKey.USER_HAS_ORDER 缓存
 
 
     @Override

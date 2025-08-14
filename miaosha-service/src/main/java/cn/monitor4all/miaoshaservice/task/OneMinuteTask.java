@@ -3,10 +3,11 @@ package cn.monitor4all.miaoshaservice.task;
 import cn.monitor4all.miaoshadao.dao.OrderRecord;
 import cn.monitor4all.miaoshaservice.constant.OrderRecordStatus;
 import cn.monitor4all.miaoshaservice.service.OrderService;
+import cn.monitor4all.miaoshaservice.service.TicketService;
 import com.google.common.collect.Lists;
 import com.mysql.jdbc.log.Log;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import javax.annotation.Resource;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -29,8 +30,11 @@ import java.util.concurrent.TimeUnit;
 @EnableScheduling//开启定时任务
 @Component
 public class OneMinuteTask {
-    @Autowired
+    @Resource
     private OrderService orderService;
+    
+    @Resource
+    private TicketService ticketService;
 
     // 一分钟执行一次
     @Scheduled(cron="0/1 * * * * ?")//每秒钟执行一次，以空格分隔
@@ -46,6 +50,21 @@ public class OneMinuteTask {
 
 
         // 库存回退也是有数据库+mq双重保障，删除 用户-商品缓存
+    }
+    
+    // 每天0点更新票券数据
+    @Scheduled(cron = "0 0 0 * * ?")
+    public void updateDailyTickets() {
+        try {
+            log.info("开始执行每日票券更新任务");
+            // 调用票券服务更新每日票券
+            if (ticketService instanceof cn.monitor4all.miaoshaservice.service.impl.TicketServiceImpl) {
+                ((cn.monitor4all.miaoshaservice.service.impl.TicketServiceImpl) ticketService).updateDailyTickets();
+                log.info("每日票券更新任务执行完成");
+            }
+        } catch (Exception e) {
+            log.error("每日票券更新任务执行失败: {}", e.getMessage(), e);
+        }
     }
 
     //  多线程 异步 重新下发

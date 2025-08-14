@@ -1,6 +1,8 @@
 package cn.monitor4all.miaoshadao.dao;
 
 public class User {
+    public static final long ANONYMOUS = -1L;
+
     private Long id;
 
     private String userName;

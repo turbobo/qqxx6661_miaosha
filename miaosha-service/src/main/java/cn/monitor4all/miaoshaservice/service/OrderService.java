@@ -24,7 +24,7 @@ public interface OrderService {
      */
     public int createOptimisticOrder(int sid);
 
-    public int createOptimisticOrder(int sid, int userId);
+    public int createOptimisticOrder(int sid, Long userId);
 
 
     /**
@@ -45,7 +45,7 @@ public interface OrderService {
      * @return
      * @throws Exception
      */
-    public int createVerifiedOrder(Integer sid, Integer userId, String verifyHash) throws Exception;
+    public int createVerifiedOrder(Integer sid, Long userId, String verifyHash) throws Exception;
 
     /**
      * 创建正确订单：验证库存 + 下单乐观锁 + 更新订单信息到缓存
@@ -53,9 +53,9 @@ public interface OrderService {
      * @param userId
      * @throws Exception
      */
-    public void createOrderByMq(Integer sid, Integer userId) throws Exception;
+    public void createOrderByMq(Integer sid, Long userId) throws Exception;
 
-    public void createOrderByMq(String orderId, Integer sid, Integer userId) throws Exception;
+    public void createOrderByMq(String orderId, Integer sid, Long userId) throws Exception;
 
     /**
      * 检查缓存中用户是否已经有订单
@@ -64,7 +64,7 @@ public interface OrderService {
      * @return
      * @throws Exception
      */
-    public Boolean checkUserOrderInfoInCache(Integer sid, Integer userId) throws Exception;
+    public Boolean checkUserOrderInfoInCache(Integer sid, Long userId) throws Exception;
 
 
     // 写入订单记录表

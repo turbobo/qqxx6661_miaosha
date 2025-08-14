@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitHandler;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.beans.factory.annotation.Autowired;
+import javax.annotation.Resource;
 import org.springframework.stereotype.Component;
 @Component
 @RabbitListener(queues = "orderQueue")
@@ -15,10 +15,10 @@ public class OrderMqReceiver {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OrderMqReceiver.class);
 
-    @Autowired
+    @Resource
     private StockService stockService;
 
-    @Autowired
+    @Resource
     private OrderService orderService;
 
     @RabbitHandler
