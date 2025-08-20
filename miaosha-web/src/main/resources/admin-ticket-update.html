@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员票券更新</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">管理员票券更新系统</h1>
+            
+            <!-- 导航菜单 -->
+            <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+                <h2 class="text-lg font-semibold mb-3 text-gray-800">管理功能</h2>
+                <div class="flex flex-wrap gap-3">
+                    <a href="admin-ticket-update.html" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-edit mr-2"></i>票券更新
+                    </a>
+                    <a href="ticket-validation.html" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                        <i class="fas fa-check-circle mr-2"></i>票数合法性检查
+                    </a>
+                    <a href="index.html" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-home mr-2"></i>返回首页
+                    </a>
+                </div>
+            </div>
+            
+            <!-- 状态显示 -->
+            <div v-if="message" :class="messageClass" class="mb-6 p-4 rounded-lg">
+                {{ message }}
+            </div>
+            
+            <!-- 票券更新表单 -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4">批量更新票券</h2>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">管理员ID</label>
+                    <input v-model="adminId" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="输入管理员ID">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">票券更新列表</label>
+                    <div v-for="(ticket, index) in tickets" :key="index" class="border border-gray-200 rounded-md p-4 mb-3">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">日期</label>
+                                <input v-model="ticket.date" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">票券名称</label>
+                                <input v-model="ticket.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="票券名称">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">总票数</label>
+                                <input v-model.number="ticket.totalCount" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">剩余票数</label>
+                                <input v-model.number="ticket.remainingCount" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0">
+                            </div>
+                        </div>
+                        <button @click="removeTicket(index)" class="mt-2 px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm">删除</button>
+                    </div>
+                </div>
+                
+                <div class="flex gap-4">
+                    <button @click="addTicket" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">
+                        添加票券
+                    </button>
+                    <button @click="loadDefaultTickets" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+                        加载默认3天票券
+                    </button>
+                    <button @click="updateTickets" :disabled="!canUpdate" class="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                        批量更新
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 更新结果 -->
+            <div v-if="updateResult" class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">更新结果</h2>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600">{{ updateResult.totalCount }}</div>
+                            <div class="text-gray-600">总请求数</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-green-600">{{ updateResult.successCount }}</div>
+                            <div class="text-gray-600">成功数</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-red-600">{{ updateResult.failCount }}</div>
+                            <div class="text-gray-600">失败数</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-gray-600">{{ updateResult.timestamp }}</div>
+                            <div class="text-gray-600">时间戳</div>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-4">
+                        <h3 class="font-semibold mb-2">详细结果</h3>
+                        <div v-for="(result, index) in updateResult.updateResults" :key="index" class="border border-gray-200 rounded-md p-3 mb-2">
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium">{{ result.date }}</span>
+                                <span :class="getStatusClass(result.status)" class="px-2 py-1 rounded-full text-xs">
+                                    {{ result.status }}
+                                </span>
+                            </div>
+                            <div class="text-sm text-gray-600 mt-1">{{ result.message }}</div>
+                            <div v-if="result.oldTotalCount !== undefined" class="text-xs text-gray-500 mt-1">
+                                总票数: {{ result.oldTotalCount }} → {{ result.newTotalCount }} | 
+                                剩余票数: {{ result.oldRemainingCount }} → {{ result.newRemainingCount }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 当前票券状态 -->
+            <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+                <h2 class="text-xl font-semibold mb-4">当前票券状态</h2>
+                <button @click="refreshCurrentTickets" class="mb-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
+                    刷新状态
+                </button>
+                <div v-if="currentTickets.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div v-for="ticket in currentTickets" :key="ticket.date" class="border border-gray-200 rounded-md p-4">
+                        <h3 class="font-semibold text-lg">{{ ticket.name || '票券' }}</h3>
+                        <p class="text-gray-600">{{ ticket.date }}</p>
+                        <div class="mt-2 space-y-1 text-sm">
+                            <div>总票数: <span class="font-medium">{{ ticket.totalCount }}</span></div>
+                            <div>剩余票数: <span class="font-medium text-green-600">{{ ticket.remainingCount }}</span></div>
+                            <div>已售票数: <span class="font-medium text-red-600">{{ ticket.soldCount }}</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="text-gray-500 text-center py-8">
+                    暂无票券数据
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    adminId: 'admin',
+                    tickets: [],
+                    message: '',
+                    messageType: 'info',
+                    updateResult: null,
+                    currentTickets: []
+                };
+            },
+            computed: {
+                messageClass() {
+                    const base = 'p-4 rounded-lg';
+                    switch (this.messageType) {
+                        case 'success': return base + ' bg-green-100 text-green-800';
+                        case 'error': return base + ' bg-red-100 text-red-800';
+                        case 'warning': return base + ' bg-yellow-100 text-yellow-800';
+                        default: return base + ' bg-blue-100 text-blue-800';
+                    }
+                },
+                canUpdate() {
+                    return this.adminId && this.tickets.length > 0 && 
+                           this.tickets.every(t => t.date && t.totalCount !== null && t.remainingCount !== null);
+                }
+            },
+            mounted() {
+                this.loadDefaultTickets();
+                this.refreshCurrentTickets();
+            },
+            methods: {
+                addTicket() {
+                    this.tickets.push({
+                        date: '',
+                        name: '',
+                        totalCount: 100,
+                        remainingCount: 100
+                    });
+                },
+                removeTicket(index) {
+                    this.tickets.splice(index, 1);
+                },
+                loadDefaultTickets() {
+                    const today = new Date();
+                    const tomorrow = new Date(today);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    const dayAfterTomorrow = new Date(today);
+                    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+                    
+                    this.tickets = [
+                        {
+                            date: this.formatDate(today),
+                            name: '今日票券',
+                            totalCount: 100,
+                            remainingCount: 100
+                        },
+                        {
+                            date: this.formatDate(tomorrow),
+                            name: '明日票券',
+                            totalCount: 150,
+                            remainingCount: 150
+                        },
+                        {
+                            date: this.formatDate(dayAfterTomorrow),
+                            name: '后日票券',
+                            totalCount: 200,
+                            remainingCount: 200
+                        }
+                    ];
+                    
+                    this.showMessage('已加载默认3天票券', 'success');
+                },
+                formatDate(date) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                },
+                async updateTickets() {
+                    try {
+                        this.showMessage('正在更新票券...', 'info');
+                        
+                        const response = await axios.post('/api/tickets/admin/updateTicketsWithPessimistic', {
+                            adminId: this.adminId,
+                            ticketUpdates: this.tickets
+                        });
+                        
+                        if (response.data.success) {
+                            this.updateResult = response.data.data;
+                            this.showMessage('票券更新成功！', 'success');
+                            this.refreshCurrentTickets();
+                        } else {
+                            this.showMessage('票券更新失败: ' + response.data.message, 'error');
+                        }
+                    } catch (error) {
+                        console.error('更新失败:', error);
+                        this.showMessage('更新失败: ' + (error.response?.data?.message || error.message), 'error');
+                    }
+                },
+                async refreshCurrentTickets() {
+                    try {
+                        const response = await axios.get('/api/tickets/list');
+                        if (response.data.success) {
+                            this.currentTickets = response.data.data;
+                        }
+                    } catch (error) {
+                        console.error('获取票券状态失败:', error);
+                    }
+                },
+                getStatusClass(status) {
+                    switch (status) {
+                        case 'CREATED': return 'bg-green-100 text-green-800';
+                        case 'UPDATED': return 'bg-blue-100 text-blue-800';
+                        case 'FAILED': return 'bg-red-100 text-red-800';
+                        case 'ERROR': return 'bg-red-100 text-red-800';
+                        default: return 'bg-gray-100 text-gray-800';
+                    }
+                },
+                showMessage(message, type = 'info') {
+                    this.message = message;
+                    this.messageType = type;
+                    setTimeout(() => {
+                        this.message = '';
+                    }, 5000);
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

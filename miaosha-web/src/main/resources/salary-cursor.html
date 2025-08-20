@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>薪资计算器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36D399',
+                        neutral: '#F3F4F6',
+                        dark: '#1F2937',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto { content-visibility: auto; }
+            .card-shadow { box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
+            .input-focus { @apply focus:ring-2 focus:ring-primary/50 focus:border-primary; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-inter text-dark">
+    <!-- 导航栏 -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50 transition-all duration-300">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-calculator text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold text-primary">薪资计算器</h1>
+            </div>
+            <div class="hidden md:flex space-x-6">
+                <a href="#" class="text-gray-600 hover:text-primary transition-colors">首页</a>
+                <a href="#features" class="text-gray-600 hover:text-primary transition-colors">功能</a>
+                <a href="#how-to" class="text-gray-600 hover:text-primary transition-colors">使用说明</a>
+                <a href="#faq" class="text-gray-600 hover:text-primary transition-colors">常见问题</a>
+            </div>
+            <button class="md:hidden text-gray-600 focus:outline-none" id="mobile-menu-button">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+        </div>
+        <!-- 移动端菜单 -->
+        <div class="md:hidden hidden bg-white shadow-lg absolute w-full" id="mobile-menu">
+            <div class="container mx-auto px-4 py-3 flex flex-col space-y-3">
+                <a href="#" class="text-gray-600 hover:text-primary transition-colors py-2">首页</a>
+                <a href="#features" class="text-gray-600 hover:text-primary transition-colors py-2">功能</a>
+                <a href="#how-to" class="text-gray-600 hover:text-primary transition-colors py-2">使用说明</a>
+                <a href="#faq" class="text-gray-600 hover:text-primary transition-colors py-2">常见问题</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 英雄区域 -->
+    <section class="bg-gradient-to-r from-primary/90 to-primary py-16 md:py-24">
+        <div class="container mx-auto px-4 text-center">
+            <h2 class="text-[clamp(2rem,5vw,3.5rem)] font-bold text-white mb-4">简单高效的薪资计算工具</h2>
+            <p class="text-[clamp(1rem,2vw,1.25rem)] text-white/90 max-w-2xl mx-auto mb-8">
+                精确计算您的税后收入、社保公积金扣除和个人所得税，让薪资一目了然
+            </p>
+            <a href="#calculator" class="inline-block bg-white text-primary font-semibold px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300">
+                开始计算 <i class="fa-solid fa-arrow-right ml-2"></i>
+            </a>
+        </div>
+    </section>
+
+    <!-- 计算器主体 -->
+    <section id="calculator" class="py-16 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+                <div class="bg-primary/10 p-6 md:p-8">
+                    <h3 class="text-2xl font-bold text-primary mb-4">薪资计算</h3>
+                    <p class="text-gray-600 mb-6">填写您的薪资信息，获取详细计算结果</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- 收入信息 -->
+                        <div class="bg-white rounded-xl p-6 shadow-sm">
+                            <h4 class="text-lg font-semibold mb-4 text-gray-800">收入信息</h4>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="salary-type" class="block text-sm font-medium text-gray-700 mb-1">薪资类型</label>
+                                    <div class="flex items-center space-x-4">
+                                        <label class="inline-flex items-center cursor-pointer">
+                                            <input type="radio" name="salary-type" value="monthly" checked class="form-radio text-primary h-4 w-4">
+                                            <span class="ml-2 text-gray-700">月薪</span>
+                                        </label>
+                                        <label class="inline-flex items-center cursor-pointer">
+                                            <input type="radio" name="salary-type" value="hourly" class="form-radio text-primary h-4 w-4">
+                                            <span class="ml-2 text-gray-700">时薪</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div id="monthly-salary-group">
+                                    <label for="monthly-salary" class="block text-sm font-medium text-gray-700 mb-1">税前月薪 (元)</label>
+                                    <input type="number" id="monthly-salary" value="10000" min="0" step="100" class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus transition-all">
+                                </div>
+                                <div id="hourly-salary-group" class="hidden">
+                                    <label for="hourly-salary" class="block text-sm font-medium text-gray-700 mb-1">时薪 (元/小时)</label>
+                                    <input type="number" id="hourly-salary" value="50" min="0" step="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus transition-all">
+                                    <label for="working-hours" class="block text-sm font-medium text-gray-700 mb-1">每月工作小时数</label>
+                                    <input type="number" id="working-hours" value="160" min="0" step="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus transition-all">
+                                </div>
+                                <div>
+                                    <label for="bonus" class="block text-sm font-medium text-gray-700 mb-1">月度奖金 (元)</label>
+                                    <input type="number" id="bonus" value="0" min="0" step="100" class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus transition-all">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 扣除项 -->
+                        <div class="bg-white rounded-xl p-6 shadow-sm">
+                            <h4 class="text-lg font-semibold mb-4 text-gray-800">扣除项</h4>
+                            <div class="space-y-4">
+                                <div id="insurance-group">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">社保公积金</label>
+                                    <div class="flex items-center space-x-4 mb-2">
+                                        <label class="inline-flex items-center cursor-pointer">
+                                            <input type="radio" name="insurance-type" value="auto" checked class="form-radio text-primary h-4 w-4">
+                                            <span class="ml-2 text-gray-700">使用综合比例</span>
+                                        </label>
+                                        <label class="inline-flex items-center cursor-pointer">
+                                            <input type="radio" name="insurance-type" value="manual" class="form-radio text-primary h-4 w-4">
+                                            <span class="ml-2 text-gray-700">自定义各项比例</span>
+                                        </label>
+                                    </div>
+                                    <div id="insurance-auto-group">
+                                        <label for="insurance-rate" class="block text-sm font-medium text-gray-700 mb-1">综合比例 (%)</label>
+                                        <div class="flex items-center">
+                                            <input type="range" id="insurance-rate" min="0" max="30" value="22" step="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary">
+                                            <span id="insurance-rate-value" class="ml-2 text-sm font-medium text-primary">22%</span>
+                                        </div>
+                                    </div>
+                                    <div id="insurance-manual-group" class="hidden space-y-3 pt-2">
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label for="pension-rate" class="block text-xs text-gray-500 mb-1">养老保险 (%)</label>
+                                                <input type="number" id="pension-rate" value="8" min="0" max="30" step="0.5" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg input-focus text-sm">
+                                            </div>
+                                            <div>
+                                                <label for="medical-rate" class="block text-xs text-gray-500 mb-1">医疗保险 (%)</label>
+                                                <input type="number" id="medical-rate" value="2" min="0" max="30" step="0.5" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg input-focus text-sm">
+                                            </div>
+                                            <div>
+                                                <label for="unemployment-rate" class="block text-xs text-gray-500 mb-1">失业保险 (%)</label>
+                                                <input type="number" id="unemployment-rate" value="0.5" min="0" max="30" step="0.5" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg input-focus text-sm">
+                                            </div>
+                                            <div>
+                                                <label for="housing-fund-rate" class="block text-xs text-gray-500 mb-1">住房公积金 (%)</label>
+                                                <input type="number" id="housing-fund-rate" value="12" min="0" max="30" step="0.5" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg input-focus text-sm">
+                                            </div>
+                                        </div>
+                                        <div class="text-xs text-gray-500 text-right">
+                                            <span id="total-insurance-rate">总比例: 22.5%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="special-deduction" class="block text-sm font-medium text-gray-700 mb-1">专项附加扣除 (元)</label>
+                                    <select id="special-deduction" class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus transition-all">
+                                        <option value="0">无</option>
+                                        <option value="1000">子女教育 (1000元/月)</option>
+                                        <option value="1500">住房租金 (1500元/月)</option>
+                                        <option value="1000">房贷利息 (1000元/月)</option>
+                                        <option value="2000">赡养老人 (2000元/月)</option>
+                                        <option value="400">继续教育 (400元/月)</option>
+                                        <option value="8000">自定义</option>
+                                    </select>
+                                </div>
+                                <div id="custom-deduction-group" class="hidden">
+                                    <label for="custom-deduction" class="block text-sm font-medium text-gray-700 mb-1">自定义扣除金额 (元)</label>
+                                    <input type="number" id="custom-deduction" value="0" min="0" step="100" class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus transition-all">
+                                </div>
+                                <div>
+                                    <label for="other-deduction" class="block text-sm font-medium text-gray-700 mb-1">其他扣除 (元)</label>
+                                    <input type="number" id="other-deduction" value="0" min="0" step="100" class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus transition-all">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 text-center">
+                        <button id="calculate-btn" class="bg-primary hover:bg-primary/90 text-white font-semibold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-300">
+                            <i class="fa-solid fa-calculator mr-2"></i>计算薪资
+                        </button>
+                    </div>
+                </div>
+                <!-- 计算结果 -->
+                <div class="p-6 md:p-8">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-6">计算结果</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+                            <p class="text-sm text-gray-500 mb-1">税前总收入</p>
+                            <p id="gross-income" class="text-2xl font-bold text-gray-800">¥10,000.00</p>
+                        </div>
+                        <div class="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+                            <p class="text-sm text-gray-500 mb-1">社保公积金</p>
+                            <p id="insurance-amount" class="text-2xl font-bold text-gray-800">¥2,200.00</p>
+                        </div>
+                        <div class="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+                            <p class="text-sm text-gray-500 mb-1">个人所得税</p>
+                            <p id="tax-amount" class="text-2xl font-bold text-gray-800">¥230.00</p>
+                        </div>
+                        <div class="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+                            <p class="text-sm text-gray-500 mb-1">专项附加扣除</p>
+                            <p id="special-deduction-amount" class="text-2xl font-bold text-gray-800">¥0.00</p>
+                        </div>
+                        <div class="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+                            <p class="text-sm text-gray-500 mb-1">其他扣除</p>
+                            <p id="other-deduction-amount" class="text-2xl font-bold text-gray-800">¥0.00</p>
+                        </div>
+                        <div class="bg-secondary/10 border border-secondary/20 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+                            <p class="text-sm text-gray-600 mb-1">税后实发工资</p>
+                            <p id="net-income" class="text-2xl font-bold text-secondary">¥7,570.00</p>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-6 mb-8">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-800">详细计算过程</h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead>
+                                    <tr>
+                                        <th class="px-6 py-3 bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">项目</th>
+                                        <th class="px-6 py-3 bg-gray-100 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">金额 (元)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200" id="calculation-details">
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">月薪</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">¥10,000.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">奖金</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">¥0.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">应纳税所得额</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">¥2,800.00</td>
+                                    </tr>
+                                    <tr class="bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">社保公积金 (22%)</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">¥2,200.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">养老保险 (8%)</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">¥800.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">医疗保险 (2%)</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">¥200.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">失业保险 (0.5%)</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">¥50.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">住房公积金 (12%)</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">¥1,200.00</td>
+                                    </tr>
+                                    <tr class="bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">个人所得税</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">¥230.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">起征点</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">¥5,000.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">税率</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">3%</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">速算扣除数</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">¥0.00</td>
+                                    </tr>
+                                    <tr class="bg-secondary/10">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-secondary">税后实发工资</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-secondary text-right">¥7,570.00</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="flex justify-center">
+                        <button id="export-btn" class="bg-gray-800 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300">
+                            <i class="fa-solid fa-download mr-2"></i>导出结果
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 功能特点 -->
+    <section id="features" class="py-16 bg-gray-50">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">功能特点</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto">我们的薪资计算器提供全面的功能，满足您的各种薪资计算需求</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                    <div class="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-calculator text-primary text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-3">精准计算</h3>
+                    <p class="text-gray-600">基于最新税法政策，精确计算社保公积金和个人所得税，确保结果准确可靠</p>
+                </div>
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                    <div class="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-sliders text-primary text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-3">灵活配置</h3>
+                    <p class="text-gray-600">支持自定义社保比例、专项附加扣除等参数，适应不同地区和个人情况</p>
+                </div>
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                    <div class="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-file-text text-primary text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-3">详细报告</h3>
+                    <p class="text-gray-600">提供全面的计算明细，让您清楚了解每一项扣除和税收的计算过程</p>
+                </div>
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                    <div class="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-mobile text-primary text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-3">移动适配</h3>
+                    <p class="text-gray-600">完全响应式设计，在手机、平板和电脑上都能获得最佳使用体验</p>
+                </div>
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                    <div class="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-download text-primary text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-3">结果导出</h3>
+                    <p class="text-gray-600">支持将计算结果导出保存，方便您记录和分享薪资信息</p>
+                </div>
+                <div class="bg-white rounded-xl p-8 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                    <div class="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-shield text-primary text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-3">数据安全</h3>
+                    <p class="text-gray-600">所有计算在本地完成，不会上传您的个人薪资信息，保障隐私安全</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 使用说明 -->
+    <section id="how-to" class="py-16 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">使用说明</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto">简单几步，轻松获取您的薪资明细</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="flex flex-col items-center">
+                    <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-white text-2xl font-bold mb-6">1</div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-3 text-center">填写基本信息</h3>
+                    <p class="text-gray-600 text-center">选择薪资类型（月薪或时薪），输入您的收入金额和奖金</p>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-white text-2xl font-bold mb-6">2</div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-3 text-center">设置扣除项目</h3>
+                    <p class="text-gray-600 text-center">调整社保公积金比例，添加专项附加扣除和其他扣除项目</p>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-white text-2xl font-bold mb-6">3</div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-3 text-center">获取计算结果</h3>
+                    <p class="text-gray-600 text-center">点击计算按钮，查看详细的薪资计算结果和税收明细</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 常见问题 -->
+    <section id="faq" class="py-16 bg-gray-50">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">常见问题</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto">解答您在使用薪资计算器时可能遇到的问题</p>
+            </div>
+            <div class="max-w-3xl mx-auto space-y-4">
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                    <button class="faq-toggle w-full flex justify-between items-center p-6 text-left focus:outline-none">
+                        <span class="font-semibold text-gray-800">社保公积金比例如何确定？</span>
+                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="faq-content hidden px-6 pb-6">
+                        <p class="text-gray-600">社保公积金比例根据不同地区和公司政策有所不同。一般来说，养老保险个人缴纳比例为8%，医疗保险为2%，失业保险为0.5%，住房公积金为5%-12%。您可以根据实际情况调整计算器中的比例。</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                    <button class="faq-toggle w-full flex justify-between items-center p-6 text-left focus:outline-none">
+                        <span class="font-semibold text-gray-800">什么是专项附加扣除？</span>
+                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="faq-content hidden px-6 pb-6">
+                        <p class="text-gray-600">专项附加扣除是指个人所得税法规定的子女教育、继续教育、大病医疗、住房贷款利息、住房租金和赡养老人等六项专项附加扣除。这些扣除可以在计算应纳税所得额时从收入中扣除，从而减少个人所得税负担。</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                    <button class="faq-toggle w-full flex justify-between items-center p-6 text-left focus:outline-none">
+                        <span class="font-semibold text-gray-800">计算结果与实际发放工资不符怎么办？</span>
+                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="faq-content hidden px-6 pb-6">
+                        <p class="text-gray-600">计算结果可能与实际发放工资存在差异，主要原因可能包括：公司社保公积金缴纳基数与您输入的不同、有其他未计入的扣除项目、个人所得税计算方式有调整等。建议您向公司人力资源部门咨询详细的工资构成和扣除明细。</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                    <button class="faq-toggle w-full flex justify-between items-center p-6 text-left focus:outline-none">
+                        <span class="font-semibold text-gray-800">年终奖如何计算个人所得税？</span>
+                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="faq-content hidden px-6 pb-6">
+                        <p class="text-gray-600">根据现行税法，年终奖可以选择单独计税或并入综合所得计税。单独计税是将年终奖除以12个月，按其商数确定适用税率和速算扣除数；并入综合所得计税则是将年终奖与全年综合所得合并计算个人所得税。您可以根据自己的情况选择更优惠的计税方式。</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                    <button class="faq-toggle w-full flex justify-between items-center p-6 text-left focus:outline-none">
+                        <span class="font-semibold text-gray-800">计算器的数据安全吗？</span>
+                        <i class="fa-solid fa-chevron-down text-gray-500 transition-transform duration-300"></i>
+                    </button>

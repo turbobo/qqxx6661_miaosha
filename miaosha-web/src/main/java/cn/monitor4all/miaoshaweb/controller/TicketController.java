@@ -10,6 +10,7 @@ import cn.monitor4all.miaoshaservice.service.MiaoshaStatusService;
 import cn.monitor4all.miaoshaservice.service.TicketOptimisticUpdateService;
 import cn.monitor4all.miaoshaservice.service.TicketService;
 import cn.monitor4all.miaoshaservice.service.UserService;
+import com.google.common.util.concurrent.RateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -19,10 +20,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -42,6 +40,10 @@ public class TicketController {
 
     @Resource
     private UserService userService;
+
+
+    // Guava令牌桶：每秒放行10个请求
+    RateLimiter rateLimiter = RateLimiter.create(10);
     
     // 获取最近3天的票券信息
     @GetMapping("/list")
@@ -138,6 +140,9 @@ public class TicketController {
      *   时间验证   用户状态    接口限流   订单生成   异步通知
      *     ↓           ↓         ↓         ↓         ↓
      *   快速失败   快速失败    快速失败   缓存更新   监控记录
+     *
+     *   限流 → 合法性校验 → 参数校验 → 防重放 → 库存预扣 → 核心业务 → 结果返回
+     *   核心原则：“轻量拦截在前，重操作在后”，用最低的成本（限流、缓存校验）拦截尽可能多的无效请求，让真正有效的请求进入核心业务流程，从而在高并发场景下保证系统的稳定性和安全性。
      * @param request
      * @param httpRequest
      * @return
@@ -147,48 +152,13 @@ public class TicketController {
         try {
             LOGGER.info("开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
 
-            // 用户访问票数页面，生成MD5字段
-            // 抢购，携带MD5字段
-
-            // 1、用户限流
-            // 参数、验证码 校验
-            // 验证是否在抢购时间内
-            // 接口限流
-            // 3、用户、票数校验
-            // 4、乐观锁更新票券库存
-            // 5、生成订单
-            // 6、返回选购成功
-            // 7、查询订单
-
-
-            int count = userService.addUserCount(request.getUserId());
-            LOGGER.info("用户截至该次的访问次数为: [{}]", count);
-            boolean isBanned = userService.getUserIsBanned(request.getUserId());
-            if (isBanned) {
-                return ApiResponse.error("购买失败，超过频率限制");
-            }
-            
-            // 参数验证
-            String purchaseDate = request.getDate();
-            if (purchaseDate == null || purchaseDate.isEmpty()) {
-                LOGGER.warn("日期格式错误，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
-                return ApiResponse.error("日期格式错误或日期不能为空");
-            }
-            
-            // 使用前端传递的userId，允许匿名用户
-            Long userId = request.getUserId();
-            if (Objects.isNull(userId)) {
-                userId = User.ANONYMOUS; // 默认匿名用户
-                LOGGER.info("用户ID为空，使用默认匿名用户ID: {}", userId);
-            }
-            
             // 调用服务层购买票券
-            PurchaseRecord record = ticketService.purchaseTicket(String.valueOf(userId), purchaseDate);
+            ApiResponse<PurchaseRecord> response = ticketService.purchaseTicket(request);
             
-            LOGGER.info("票券购买成功，用户ID: {}, 日期: {}, 票券编号: {}", 
-                userId, purchaseDate, record.getTicketCode());
+            LOGGER.info("票券购买成功，用户ID: {}, 日期: {}, 票券编号: {}",
+                    request.getUserId(), request.getDate(), response.getData().getTicketCode());
             
-            return ApiResponse.success(record);
+            return response;
             
         } catch (IllegalArgumentException e) {
             LOGGER.warn("票券购买参数错误: {}", e.getMessage());
@@ -205,47 +175,18 @@ public class TicketController {
     @PostMapping("/v2/purchase")
     public ApiResponse<PurchaseRecord> purchaseTicketV2(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
         try {
-            LOGGER.info("开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+            LOGGER.info("开始处理票券购买请求V2，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
 
-            // 1. 请求参数校验
-
-            // 前置校验
-
-            // 限流检查
-
-            // 异步处理
-
-            // 返回结果
-
-            // 调用服务层购买票券
+            // 调用服务层购买票券V2版本
             PurchaseRecord record = ticketService.purchaseTicketV2(request);
-
-//            // 2. 用户限流检查
-//            if (isUserRateLimited(request.getUserId())) {
-//                return ApiResponse.error("用户访问频率过高，请稍后再试");
-//            }
-//
-//            // 3. 接口限流检查
-//            if (isApiRateLimited()) {
-//                return ApiResponse.error("系统繁忙，请稍后再试");
-//            }
-//
-//            // 4. 业务逻辑处理（异步）
-//            CompletableFuture<PurchaseRecord> future = processPurchaseAsync(request);
-//
-//            // 5. 等待结果（设置超时）
-//            PurchaseRecord record = future.get(5, TimeUnit.SECONDS);
-//
-//            LOGGER.info("票券购买成功，用户ID: {}, 日期: {}, 票券编号: {}",
-//                    request.getUserId(), request.getDate(), record.getTicketCode());
-
+            
+            LOGGER.info("票券购买V2成功，用户ID: {}, 日期: {}, 票券编号: {}",
+                    request.getUserId(), request.getDate(), record.getTicketCode());
+            
             return ApiResponse.success(record);
-
-        } catch (TimeoutException e) {
-            LOGGER.warn("票券购买超时，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
-            return ApiResponse.error("购买处理超时，请稍后查询订单状态");
+            
         } catch (Exception e) {
-            LOGGER.error("票券购买失败，用户ID: {}, 日期: {}", request.getUserId(), request.getDate(), e);
+            LOGGER.error("票券购买V2失败，用户ID: {}, 日期: {}", request.getUserId(), request.getDate(), e);
             return ApiResponse.error("购买失败，请重试");
         }
     }

@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>票券管理系统</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .nav-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #ddd; }
+        .nav-tab { padding: 10px 20px; cursor: pointer; border: none; background: none; }
+        .nav-tab.active { border-bottom: 2px solid #007bff; color: #007bff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .section { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-danger { background: #dc3545; color: white; }
+        .ticket-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .ticket-card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .status-processing { background: #fff3cd; color: #856404; }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .progress-bar { width: 100%; height: 20px; background: #eee; border-radius: 10px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #28a745; transition: width 0.3s; }
+        .log { background: #f8f9fa; padding: 10px; border-radius: 4px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎫 票券管理系统</h1>
+            <p>支持同步抢购(V1)和异步抢购(V2)，实时监控票券状态</p>
+        </div>
+        
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('overview')">概览</button>
+            <button class="nav-tab" onclick="showTab('purchase')">抢购</button>
+            <button class="nav-tab" onclick="showTab('tickets')">票券列表</button>
+            <button class="nav-tab" onclick="showTab('admin')">管理</button>
+        </div>
+        
+        <!-- 概览页面 -->
+        <div id="overview" class="tab-content active">
+            <div class="section">
+                <h3>📊 票券统计概览</h3>
+                <div id="statsOverview">
+                    <p>总票数: <span id="totalTickets">-</span></p>
+                    <p>剩余票数: <span id="remainingTickets">-</span></p>
+                    <p>已售票数: <span id="soldTickets">-</span></p>
+                    <p>售出率: <span id="sellRate">-</span>%</p>
+                </div>
+                <button class="btn btn-primary" onclick="refreshStats()">刷新统计</button>
+            </div>
+            
+            <div class="section">
+                <h3>🎯 秒杀活动状态</h3>
+                <div id="miaoshaStatus">加载中...</div>
+                <button class="btn btn-primary" onclick="getMiaoshaStatus()">刷新状态</button>
+            </div>
+        </div>
+        
+        <!-- 抢购页面 -->
+        <div id="purchase" class="tab-content">
+            <div class="section">
+                <h3>🚀 票券抢购</h3>
+                <div class="form-group">
+                    <label for="purchaseUserId">用户ID:</label>
+                    <input type="number" id="purchaseUserId" value="1001">
+                </div>
+                <div class="form-group">
+                    <label for="purchaseDate">票券日期:</label>
+                    <input type="text" id="purchaseDate" value="2025-01-15">
+                </div>
+                <div class="form-group">
+                    <label for="purchaseVerifyHash">验证码:</label>
+                    <input type="text" id="purchaseVerifyHash" value="test123">
+                </div>
+                
+                <button class="btn btn-primary" onclick="getVerifyHash()">获取验证码</button>
+                <button class="btn btn-success" onclick="purchaseTicketV1()">同步抢购(V1)</button>
+                <button class="btn btn-warning" onclick="purchaseTicketV2()">异步抢购(V2)</button>
+                
+                <div id="purchaseStatus" class="status hidden"></div>
+                <div id="purchaseProgress" class="progress-bar hidden">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
+                <div id="purchaseResult"></div>
+            </div>
+            
+            <div class="section">
+                <h3>⏱️ 抢购进度监控</h3>
+                <div id="pollingStatus">等待抢购请求...</div>
+                <div id="pollingLog" class="log hidden"></div>
+            </div>
+        </div>
+        
+        <!-- 票券列表页面 -->
+        <div id="tickets" class="tab-content">
+            <div class="section">
+                <h3>🎫 票券详细信息</h3>
+                <button class="btn btn-primary" onclick="loadTickets()">加载票券</button>
+                <button class="btn btn-success" onclick="validateTime()">验证抢购时间</button>
+                <button class="btn btn-warning" onclick="validateTicketCount()">验证票数</button>
+            </div>
+            
+            <div id="ticketsGrid" class="ticket-grid"></div>
+        </div>
+        
+        <!-- 管理页面 -->
+        <div id="admin" class="tab-content">
+            <div class="section">
+                <h3>🔄 票券更新</h3>
+                <button class="btn btn-primary" onclick="updateDailyTickets()">更新每日票券</button>
+                <button class="btn btn-warning" onclick="pauseMiaosha()">暂停秒杀</button>
+                <button class="btn btn-success" onclick="resumeMiaosha()">恢复秒杀</button>
+            </div>
+            
+            <div class="section">
+                <h3>📝 票数修改</h3>
+                <div class="form-group">
+                    <label for="adminId">管理员ID:</label>
+                    <input type="text" id="adminId" value="admin">
+                </div>
+                <div class="form-group">
+                    <label for="ticketDate">票券日期:</label>
+                    <input type="text" id="ticketDate" value="2025-01-15">
+                </div>
+                <div class="form-group">
+                    <label for="ticketTotal">总票数:</label>
+                    <input type="number" id="ticketTotal" value="100">
+                </div>
+                <div class="form-group">
+                    <label for="ticketRemaining">剩余票数:</label>
+                    <input type="number" id="ticketRemaining" value="80">
+                </div>
+                
+                <button class="btn btn-primary" onclick="updateTicketsWithPessimistic()">悲观锁更新</button>
+                <button class="btn btn-warning" onclick="updateTicketsWithOptimistic()">乐观锁更新</button>
+                <button class="btn btn-success" onclick="getOptimisticRetryStats()">重试统计</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentMessageId = null;
+        let pollingInterval = null;
+        let pollingStartTime = null;
+        const POLLING_TIMEOUT = 120000; // 2分钟超时
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTickets();
+            refreshStats();
+            getMiaoshaStatus();
+        });
+        
+        // 标签页切换
+        function showTab(tabName) {
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            const navTabs = document.querySelectorAll('.nav-tab');
+            navTabs.forEach(tab => tab.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            
+            if (tabName === 'overview') {
+                refreshStats();
+                getMiaoshaStatus();
+            } else if (tabName === 'tickets') {
+                loadTickets();
+            }
+        }
+        
+        // 日志记录
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('pollingLog');
+            if (!logContainer) return;
+            
+            logContainer.classList.remove('hidden');
+            const timestamp = new Date().toLocaleTimeString();
+            logContainer.innerHTML += `[${timestamp}] ${message}\n`;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        // 更新状态显示
+        function updateStatus(message, type) {
+            const statusDiv = document.getElementById('purchaseStatus');
+            if (!statusDiv) return;
+            
+            statusDiv.textContent = message;
+            statusDiv.className = `status status-${type}`;
+            statusDiv.classList.remove('hidden');
+        }
+        
+        // 更新进度条
+        function updateProgress(percentage) {
+            const progressFill = document.getElementById('progressFill');
+            if (progressFill) {
+                progressFill.style.width = percentage + '%';
+            }
+        }
+        
+        // 显示结果
+        function showResult(data, title = '抢购结果') {
+            const resultDiv = document.getElementById('purchaseResult');
+            if (!resultDiv) return;
+            
+            resultDiv.innerHTML = `<h4>${title}</h4><pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+        
+        // 加载票券列表
+        async function loadTickets() {
+            try {
+                const response = await fetch('/tickets/list');
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    displayTickets(data.data);
+                } else {
+                    alert('加载票券失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('加载票券异常: ' + error.message);
+            }
+        }
+        
+        // 显示票券列表
+        function displayTickets(tickets) {
+            const grid = document.getElementById('ticketsGrid');
+            if (!grid) return;
+            
+            grid.innerHTML = '';
+            
+            tickets.forEach(ticket => {
+                const card = document.createElement('div');
+                card.className = 'ticket-card';
+                
+                const sellRate = ticket.total > 0 ? ((ticket.total - ticket.remaining) / ticket.total * 100).toFixed(1) : 0;
+                
+                card.innerHTML = `
+                    <h4>${ticket.date}</h4>
+                    <p>总票数: ${ticket.total}</p>
+                    <p>剩余票数: ${ticket.remaining}</p>
+                    <p>已售票数: ${ticket.total - ticket.remaining}</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${sellRate}%"></div>
+                    </div>
+                    <p>售出率: ${sellRate}%</p>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+        
+        // 刷新统计信息
+        async function refreshStats() {
+            try {
+                const response = await fetch('/tickets/stats');
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    const stats = data.data;
+                    document.getElementById('totalTickets').textContent = stats.totalTickets;
+                    document.getElementById('remainingTickets').textContent = stats.remainingTickets;
+                    document.getElementById('soldTickets').textContent = stats.soldTickets;
+                    document.getElementById('sellRate').textContent = stats.sellRate;
+                } else {
+                    alert('获取统计信息失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('获取统计信息异常: ' + error.message);
+            }
+        }
+        
+        // 获取秒杀状态
+        async function getMiaoshaStatus() {
+            try {
+                const response = await fetch('/tickets/miaosha/status');
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    const status = data.data;
+                    const statusDiv = document.getElementById('miaoshaStatus');
+                    
+                    statusDiv.innerHTML = `
+                        <p>状态: ${status.paused ? '⏸️ 已暂停' : '▶️ 运行中'}</p>
+                        <p>状态描述: ${status.status}</p>
+                        <p>操作员: ${status.operator || '未知'}</p>
+                    `;
+                } else {
+                    document.getElementById('miaoshaStatus').innerHTML = '获取状态失败: ' + data.message;
+                }
+            } catch (error) {
+                document.getElementById('miaoshaStatus').innerHTML = '获取状态异常: ' + error.message;
+            }
+        }
+        
+        // 获取验证码
+        async function getVerifyHash() {
+            const userId = document.getElementById('purchaseUserId').value;
+            const date = document.getElementById('purchaseDate').value;
+            
+            if (!userId || !date) {
+                alert('请填写用户ID和票券日期');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/tickets/getVerifyHash?date=${date}&userId=${userId}`);
+                const result = await response.text();
+                
+                if (result.includes('获取验证hash失败')) {
+                    alert('获取验证码失败: ' + result);
+                } else {
+                    document.getElementById('purchaseVerifyHash').value = result.split('：')[1];
+                    alert('验证码已获取: ' + result);
+                }
+            } catch (error) {
+                alert('获取验证码异常: ' + error.message);
+            }
+        }
+        
+        // 同步抢购(V1)
+        async function purchaseTicketV1() {
+            const userId = document.getElementById('purchaseUserId').value;
+            const date = document.getElementById('purchaseDate').value;
+            const verifyHash = document.getElementById('purchaseVerifyHash').value;
+            
+            if (!userId || !date || !verifyHash) {
+                alert('请填写完整信息');
+                return;
+            }
+            
+            updateStatus('正在同步抢购中...', 'processing');
+            document.getElementById('purchaseProgress').classList.remove('hidden');
+            updateProgress(50);
+            
+            try {
+                const response = await fetch('/tickets/v1/purchase', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: parseInt(userId),
+                        date: date,
+                        verifyHash: verifyHash
+                    })
+                });
+                
+                const data = await response.json();
+                updateProgress(100);
+                
+                if (data.code === 200) {
+                    updateStatus('抢购成功！', 'success');
+                    showResult(data.data, '抢购成功');
+                    refreshStats();
+                    loadTickets();
+                } else {
+                    updateStatus('抢购失败: ' + data.message, 'error');
+                    showResult(data, '抢购失败');
+                }
+            } catch (error) {
+                updateStatus('抢购异常: ' + error.message, 'error');
+                showResult({ error: error.message }, '抢购异常');
+            }
+        }
+        
+        // 异步抢购(V2)
+        async function purchaseTicketV2() {
+            const userId = document.getElementById('purchaseUserId').value;
+            const date = document.getElementById('purchaseDate').value;
+            const verifyHash = document.getElementById('purchaseVerifyHash').value;
+            
+            if (!userId || !date || !verifyHash) {
+                alert('请填写完整信息');
+                return;
+            }
+            
+            updateStatus('正在提交异步抢购请求...', 'processing');
+            document.getElementById('purchaseProgress').classList.remove('hidden');
+            updateProgress(20);
+            
+            try {
+                const response = await fetch('/tickets/v2/purchase', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: parseInt(userId),
+                        date: date,
+                        verifyHash: verifyHash
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    if (data.data.orderExists) {
+                        updateStatus('用户已有该日期的订单', 'success');
+                        showResult(data.data, '订单已存在');
+                        updateProgress(100);
+                    } else {
+                        currentMessageId = data.data.messageId;
+                        updateStatus('抢购请求已提交，正在异步处理中...', 'processing');
+                        updateProgress(40);
+                        
+                        // 开始轮询
+                        startPolling();
+                    }
+                } else {
+                    updateStatus('抢购请求失败: ' + data.message, 'error');
+                    showResult(data, '抢购请求失败');
+                }
+            } catch (error) {
+                updateStatus('抢购请求异常: ' + error.message, 'error');
+                showResult({ error: error.message }, '抢购请求异常');
+            }
+        }
+        
+        // 开始轮询
+        function startPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            pollingStartTime = Date.now();
+            log('开始轮询查询抢购结果，消息ID: ' + currentMessageId);
+            
+            // 每500ms轮询一次
+            pollingInterval = setInterval(() => {
+                pollPurchaseResult();
+            }, 500);
+        }
+        
+        // 轮询查询抢购结果
+        async function pollPurchaseResult() {
+            if (!currentMessageId) {
+                stopPolling();
+                return;
+            }
+            
+            // 检查超时
+            if (Date.now() - pollingStartTime > POLLING_TIMEOUT) {
+                log('轮询超时(2分钟)，停止轮询');
+                updateStatus('轮询超时，请稍后重试', 'error');
+                showResult({ 
+                    message: '轮询超时，请稍后重试',
+                    messageId: currentMessageId,
+                    timeout: true
+                }, '轮询超时');
+                stopPolling();
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/tickets/v2/purchase/result?messageId=${currentMessageId}`);
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    const result = data.data;
+                    log(`查询结果: ${result.status}`);
+                    
+                    if (result.status === 'SUCCESS') {
+                        log('抢购成功！');
+                        updateStatus('异步抢购成功！', 'success');
+                        updateProgress(100);
+                        showResult(result, '异步抢购成功');
+                        stopPolling();
+                        refreshStats();
+                        loadTickets();
+                        
+                    } else if (result.status === 'FAILED') {
+                        log(`抢购失败: ${result.errorMessage}`);
+                        updateStatus(`异步抢购失败: ${result.errorMessage}`, 'error');
+                        updateProgress(100);
+                        showResult(result, '异步抢购失败');
+                        stopPolling();
+                        
+                    } else if (result.status === 'PROCESSING') {
+                        log('正在处理中...');
+                        updateStatus('正在处理中...', 'processing');
+                        updateProgress(60);
+                        
+                    } else if (result.status === 'PENDING') {
+                        log('等待处理中...');
+                        updateStatus('等待处理中...', 'processing');
+                        updateProgress(50);
+                    }
+                    
+                } else {
+                    log(`查询失败: ${data.message}`);
+                }
+            } catch (error) {
+                log(`查询异常: ${error.message}`);
+            }
+        }
+        
+        // 停止轮询
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                currentMessageId = null;
+                pollingStartTime = null;
+                log('停止轮询');
+            }
+        }
+        
+        // 验证抢购时间
+        async function validateTime() {
+            const date = document.getElementById('purchaseDate').value;
+            if (!date) {
+                alert('请选择票券日期');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/tickets/validateTime?date=${date}`);
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    const result = data.data;
+                    alert(`时间验证结果: ${result.valid ? '可以抢购' : '不能抢购'}\n${result.message || ''}`);
+                } else {
+                    alert('时间验证失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('时间验证异常: ' + error.message);
+            }
+        }
+        
+        // 验证票数
+        async function validateTicketCount() {
+            const date = document.getElementById('purchaseDate').value;
+            if (!date) {
+                alert('请选择票券日期');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/tickets/validateTicketCount?date=${date}`);
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    const result = data.data;
+                    alert(`票数验证结果: ${result.valid ? '票数合法' : '票数不合法'}\n${result.message || ''}`);
+                } else {
+                    alert('票数验证失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('票数验证异常: ' + error.message);
+            }
+        }
+        
+        // 管理员功能
+        async function updateDailyTickets() {
+            try {
+                const response = await fetch('/tickets/admin/updateDailyTickets', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    alert('每日票券更新成功');
+                    refreshStats();
+                    loadTickets();
+                } else {
+                    alert('更新失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('更新异常: ' + error.message);
+            }
+        }
+        
+        async function pauseMiaosha() {
+            try {
+                const response = await fetch('/tickets/admin/pauseMiaosha', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    alert('秒杀活动已暂停');
+                    getMiaoshaStatus();
+                } else {
+                    alert('暂停失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('暂停异常: ' + error.message);
+            }
+        }
+        
+        async function resumeMiaosha() {
+            try {
+                const response = await fetch('/tickets/admin/resumeMiaosha', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    alert('秒杀活动已恢复');
+                    getMiaoshaStatus();
+                } else {
+                    alert('恢复失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('恢复异常: ' + error.message);
+            }
+        }
+        
+        async function updateTicketsWithPessimistic() {
+            const adminId = document.getElementById('adminId').value;
+            const date = document.getElementById('ticketDate').value;
+            const total = document.getElementById('ticketTotal').value;
+            const remaining = document.getElementById('ticketRemaining').value;
+            
+            if (!adminId || !date || !total || !remaining) {
+                alert('请填写完整信息');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/tickets/admin/updateTicketsWithPessimistic', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        adminId: adminId,
+                        ticketUpdates: [{
+                            date: date,
+                            total: parseInt(total),
+                            remaining: parseInt(remaining)
+                        }]
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    alert('悲观锁更新成功');
+                    refreshStats();
+                    loadTickets();
+                } else {
+                    alert('更新失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('更新异常: ' + error.message);
+            }
+        }
+        
+        async function updateTicketsWithOptimistic() {
+            const adminId = document.getElementById('adminId').value;
+            const date = document.getElementById('ticketDate').value;
+            const total = document.getElementById('ticketTotal').value;
+            const remaining = document.getElementById('ticketRemaining').value;
+            
+            if (!adminId || !date || !total || !remaining) {
+                alert('请填写完整信息');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/tickets/admin/updateTicketsWithOptimistic', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        adminId: adminId,
+                        ticketUpdates: [{
+                            date: date,
+                            total: parseInt(total),
+                            remaining: parseInt(remaining)
+                        }]
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    alert('乐观锁更新成功');
+                    refreshStats();
+                    loadTickets();
+                } else {
+                    alert('更新失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('更新异常: ' + error.message);
+            }
+        }
+        
+        async function getOptimisticRetryStats() {
+            try {
+                const response = await fetch('/tickets/admin/optimisticRetryStats');
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    showResult(data.data, '乐观锁重试统计');
+                } else {
+                    alert('获取统计失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('获取统计异常: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

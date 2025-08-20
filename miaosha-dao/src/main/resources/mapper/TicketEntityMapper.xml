@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.monitor4all.miaoshadao.mapper.TicketEntityMapper">
+    
+    <resultMap id="BaseResultMap" type="cn.monitor4all.miaoshadao.dao.TicketEntity">
+        <id column="id" jdbcType="INTEGER" property="id"/>
+        <result column="date" jdbcType="VARCHAR" property="date"/>
+        <result column="name" jdbcType="VARCHAR" property="name"/>
+        <result column="total_count" jdbcType="INTEGER" property="totalCount"/>
+        <result column="remaining_count" jdbcType="INTEGER" property="remainingCount"/>
+        <result column="sold_count" jdbcType="INTEGER" property="soldCount"/>
+        <result column="version" jdbcType="INTEGER" property="version"/>
+        <result column="status" jdbcType="INTEGER" property="status"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="update_time" jdbcType="TIMESTAMP" property="updateTime"/>
+    </resultMap>
+    
+    <sql id="Base_Column_List">
+        id, date, name, total_count, remaining_count, sold_count, version, status, create_time, update_time
+    </sql>
+    
+    <select id="selectByPrimaryKey" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from ticket
+        where id = #{id,jdbcType=INTEGER}
+    </select>
+    
+    <select id="selectByDate" parameterType="java.lang.String" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from ticket
+        where date = #{date,jdbcType=VARCHAR} and status = 1
+    </select>
+    
+    <select id="selectByDateForUpdate" parameterType="java.lang.String" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from ticket
+        where date = #{date,jdbcType=VARCHAR} and status = 1
+        for update
+    </select>
+    
+    <select id="selectRecentTickets" parameterType="java.lang.String" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from ticket
+        where date >= #{startDate,jdbcType=VARCHAR} and date &lt;= #{endDate,jdbcType=VARCHAR} and status = 1
+        order by date asc
+    </select>
+    
+    <select id="selectAllActiveTickets" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from ticket
+        where status = 1
+        order by date asc
+    </select>
+    
+    <insert id="insert" parameterType="cn.monitor4all.miaoshadao.dao.TicketEntity">
+        insert into ticket (date, name, total_count, remaining_count, sold_count, version, status)
+        values (#{date,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{totalCount,jdbcType=INTEGER},
+                #{remainingCount,jdbcType=INTEGER}, #{soldCount,jdbcType=INTEGER}, #{version,jdbcType=INTEGER}, #{status,jdbcType=INTEGER})
+    </insert>
+    
+    <insert id="insertSelective" parameterType="cn.monitor4all.miaoshadao.dao.TicketEntity">
+        insert into ticket
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="date != null">date,</if>
+            <if test="name != null">name,</if>
+            <if test="totalCount != null">total_count,</if>
+            <if test="remainingCount != null">remaining_count,</if>
+            <if test="soldCount != null">sold_count,</if>
+            <if test="version != null">version,</if>
+            <if test="status != null">status,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="date != null">#{date,jdbcType=VARCHAR},</if>
+            <if test="name != null">#{name,jdbcType=VARCHAR},</if>
+            <if test="totalCount != null">#{totalCount,jdbcType=INTEGER},</if>
+            <if test="remainingCount != null">#{remainingCount,jdbcType=INTEGER},</if>
+            <if test="soldCount != null">#{soldCount,jdbcType=INTEGER},</if>
+            <if test="version != null">#{version,jdbcType=INTEGER},</if>
+            <if test="status != null">#{status,jdbcType=INTEGER},</if>
+        </trim>
+    </insert>
+    
+    <update id="updateByPrimaryKey" parameterType="cn.monitor4all.miaoshadao.dao.TicketEntity">
+        update ticket
+        set date = #{date,jdbcType=VARCHAR},
+            name = #{name,jdbcType=VARCHAR},
+            total_count = #{totalCount,jdbcType=INTEGER},
+            remaining_count = #{remainingCount,jdbcType=INTEGER},
+            sold_count = #{soldCount,jdbcType=INTEGER},
+            version = #{version,jdbcType=INTEGER},
+            status = #{status,jdbcType=INTEGER}
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <update id="updateByPrimaryKeySelective" parameterType="cn.monitor4all.miaoshadao.dao.TicketEntity">
+        update ticket
+        <set>
+            <if test="date != null">date = #{date,jdbcType=VARCHAR},</if>
+            <if test="name != null">name = #{name,jdbcType=VARCHAR},</if>
+            <if test="totalCount != null">total_count = #{totalCount,jdbcType=INTEGER},</if>
+            <if test="remainingCount != null">remaining_count = #{remainingCount,jdbcType=INTEGER},</if>
+            <if test="soldCount != null">sold_count = #{soldCount,jdbcType=INTEGER},</if>
+            <if test="version != null">version = #{version,jdbcType=INTEGER},</if>
+            <if test="status != null">status = #{status,jdbcType=INTEGER},</if>
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+    
+    <update id="updateStockByOptimistic" parameterType="cn.monitor4all.miaoshadao.dao.TicketEntity">
+        update ticket
+        set remaining_count = #{remainingCount,jdbcType=INTEGER},
+            sold_count = #{soldCount,jdbcType=INTEGER},
+            version = #{version,jdbcType=INTEGER} + 1
+        where id = #{id,jdbcType=INTEGER} and version = #{version,jdbcType=INTEGER}
+    </update>
+    
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer">
+        delete from ticket where id = #{id,jdbcType=INTEGER}
+    </delete>
+    
+    <delete id="deleteByDate" parameterType="java.lang.String">
+        delete from ticket where date = #{date,jdbcType=VARCHAR}
+    </delete>
+    
+</mapper>

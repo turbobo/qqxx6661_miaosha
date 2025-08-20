@@ -14,7 +14,7 @@ public class OrderRecord {
 
     private Integer count;
 
-    private Integer userId;
+    private Long userId;
     private Integer status;
 
     private Date createTime;
@@ -52,11 +52,11 @@ public class OrderRecord {
         this.count = count;
     }
 
-    public Integer getUserId() {
+    public Long getUserId() {
         return userId;
     }
 
-    public void setUserId(Integer userId) {
+    public void setUserId(Long userId) {
         this.userId = userId;
     }
 

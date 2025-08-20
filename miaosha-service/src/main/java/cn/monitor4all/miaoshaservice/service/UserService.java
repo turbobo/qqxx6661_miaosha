@@ -37,4 +37,6 @@ public interface UserService {
 
 
     public void validUser(Long userId) throws Exception;
+
+    boolean isAllowed(Long userId, int maxRequests, int windowSeconds);
 }

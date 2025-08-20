@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>异步抢购演示</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.processing {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .log {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        .log-entry.info { color: #007bff; }
+        .log-entry.success { color: #28a745; }
+        .log-entry.error { color: #dc3545; }
+        .log-entry.warning { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>异步抢购演示</h1>
+        <p>本页面演示基于消息队列的异步抢购功能，前端发送抢购请求后，通过轮询查询抢购结果。</p>
+        
+        <div class="form-group">
+            <label for="userId">用户ID:</label>
+            <input type="number" id="userId" value="1001" placeholder="请输入用户ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="date">票券日期:</label>
+            <input type="text" id="date" value="2025-01-15" placeholder="格式: YYYY-MM-DD">
+        </div>
+        
+        <div class="form-group">
+            <label for="verifyHash">验证码:</label>
+            <input type="text" id="verifyHash" value="test123" placeholder="请输入验证码">
+        </div>
+        
+        <div class="form-group">
+            <button id="purchaseBtn" onclick="startPurchase()">开始抢购</button>
+            <button id="checkResultBtn" onclick="checkResult()" disabled>查询结果</button>
+            <button onclick="clearLog()">清空日志</button>
+        </div>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <div id="result" class="result" style="display: none;"></div>
+        
+        <div class="log">
+            <div class="log-entry info">系统日志:</div>
+            <div id="logContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentMessageId = null;
+        let pollingInterval = null;
+        
+        function log(message, type = 'info') {
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logContent.appendChild(logEntry);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+        
+        function updateStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+        
+        function updateResult(data) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <h3>抢购结果:</h3>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            resultDiv.style.display = 'block';
+        }
+        
+        function startPurchase() {
+            const userId = document.getElementById('userId').value;
+            const date = document.getElementById('date').value;
+            const verifyHash = document.getElementById('verifyHash').value;
+            
+            if (!userId || !date || !verifyHash) {
+                alert('请填写完整信息');
+                return;
+            }
+            
+            log('开始发送抢购请求...', 'info');
+            updateStatus('正在发送抢购请求...', 'processing');
+            
+            // 禁用按钮
+            document.getElementById('purchaseBtn').disabled = true;
+            document.getElementById('checkResultBtn').disabled = true;
+            
+            // 发送抢购请求
+            fetch('/api/tickets/v2/purchase', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: parseInt(userId),
+                    date: date,
+                    verifyHash: verifyHash
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 200) {
+                    log('抢购请求发送成功', 'success');
+                    log(`消息ID: ${data.data.messageId}`, 'info');
+                    
+                    currentMessageId = data.data.messageId;
+                    updateStatus('抢购请求已提交，正在处理中...', 'processing');
+                    
+                    // 开始轮询查询结果
+                    startPolling();
+                    
+                } else {
+                    log(`抢购请求失败: ${data.message}`, 'error');
+                    updateStatus(`抢购失败: ${data.message}`, 'error');
+                    document.getElementById('purchaseBtn').disabled = false;
+                }
+            })
+            .catch(error => {
+                log(`请求异常: ${error.message}`, 'error');
+                updateStatus(`请求异常: ${error.message}`, 'error');
+                document.getElementById('purchaseBtn').disabled = false;
+            });
+        }
+        
+        function startPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            // 每500ms轮询一次
+            pollingInterval = setInterval(() => {
+                checkResult();
+            }, 500);
+            
+            log('开始轮询查询抢购结果，间隔500ms', 'info');
+        }
+        
+        function checkResult() {
+            if (!currentMessageId) {
+                log('没有有效的消息ID', 'warning');
+                return;
+            }
+            
+            log(`查询抢购结果，消息ID: ${currentMessageId}`, 'info');
+            
+            fetch(`/api/tickets/v2/purchase/result?messageId=${currentMessageId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 200) {
+                    const result = data.data;
+                    log(`查询结果: ${result.status}`, 'info');
+                    
+                    if (result.status === 'SUCCESS') {
+                        log('抢购成功！', 'success');
+                        updateStatus('抢购成功！', 'success');
+                        updateResult(result);
+                        stopPolling();
+                        document.getElementById('purchaseBtn').disabled = false;
+                        
+                    } else if (result.status === 'FAILED') {
+                        log(`抢购失败: ${result.errorMessage}`, 'error');
+                        updateStatus(`抢购失败: ${result.errorMessage}`, 'error');
+                        updateResult(result);
+                        stopPolling();
+                        document.getElementById('purchaseBtn').disabled = false;
+                        
+                    } else if (result.status === 'PROCESSING') {
+                        log('正在处理中...', 'info');
+                        updateStatus('正在处理中...', 'processing');
+                        
+                    } else if (result.status === 'PENDING') {
+                        log('等待处理中...', 'info');
+                        updateStatus('等待处理中...', 'processing');
+                    }
+                    
+                } else {
+                    log(`查询失败: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                log(`查询异常: ${error.message}`, 'error');
+            });
+        }
+        
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                log('停止轮询', 'info');
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('logContent').innerHTML = '<div class="log-entry info">系统日志:</div>';
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+            currentMessageId = null;
+            stopPolling();
+            document.getElementById('purchaseBtn').disabled = false;
+            document.getElementById('checkResultBtn').disabled = true;
+        }
+        
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('异步抢购演示页面加载完成', 'info');
+            log('使用说明:', 'info');
+            log('1. 填写用户ID、票券日期和验证码', 'info');
+            log('2. 点击"开始抢购"按钮', 'info');
+            log('3. 系统会自动轮询查询抢购结果', 'info');
+            log('4. 轮询间隔为500ms', 'info');
+        });
+    </script>
+</body>
+</html>

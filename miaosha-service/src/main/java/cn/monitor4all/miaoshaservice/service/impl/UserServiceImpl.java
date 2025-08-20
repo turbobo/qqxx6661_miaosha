@@ -9,13 +9,19 @@ import cn.monitor4all.miaoshaservice.service.ValidationService;
 import cn.monitor4all.miaoshaservice.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.scripting.support.ResourceScriptSource;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import org.springframework.util.DigestUtils;
 
 import java.time.LocalTime;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -24,15 +30,12 @@ public class UserServiceImpl implements UserService {
     private static final Logger LOGGER = LoggerFactory.getLogger(UserServiceImpl.class);
 
     private static final String SALT = "randomString";
-    private static final int ALLOW_COUNT = 10;
+    private static final int ALLOW_COUNT = 3;
 
     // 设置抢购开始时间
     private static final LocalTime START_TIME = LocalTime.of(9, 0); // 上午9点开始
     // 设置抢购结束时间
     private static final LocalTime END_TIME = LocalTime.of(23, 0);  // 晚上11点结束
-
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
 
     @Resource
     private UserMapper userMapper;
@@ -43,6 +46,29 @@ public class UserServiceImpl implements UserService {
 
     @Resource
     private ValidationService validationService;
+
+    // 注入Redis模板
+    private final StringRedisTemplate stringRedisTemplate;
+
+    // 定义Redis脚本（返回值为Long类型）
+    private DefaultRedisScript<Long> rateLimitScript;  // 这里是关键修复点
+
+    // 构造函数注入
+    public UserServiceImpl(StringRedisTemplate stringRedisTemplate) {
+        this.stringRedisTemplate = stringRedisTemplate;
+    }
+
+    // 初始化：加载Lua脚本
+    @PostConstruct
+    public void init() {
+        rateLimitScript = new DefaultRedisScript<>();
+        // 简化类名引用（需提前导入对应包）
+        rateLimitScript.setScriptSource(new ResourceScriptSource(
+                new ClassPathResource("user_rate_limit.lua")
+        ));
+        rateLimitScript.setResultType(Long.class);
+    }
+
 
     @Override
     public String getVerifyHash(Integer sid, Long userId) throws Exception {
@@ -124,5 +150,29 @@ public class UserServiceImpl implements UserService {
             throw new Exception("用户不存在");
         }
         LOGGER.info("用户信息：[{}]", user.toString());
+    }
+
+
+    /**
+     * 检查用户请求是否允许
+     * @param userId 用户ID
+     * @param maxRequests 时间窗口内最大请求次数
+     * @param windowSeconds 时间窗口（秒）
+     * @return true：允许请求；false：限流
+     */
+    public boolean isAllowed(Long userId, int maxRequests, int windowSeconds) {
+        // 构建限流键（格式：user:limit:123456）
+        String limitKey = "user:limit:" + userId;
+
+        // 执行Lua脚本
+        Long result = stringRedisTemplate.execute(
+                rateLimitScript,
+                Collections.singletonList(limitKey), // KEYS参数
+                String.valueOf(maxRequests),         // ARGV[1]：最大次数
+                String.valueOf(windowSeconds)        // ARGV[2]：时间窗口，key没过期，值加1，key过期，则重置1分钟
+        );
+
+        // 结果为1表示允许，0表示限流
+        return result != null && result == 1;
     }
 }

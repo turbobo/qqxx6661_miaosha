@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>票数合法性检查</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <!-- 页面标题 -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                    <i class="fas fa-ticket-alt text-blue-600 mr-3"></i>
+                    票数合法性检查系统
+                </h1>
+                <p class="text-gray-600">根据日期检查票券数量的合法性</p>
+            </div>
+
+            <!-- 检查表单 -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-search text-green-600 mr-2"></i>
+                    票数合法性检查
+                </h2>
+                
+                <div class="flex gap-4 items-end">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">选择日期</label>
+                        <input 
+                            type="date" 
+                            v-model="selectedDate" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            :max="maxDate"
+                        >
+                    </div>
+                    <button 
+                        @click="validateTicketCount"
+                        :disabled="!selectedDate || loading"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <i v-if="loading" class="fas fa-spinner fa-spin mr-2"></i>
+                        <i v-else class="fas fa-check mr-2"></i>
+                        {{ loading ? '检查中...' : '开始检查' }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- 检查结果 -->
+            <div v-if="validationResult" class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-clipboard-check text-purple-600 mr-2"></i>
+                    检查结果
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 基本信息 -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="font-medium text-gray-700">检查日期:</span>
+                            <span class="text-gray-900">{{ validationResult.ticketDate }}</span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="font-medium text-gray-700">检查状态:</span>
+                            <span :class="validationResult.valid ? 'text-green-600' : 'text-red-600'">
+                                <i :class="validationResult.valid ? 'fas fa-check-circle' : 'fas fa-times-circle'" class="mr-1"></i>
+                                {{ validationResult.valid ? '通过' : '失败' }}
+                            </span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="font-medium text-gray-700">状态代码:</span>
+                            <span class="text-gray-900 font-mono text-sm">{{ validationResult.code }}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 票数信息 -->
+                    <div class="space-y-3">
+                        <div v-if="validationResult.totalCount !== undefined" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="font-medium text-gray-700">总票数:</span>
+                            <span class="text-gray-900 font-semibold">{{ validationResult.totalCount }}</span>
+                        </div>
+                        
+                        <div v-if="validationResult.remainingCount !== undefined" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="font-medium text-gray-700">剩余票数:</span>
+                            <span class="text-gray-900 font-semibold">{{ validationResult.remainingCount }}</span>
+                        </div>
+                        
+                        <div v-if="validationResult.soldCount !== undefined" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="font-medium text-gray-700">已售票数:</span>
+                            <span class="text-gray-900 font-semibold">{{ validationResult.soldCount }}</span>
+                        </div>
+                        
+                        <div v-if="validationResult.soldPercentage !== undefined" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="font-medium text-gray-700">售出比例:</span>
+                            <span class="text-gray-900 font-semibold">{{ validationResult.soldPercentage.toFixed(1) }}%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 消息提示 -->
+                <div class="mt-4 p-4 rounded-lg" :class="validationResult.valid ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'">
+                    <i :class="validationResult.valid ? 'fas fa-info-circle' : 'fas fa-exclamation-triangle'" class="mr-2"></i>
+                    {{ validationResult.message }}
+                </div>
+            </div>
+
+            <!-- 错误信息 -->
+            <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                    <span class="text-red-800">{{ error }}</span>
+                </div>
+            </div>
+
+            <!-- 使用说明 -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-blue-800 mb-3">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    使用说明
+                </h3>
+                <div class="text-blue-700 space-y-2">
+                    <p><strong>功能说明：</strong>本系统用于检查指定日期票券的数量合法性，包括总票数、剩余票数、已售票数等。</p>
+                    <p><strong>检查项目：</strong></p>
+                    <ul class="list-disc list-inside ml-4 space-y-1">
+                        <li>总票数必须大于0</li>
+                        <li>剩余票数不能为负数</li>
+                        <li>剩余票数不能超过总票数</li>
+                        <li>已售票数不能为负数</li>
+                        <li>总票数 = 剩余票数 + 已售票数</li>
+                    </ul>
+                    <p><strong>使用方法：</strong>选择要检查的日期，点击"开始检查"按钮即可。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    selectedDate: '',
+                    validationResult: null,
+                    loading: false,
+                    error: ''
+                }
+            },
+            computed: {
+                maxDate() {
+                    const today = new Date();
+                    const maxDate = new Date(today);
+                    maxDate.setDate(today.getDate() + 30); // 最多选择30天后的日期
+                    return maxDate.toISOString().split('T')[0];
+                }
+            },
+            mounted() {
+                // 设置默认日期为今天
+                const today = new Date();
+                this.selectedDate = today.toISOString().split('T')[0];
+            },
+            methods: {
+                async validateTicketCount() {
+                    if (!this.selectedDate) {
+                        this.error = '请选择要检查的日期';
+                        return;
+                    }
+                    
+                    this.loading = true;
+                    this.error = '';
+                    this.validationResult = null;
+                    
+                    try {
+                        const response = await axios.get(`http://localhost:8081/api/tickets/validateTicketCount?date=${this.selectedDate}`);
+                        
+                        if (response.data.code === 200) {
+                            this.validationResult = response.data.data;
+                        } else {
+                            this.error = response.data.message || '检查失败';
+                        }
+                    } catch (err) {
+                        console.error('检查票数合法性失败:', err);
+                        if (err.response) {
+                            this.error = err.response.data.message || '检查失败';
+                        } else {
+                            this.error = '网络错误，请检查服务是否正常运行';
+                        }
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

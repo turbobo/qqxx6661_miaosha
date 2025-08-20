@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日票数抢购系统 V2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#F59E0B',
+                        danger: '#EF4444',
+                        dark: '#1E293B',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-hover {
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+            }
+            .card-hover:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.1), 0 10px 10px -5px rgba(59, 130, 246, 0.04);
+            }
+            .pulse {
+                animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+            .star-rotate {
+                animation: rotate 8s linear infinite;
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+        
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <!-- 顶部导航 -->
+        <header class="bg-white shadow-sm sticky top-0 z-50 mb-8">
+            <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fa fa-ticket text-primary text-2xl"></i>
+                    <h1 class="text-xl font-bold text-dark">票券抢购系统 V2</h1>
+                    <span class="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-2 py-1 rounded-full font-medium">V2</span>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- 注释掉用户信息显示和登录相关按钮 -->
+                    <!-- <div v-if="currentUser" class="flex items-center space-x-2 text-gray-600">
+                        <i class="fa fa-user-circle-o text-xl"></i>
+                        <span>{{ currentUser }}</span>
+                    </div>
+                    <div v-if="!currentUser" class="text-gray-500">
+                        <span>未登录</span>
+                    </div>
+                    <button v-if="currentUser" @click="logout" 
+                            class="text-gray-500 hover:text-gray-700 transition-colors">
+                        <i class="fa fa-sign-out mr-1"></i>
+                        退出登录
+                    </button>
+                    <button v-if="!currentUser" @click="goToLogin" 
+                            class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                        <i class="fa fa-sign-in mr-1"></i>
+                        登录
+                    </button> -->
+                    
+                    <!-- 显示匿名用户信息 -->
+                    <div class="flex items-center space-x-2 text-gray-600">
+                        <i class="fa fa-user-circle-o text-xl"></i>
+                        <span>匿名用户</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- 页面标题 -->
+        <div class="text-center mb-10">
+            <h2 class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-dark mb-3">每日限量票券抢购 V2</h2>
+            <p class="text-gray-500 max-w-xl mx-auto">每人每天限购一张票券，先到先得。点击下方日期卡片即可参与抢购。</p>
+        </div>
+        
+        <!-- 管理功能导航 -->
+        <div class="bg-white shadow-sm rounded-lg mb-6">
+            <div class="container mx-auto px-4 py-3">
+                <div class="flex flex-wrap gap-3 justify-center">
+                    <a href="admin-ticket-update.html" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm">
+                        <i class="fa fa-edit mr-2"></i>票券管理
+                    </a>
+                    <a href="ticket-validation.html" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm">
+                        <i class="fa fa-check-circle mr-2"></i>票数检查
+                    </a>
+                    <a href="admin-miaosha-control.html" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm">
+                        <i class="fa fa-cogs mr-2"></i>秒杀控制
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 加载状态 -->
+        <div v-if="loading" class="flex justify-center items-center py-16">
+            <div class="text-center">
+                <i class="fa fa-spinner fa-spin text-3xl text-primary mb-4"></i>
+                <p class="text-gray-500">加载票券信息中...</p>
+            </div>
+        </div>
+        
+        <!-- 错误状态 -->
+        <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-8 text-center">
+            <i class="fa fa-exclamation-circle text-red-500 mr-2"></i>
+            <span class="text-red-500">{{ error }}</span>
+        </div>
+        
+        <!-- 票数卡片容器 - 只展示最近3天 -->
+        <div v-if="!loading && !error" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <!-- 票券卡片 -->
+            <div v-for="(ticket, index) in tickets" :key="index" 
+                 class="bg-white rounded-xl overflow-hidden shadow-md card-hover"
+                 :class="{'border-t-4 border-primary': index === 0, 
+                          'border-t-4 border-secondary': index === 1,
+                          'border-t-4 border-accent': index === 2}">
+                <div class="p-1" 
+                     :class="{'bg-gradient-to-r from-primary to-blue-400': index === 0,
+                              'bg-gradient-to-r from-secondary to-emerald-400': index === 1,
+                              'bg-gradient-to-r from-accent to-amber-400': index === 2}"></div>
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-5">
+                        <div>
+                            <h3 class="text-lg font-bold text-dark">{{ ticket.formattedDate }}</h3>
+                            <p class="text-gray-500">{{ ticket.weekday }}</p>
+                        </div>
+                        <span :class="{'bg-primary/10 text-primary': index === 0,
+                                       'bg-secondary/10 text-secondary': index === 1,
+                                       'bg-accent/10 text-accent': index === 2}" 
+                              class="text-xs px-2 py-1 rounded-full font-medium">
+                            {{ index === 0 ? '今天' : index === 1 ? '明天' : '后天' }}
+                        </span>
+                    </div>
+                    
+                    <div class="flex items-center justify-center mb-6">
+                        <div class="relative w-24 h-24 flex items-center justify-center">
+                            <div class="star-rotate text-accent">
+                                <i class="fa fa-star text-5xl"></i>
+                            </div>
+                            <div class="absolute text-center">
+                                <span class="text-2xl font-bold text-dark">{{ ticket.remaining }}</span>
+                                <span class="text-gray-500">张</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-gray-500">剩余票数</span>
+                            <span class="font-medium">{{ ticket.remaining }} / {{ ticket.total }}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div :class="{'bg-primary': index === 0, 
+                                          'bg-secondary': index === 1,
+                                          'bg-accent': index === 2,
+                                          'bg-danger': ticket.remaining / ticket.total < 0.2}" 
+                                 class="h-2.5 rounded-full" 
+                                 :style="{ width: (ticket.remaining / ticket.total) * 100 + '%' }"></div>
+                        </div>
+                    </div>
+                    
+                    <button @click="handlePurchase(ticket)" 
+                            :disabled="ticket.remaining <= 0 || purchasedDates.includes(ticket.formattedDate)"
+                            :class="{'bg-primary hover:bg-primary/90 pulse': index === 0 && ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate),
+                                     'bg-secondary hover:bg-secondary/90': index === 1 && ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate),
+                                     'bg-accent hover:bg-accent/90': index === 2 && ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate),
+                                     'bg-gray-200 text-gray-500 cursor-not-allowed': ticket.remaining <= 0 || purchasedDates.includes(ticket.formattedDate)}"
+                            class="w-full py-3 text-white rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors">
+                        <i v-if="ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate)" class="fa fa-shopping-cart"></i>
+                        <i v-if="ticket.remaining <= 0" class="fa fa-times"></i>
+                        <i v-if="purchasedDates.includes(ticket.formattedDate)" class="fa fa-check"></i>
+                        <span v-if="ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate)">立即抢购</span>
+                        <span v-if="ticket.remaining <= 0">已售罄</span>
+                        <span v-if="purchasedDates.includes(ticket.formattedDate)">已抢购</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- V2版本新功能展示 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-10">
+            <h3 class="text-xl font-bold text-dark mb-4 flex items-center">
+                <i class="fa fa-rocket text-purple-500 mr-2"></i>
+                V2版本新功能
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-3">
+                    <div class="flex items-start">
+                        <i class="fa fa-bolt text-yellow-500 mt-1 mr-2"></i>
+                        <span class="text-gray-600">更快的响应速度，优化了API性能</span>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fa fa-shield text-green-500 mt-1 mr-2"></i>
+                        <span class="text-gray-600">增强的安全防护，防止恶意刷票</span>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fa fa-chart-line text-blue-500 mt-1 mr-2"></i>
+                        <span class="text-gray-600">实时库存监控，更准确的票数显示</span>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex items-start">
+                        <i class="fa fa-mobile text-purple-500 mt-1 mr-2"></i>
+                        <span class="text-gray-600">移动端优化，更好的触屏体验</span>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fa fa-clock-o text-orange-500 mt-1 mr-2"></i>
+                        <span class="text-gray-600">智能排队系统，减少服务器压力</span>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fa fa-bell text-red-500 mt-1 mr-2"></i>
+                        <span class="text-gray-600">抢购提醒功能，不错过任何机会</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 抢购规则 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-10">
+            <h3 class="text-xl font-bold text-dark mb-4 flex items-center">
+                <i class="fa fa-info-circle text-primary mr-2"></i>
+                抢购规则
+            </h3>
+            
+            <ul class="space-y-3 text-gray-600">
+                <li class="flex items-start">
+                    <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
+                    <span>每人每天限购一张票券，重复抢购将失败</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
+                    <span>票券抢购成功后，将为您保留24小时，请及时使用</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
+                    <span>票券一旦售出，不退不换，请确认日期后再抢购</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
+                    <span>每日0点更新票数，售完即止</span>
+                </li>
+            </ul>
+        </div>
+        
+        <!-- 确认抢购弹窗 -->
+        <div v-if="showConfirmModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4 transform transition-all duration-300 scale-100">
+                <div class="text-center mb-5">
+                    <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa fa-ticket text-primary text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-dark">确认抢购</h3>
+                    <p class="text-gray-500 mt-2">
+                        您确定要抢购{{ selectedTicket.formattedDate }}（{{ selectedTicket.weekday }}）的票券吗？每人每天限购一张。
+                    </p>
+                </div>
+                
+                <div class="flex space-x-3">
+                    <button @click="showConfirmModal = false" 
+                            class="flex-1 py-3 border border-gray-200 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+                        取消
+                    </button>
+                    <button @click="confirmPurchase()" 
+                            class="flex-1 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                        确认抢购
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 抢购成功弹窗 -->
+        <div v-if="showSuccessModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa fa-check text-green-500 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-green-500">抢购成功！</h3>
+                    <p class="text-gray-500 mt-2 mb-5">
+                        您已成功抢购{{ successTicketDate }}的票券
+                    </p>
+                    
+                    <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+                        <p class="text-sm"><span class="text-gray-500">票券编号：</span> <span class="font-medium">{{ ticketCode }}</span></p>
+                        <p class="text-sm mt-1"><span class="text-gray-500">有效日期：</span> <span class="font-medium">{{ successTicketDate }}</span></p>
+                    </div>
+                    
+                    <button @click="showSuccessModal = false" 
+                            class="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                        完成
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 抢购失败弹窗 -->
+        <div v-if="showFailModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa fa-times text-red-500 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-red-500">抢购失败</h3>
+                    <p class="text-gray-500 mt-2 mb-6">{{ failMessage }}</p>
+                    
+                    <button @click="showFailModal = false" 
+                            class="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                        确定
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    tickets: [],
+                    loading: true,
+                    error: '',
+                    currentUser: '', // 当前登录用户昵称
+                    currentUserId: '', // 当前用户ID
+                    selectedTicket: null,
+                    showConfirmModal: false,
+                    showSuccessModal: false,
+                    showFailModal: false,
+                    successTicketDate: '',
+                    ticketCode: '',
+                    failMessage: '',
+                    purchasedDates: [] // 已购买的日期
+                }
+            },
+            mounted() {
+                // 注释掉登录状态检查，直接加载票券数据
+                // 先检查登录状态，然后加载票券数据
+                // this.checkLoginStatus().then(() => {
+                //     this.loadTickets();
+                // });
+                
+                // 直接加载票券数据，不检查登录状态
+                this.loadTickets();
+            },
+            methods: {
+                // 注释掉登录状态检查方法
+                // 检查登录状态
+                // async checkLoginStatus() {
+                //     const token = localStorage.getItem('token');
+                //     if (!token) {
+                //         // 没有token，设置用户为未登录状态
+                //         this.currentUser = '';
+                //         this.currentUserId = '';
+                //         return Promise.resolve();
+                //     }
+                //     
+                //     try {
+                //         // 验证token并获取用户信息
+                //         const response = await axios.get('http://localhost:8081/api/auth/me', {
+                //             headers: {
+                //                 'Authorization': 'Bearer ' + token
+                //             }
+                //         });
+                //         
+                //         if (response.data.code === 200) {
+                //             const user = response.data.data;
+                //             this.currentUser = user.nickname || user.username;
+                //             this.currentUserId = user.id;
+                //             
+                //             // 设置全局axios默认header
+                //             axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+                //         } else {
+                //             // token无效，清除并设置为未登录
+                //             localStorage.removeItem('token');
+                //             localStorage.removeItem('user');
+                //             this.currentUser = '';
+                //             this.currentUserId = '';
+                //         }
+                //     } catch (err) {
+                //         console.error('验证登录状态失败:', err);
+                //         // 网络错误或token无效，设置为未登录
+                //         localStorage.removeItem('token');
+                //         localStorage.removeItem('user');
+                //         this.currentUser = '';
+                //         this.currentUserId = '';
+                //     }
+                //     
+                //     return Promise.resolve();
+                // },
+                
+                // 从后端加载票券数据
+                async loadTickets() {
+                    try {
+                        this.loading = true;
+                        // 注释掉认证相关代码，直接调用API
+                        // 使用V2版本的API
+                        const response = await axios.get('http://localhost:8081/api/v2/tickets/list');
+                        
+                        if (response.data.code === 200) {
+                            this.tickets = response.data.data;
+                            this.error = '';
+                        } else {
+                            this.error = response.data.message || '加载票券失败';
+                        }
+                    } catch (err) {
+                        // 注释掉401错误处理，简化错误处理逻辑
+                        // if (err.response && err.response.status === 401) {
+                        //     // 未授权，需要登录
+                        //     this.error = '请先登录后再查看票券信息';
+                        //     console.error('票券列表访问失败:', err);
+                        // } else {
+                        //     this.error = '网络错误，无法加载票券信息';
+                        //     console.error(err);
+                        // }
+                        
+                        this.error = '网络错误，无法加载票券信息';
+                        console.error(err);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                // 处理抢购点击事件
+                handlePurchase(ticket) {
+                    // 注释掉登录检查，允许未登录用户抢购
+                    // 检查是否已登录
+                    // if (!this.currentUser) {
+                    //     this.failMessage = '请先登录后再抢购票券';
+                    //     this.showFailModal = true;
+                    //     return;
+                    // }
+                    
+                    this.selectedTicket = ticket;
+                    this.showConfirmModal = true;
+                },
+                
+                // 确认抢购
+                async confirmPurchase() {
+                    if (!this.selectedTicket) return;
+                    
+                    try {
+                        // 隐藏确认弹窗
+                        this.showConfirmModal = false;
+                        
+                        // 发送抢购请求，使用V2版本的API
+                        const response = await axios.post('http://localhost:8081/api/v2/tickets/purchase', {
+                            userId: 'anonymous', // 使用匿名用户ID
+                            date: this.selectedTicket.date
+                        });
+                        
+                        if (response.data.code === 200) {
+                            // 抢购成功
+                            const record = response.data.data;
+                            this.successTicketDate = this.selectedTicket.formattedDate;
+                            this.ticketCode = record.ticketCode;
+                            this.purchasedDates.push(this.selectedTicket.formattedDate);
+                            
+                            // 更新票券数量
+                            this.selectedTicket.remaining--;
+                            
+                            // 显示成功弹窗
+                            this.showSuccessModal = true;
+                        } else {
+                            // 抢购失败
+                            this.failMessage = response.data.message || '抢购失败，请重试';
+                            this.showFailModal = true;
+                        }
+                    } catch (err) {
+                        this.failMessage = '网络错误，抢购失败';
+                        this.showFailModal = true;
+                        console.error(err);
+                    }
+                },
+                
+                // 注释掉退出登录和跳转登录页面方法
+                // 退出登录
+                // async logout() {
+                //     try {
+                //         // 调用后端退出接口
+                //         await axios.post('http://localhost:8081/api/auth/logout');
+                //     } catch (err) {
+                //         console.error('退出登录失败:', err);
+                //     } finally {
+                //         // 无论是否成功，都清除本地数据
+                //         localStorage.removeItem('token');
+                //         localStorage.removeItem('user');
+                //         delete axios.defaults.headers.common['Authorization'];
+                //         // 重新加载当前页面，显示未登录状态
+                //         window.location.reload();
+                //     }
+                // },
+                
+                // 跳转到登录页面
+                // goToLogin() {
+                //     window.location.href = 'login.html';
+                // }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

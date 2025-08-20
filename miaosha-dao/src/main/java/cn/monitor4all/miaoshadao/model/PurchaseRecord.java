@@ -3,18 +3,18 @@ package cn.monitor4all.miaoshadao.model;
 import java.time.LocalDate;
 
 public class PurchaseRecord {
-    private String userId;
+    private Long userId;  // 改为Long类型
     private LocalDate date;
     private String ticketCode;
     
-    public PurchaseRecord(String userId, LocalDate date, String ticketCode) {
+    public PurchaseRecord(Long userId, LocalDate date, String ticketCode) {  // 改为Long类型
         this.userId = userId;
         this.date = date;
         this.ticketCode = ticketCode;
     }
     
     // getter方法
-    public String getUserId() {
+    public Long getUserId() {  // 改为Long类型
         return userId;
     }
     

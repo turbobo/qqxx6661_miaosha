@@ -17,10 +17,11 @@ import java.util.List;
 import java.util.concurrent.*;
 
 @Controller
+@RequestMapping("/v2")
 @CrossOrigin // 添加跨域支持
-public class OrderController {
+public class OrderControllerV2 {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(OrderController.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(OrderControllerV2.class);
 
     @Resource
     private OrderService orderService;
@@ -50,9 +51,6 @@ public class OrderController {
      *
      * 测试：500张票 1000个线程，循环10次
      * 产生 10000个订单，但是只售卖了69个 数据不一致
-     *
-     *
-     * 缺少事务、锁控制、原子性操作
      */
     @RequestMapping("/createWrongOrder/{sid}")
     @ResponseBody
@@ -82,13 +80,13 @@ public class OrderController {
     @RequestMapping("/createOptimisticOrder/{sid}")
     @ResponseBody
     public String createOptimisticOrder(@PathVariable int sid) {
-//         1. 阻塞式获取令牌
+        // 1. 阻塞式获取令牌
 //        LOGGER.info("等待时间" + rateLimiter.acquire());
-//         2. 非阻塞式获取令牌
-        if (!rateLimiter.tryAcquire(1000, TimeUnit.MILLISECONDS)) {
-            LOGGER.warn("你被限流了，真不幸，直接返回失败");
-            return "你被限流了，真不幸，直接返回失败";
-        }
+        // 2. 非阻塞式获取令牌
+//        if (!rateLimiter.tryAcquire(1000, TimeUnit.MILLISECONDS)) {
+//            LOGGER.warn("你被限流了，真不幸，直接返回失败");
+//            return "你被限流了，真不幸，直接返回失败";
+//        }
         int id;
         try {
             id = orderService.createOptimisticOrder(sid);
@@ -301,7 +299,7 @@ public class OrderController {
     }
 
     /**
-     * V1 版本：同步下单
+     *
      * 设计：
      * 查询缓存的用户访问次数是否超过限制，没有则继续---一分钟6次
      * 校验用户hash合法
@@ -389,9 +387,7 @@ public class OrderController {
     }
 
     /**
-     * V2 版本：异步
-     * 下单接口：异步处理订单: 先判断用户是否有订单，再通过消息异步抢购，页面轮询查询抢购结果
-     *
+     * 下单接口：异步处理订单
      * @param sid
      * @return
      */
@@ -448,17 +444,6 @@ public class OrderController {
         return "很抱歉，你的订单尚未生成，继续排队。";
     }
 
-
-    /**
-     * 管理员修改余票的完整流程：
-     *
-     * 管理员发起修改请求（带权限校验）；
-     * 系统暂停秒杀服务（可选，视业务紧急程度）；
-     * 用悲观锁锁定库存记录，执行修改（同时更新版本号）；
-     * 记录操作日志，校验库存合法性；
-     * 同步更新 Redis 缓存，恢复秒杀服务；
-     * 前端刷新库存显示，用户可继续抢购。
-     */
 
     /**
      * 缓存再删除线程

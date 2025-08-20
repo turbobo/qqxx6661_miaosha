@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.monitor4all.miaoshadao.mapper.TicketOrderMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="cn.monitor4all.miaoshadao.dao.TicketOrder">
+        <id column="id" property="id" jdbcType="INTEGER"/>
+        <result column="order_no" property="orderNo" jdbcType="VARCHAR"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="ticket_id" property="ticketId" jdbcType="INTEGER"/>
+        <result column="ticket_code" property="ticketCode" jdbcType="VARCHAR"/>
+        <result column="ticket_date" property="ticketDate" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="amount" property="amount" jdbcType="BIGINT"/>
+        <result column="pay_time" property="payTime" jdbcType="TIMESTAMP"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <!-- 基础字段 -->
+    <sql id="Base_Column_List">
+        id, order_no, user_id, ticket_id, ticket_code, ticket_date, status, amount, 
+        pay_time, create_time, update_time, remark
+    </sql>
+
+    <!-- 插入票券订单 -->
+    <insert id="insert" parameterType="cn.monitor4all.miaoshadao.dao.TicketOrder" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ticket_order (
+            order_no, user_id, ticket_id, ticket_code, ticket_date, status, amount, 
+            pay_time, create_time, update_time, remark
+        ) VALUES (
+            #{orderNo}, #{userId}, #{ticketId}, #{ticketCode}, #{ticketDate}, #{status}, #{amount}, 
+            #{payTime}, #{createTime}, #{updateTime}, #{remark}
+        )
+    </insert>
+
+    <!-- 根据主键更新票券订单 -->
+    <update id="updateByPrimaryKey" parameterType="cn.monitor4all.miaoshadao.dao.TicketOrder">
+        UPDATE ticket_order
+        SET order_no = #{orderNo},
+            user_id = #{userId},
+            ticket_id = #{ticketId},
+            ticket_code = #{ticketCode},
+            ticket_date = #{ticketDate},
+            status = #{status},
+            amount = #{amount},
+            pay_time = #{payTime},
+            update_time = #{updateTime},
+            remark = #{remark}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据主键查询票券订单 -->
+    <select id="selectByPrimaryKey" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ticket_order
+        WHERE id = #{id}
+    </select>
+
+    <!-- 根据订单编号查询票券订单 -->
+    <select id="selectByOrderNo" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ticket_order
+        WHERE order_no = #{orderNo}
+    </select>
+
+    <!-- 根据用户ID查询票券订单列表 -->
+    <select id="selectByUserId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ticket_order
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据票券编码查询票券订单 -->
+    <select id="selectByTicketCode" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ticket_order
+        WHERE ticket_code = #{ticketCode}
+    </select>
+
+    <!-- 根据票券ID查询票券订单列表 -->
+    <select id="selectByTicketId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ticket_order
+        WHERE ticket_id = #{ticketId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据状态查询票券订单列表 -->
+    <select id="selectByStatus" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ticket_order
+        WHERE status = #{status}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据用户ID和状态查询票券订单列表 -->
+    <select id="selectByUserIdAndStatus" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ticket_order
+        WHERE user_id = #{userId} AND status = #{status}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据主键删除票券订单 -->
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer">
+        DELETE FROM ticket_order WHERE id = #{id}
+    </delete>
+
+    <!-- 根据订单编号删除票券订单 -->
+    <delete id="deleteByOrderNo" parameterType="java.lang.String">
+        DELETE FROM ticket_order WHERE order_no = #{orderNo}
+    </delete>
+
+</mapper>

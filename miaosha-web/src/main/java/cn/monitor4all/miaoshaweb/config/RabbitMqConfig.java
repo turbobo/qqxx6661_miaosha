@@ -21,4 +21,14 @@ public class RabbitMqConfig {
         return new Queue("orderQueue");
     }
 
+    @Bean
+    public Queue purchaseQueue() {
+        return new Queue("purchase.queue");
+    }
+
+    @Bean
+    public Queue purchaseDelayedQueue() {
+        return new Queue("purchase.delayed.queue");
+    }
+
 }
