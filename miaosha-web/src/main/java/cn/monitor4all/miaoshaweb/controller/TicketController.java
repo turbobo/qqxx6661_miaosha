@@ -172,6 +172,15 @@ public class TicketController {
         }
     }
 
+    /**
+     * 轮询查询结果（异步场景）：
+     * 若后端采用 “请求入队 + 异步处理” 模式（见后端设计），前端需通过轮询查询抢购结果，而非阻塞等待。
+     * 轮询频率：初期可 1-2 秒一次，3-5 次后降低频率（如 3-5 秒一次），避免高频请求浪费资源。
+     * 超时控制：设置轮询总时长（如 30 秒），超时未返回结果则提示 “抢购超时，请重试”。
+     * @param request
+     * @param httpRequest
+     * @return
+     */
     @PostMapping("/v2/purchase")
     public ApiResponse<PurchaseRecord> purchaseTicketV2(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
         try {
@@ -188,6 +197,37 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("票券购买V2失败，用户ID: {}, 日期: {}", request.getUserId(), request.getDate(), e);
             return ApiResponse.error("购买失败，请重试");
+        }
+    }
+    
+    /**
+     * 票券购买接口V3：悲观锁购票并生成订单
+     * 使用SELECT FOR UPDATE锁住票券记录，事务控制，扣库存，生成ticket_order
+     * @param request 购票请求
+     * @param httpRequest HTTP请求
+     * @return 购票结果
+     */
+    @PostMapping("/v3/purchase")
+    public ApiResponse<PurchaseRecord> purchaseTicketV3(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
+        try {
+            LOGGER.info("开始处理票券购买请求V3（悲观锁），用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+
+            // 调用服务层悲观锁购票方法
+            ApiResponse<PurchaseRecord> response = ticketService.purchaseTicketWithPessimisticLockV2(request);
+            
+            if (response.isSuccess()) {
+                LOGGER.info("票券购买V3（悲观锁）成功，用户ID: {}, 日期: {}, 票券编号: {}",
+                        request.getUserId(), request.getDate(), response.getData().getTicketCode());
+            } else {
+                LOGGER.warn("票券购买V3（悲观锁）失败，用户ID: {}, 日期: {}, 错误: {}",
+                        request.getUserId(), request.getDate(), response.getMessage());
+            }
+            
+            return response;
+            
+        } catch (Exception e) {
+            LOGGER.error("票券购买V3（悲观锁）异常，用户ID: {}, 日期: {}", request.getUserId(), request.getDate(), e);
+            return ApiResponse.error("购买失败，请重试: " + e.getMessage());
         }
     }
     

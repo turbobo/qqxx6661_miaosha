@@ -86,6 +86,15 @@ public interface TicketOrderMapper {
     List<TicketOrder> selectByUserIdAndStatus(@Param("userId") Long userId, @Param("status") Integer status);
     
     /**
+     * 根据用户ID和票券日期查询票券订单
+     *
+     * @param userId 用户ID
+     * @param ticketDate 票券日期
+     * @return 票券订单
+     */
+    TicketOrder selectByUserIdAndDate(@Param("userId") Long userId, @Param("date") String ticketDate);
+    
+    /**
      * 根据主键删除票券订单
      *
      * @param id 主键ID

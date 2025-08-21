@@ -2,9 +2,11 @@ package cn.monitor4all.miaoshaservice.service.impl;
 
 import cn.monitor4all.miaoshadao.dao.TicketEntity;
 import cn.monitor4all.miaoshadao.dao.TicketPurchaseRecord;
+import cn.monitor4all.miaoshadao.dao.TicketOrder;
 import cn.monitor4all.miaoshadao.dao.User;
 import cn.monitor4all.miaoshadao.mapper.TicketEntityMapper;
 import cn.monitor4all.miaoshadao.mapper.TicketPurchaseRecordMapper;
+import cn.monitor4all.miaoshadao.mapper.TicketOrderMapper;
 import cn.monitor4all.miaoshadao.model.*;
 import cn.monitor4all.miaoshadao.utils.CacheKey;
 import cn.monitor4all.miaoshaservice.service.*;
@@ -39,9 +41,12 @@ public class TicketServiceImpl implements TicketService {
     @Resource
     private TicketEntityMapper ticketEntityMapper;
 
-    @Resource
+        @Resource
     private TicketPurchaseRecordMapper ticketPurchaseRecordMapper;
-
+    
+    @Resource
+    private TicketOrderMapper ticketOrderMapper;
+    
     @Resource
     private TicketCacheManager ticketCacheManager;
 
@@ -56,10 +61,13 @@ public class TicketServiceImpl implements TicketService {
 
     @Resource
     private UserService userService;
+    
+    @Resource
+    private TicketCodeGeneratorService ticketCodeGeneratorService;
 
 
     // Guava令牌桶：每秒放行10个请求
-    RateLimiter rateLimiter = RateLimiter.create(10);
+    RateLimiter rateLimiter = RateLimiter.create(1000);
 
 
     public TicketServiceImpl() {
@@ -494,6 +502,9 @@ public class TicketServiceImpl implements TicketService {
         // *********入参为空校验********
         validNullParam(request);
 
+        // 限流检查
+        validRateLimit(request);
+
         // *********合法性校验：抢购时间内、用户登录、token、黑名单等********
         validLegalParam(request);
 
@@ -511,7 +522,8 @@ public class TicketServiceImpl implements TicketService {
 
 
         // 从数据库获取票券信息（使用悲观锁）
-        TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(purchaseDate);
+        PurchaseRecord purchaseRecord = doPurchaseTicketWithPessimisticLockV2(request);
+       /* TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(purchaseDate);
         if (ticketEntity == null) {
             throw new IllegalStateException("该日期的票券不存在");
         }
@@ -556,10 +568,10 @@ public class TicketServiceImpl implements TicketService {
 
         // 返回前端模型
         PurchaseRecord record = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
-        ticketCacheManager.addPurchaseRecord(userId, purchaseDate, record);
+        ticketCacheManager.addPurchaseRecord(userId, purchaseDate, record);*/
 
-        LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, ticketCode);
-        return ApiResponse.success(record);
+        LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
+        return ApiResponse.success(purchaseRecord);
     }
 
     /**
@@ -576,7 +588,7 @@ public class TicketServiceImpl implements TicketService {
             validParam(request);
 
             // 合法性校验
-            validVerification(request);
+            validLegalParam(request);
 
             // 限流检查
             validRateLimit(request);
@@ -668,15 +680,21 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 限流检查
+     * 秒杀开始前（倒计时阶段）：限制单用户每分钟最多 10-30 次请求（主要是页面刷新、倒计时同步等非抢购请求）。
+     * 秒杀进行中（抢购按钮激活后）：限制单用户每秒最多 1-2 次请求，或每分钟最多 20-50 次请求。
+     * 例如：单用户 5 秒内只能发起 1 次抢购请求（通过 Redis 记录user:limit:userId的时间戳，超过则拦截）。
+     *
+     * 用户级限流：秒杀中控制在 1-2 次 / 秒，核心是防恶意请求，保证公平。
+     * 接口级限流：低库存场景按 “库存 ×10-20 倍”，高库存场景按 “系统承载的 70%-80%”，核心是匹配系统能 ---- 博物馆 500张票
      */
     private void validRateLimit(PurchaseRequest request) {
-        // 用户限流：每个用户，1分钟10次抢购
-        boolean allowed = userService.isAllowed(request.getUserId(), 5, 60);
+        // 用户限流：每个用户，1分钟20次抢购
+        boolean allowed = userService.isAllowed(request.getUserId(), 20, 60);
         if (!allowed) {
             throw new RuntimeException("购买失败，超过频率限制");
         }
 
-        // 接口限流 每秒放行10个请求
+        // 接口限流 每秒放行5000个请求
         // 单机使用 非阻塞式获取令牌，分布式使用redis+lua脚本限流
         if (!rateLimiter.tryAcquire(1000, TimeUnit.MILLISECONDS)) {
             LOGGER.warn("你被限流了，真不幸，直接返回失败");
@@ -684,22 +702,42 @@ public class TicketServiceImpl implements TicketService {
         }
     }
 
-    // TODO 先从redis获取，再从数据库获取
     @Override
     public boolean hasPurchased(Long userId, String date) {
         try {
-            // 从数据库查询用户是否已购买指定日期的票券
-            TicketPurchaseRecord record = ticketPurchaseRecordMapper.selectByUserIdAndDate(userId, date);
-            return record != null;
-        } catch (Exception e) {
-            LOGGER.error("查询用户购买记录失败: {}", e.getMessage(), e);
-            // 如果数据库查询失败，回退到Redis缓存
-            List<PurchaseRecord> records = ticketCacheManager.getPurchaseRecords(userId);
-            if (records == null) {
-                return false;
+            // 1. 先从缓存获取是否有该日期的购买记录
+            PurchaseRecord cachedRecord = ticketCacheManager.getPurchaseRecord(userId, date);
+            if (cachedRecord != null) {
+                LOGGER.debug("从缓存获取到用户购买记录，用户ID: {}, 日期: {}, 票券编码: {}", 
+                    userId, date, cachedRecord.getTicketCode());
+                return true;
             }
-            return records.stream()
-                .anyMatch(record -> record.getDate().equals(LocalDate.parse(date)));
+            
+            LOGGER.debug("缓存中未找到用户购买记录，尝试从数据库查询，用户ID: {}, 日期: {}", userId, date);
+            
+            // 2. 缓存中没有，从数据库的ticket_order表查询用户ID+date的订单
+            TicketOrder ticketOrder = ticketOrderMapper.selectByUserIdAndDate(userId, date);
+            if (ticketOrder != null) {
+                LOGGER.info("从数据库ticket_order表查询到用户购买记录，用户ID: {}, 日期: {}, 订单号: {}", 
+                    userId, date, ticketOrder.getOrderNo());
+                
+                // 将数据库记录同步到缓存
+                PurchaseRecord record = new PurchaseRecord(
+                    ticketOrder.getUserId(), 
+                    LocalDate.parse(ticketOrder.getTicketDate()), 
+                    ticketOrder.getTicketCode()
+                );
+                ticketCacheManager.addPurchaseRecord(userId, date, record);
+                
+                return true;
+            }
+            
+            LOGGER.debug("数据库中未找到用户购买记录，用户ID: {}, 日期: {}", userId, date);
+            return false;
+            
+        } catch (Exception e) {
+            LOGGER.error("查询用户购买记录失败，用户ID: {}, 日期: {}, 错误: {}", userId, date, e.getMessage(), e);
+            return false;
         }
     }
 
@@ -949,12 +987,147 @@ public class TicketServiceImpl implements TicketService {
         validationService.validateTicketCountWithException(date);
     }
 
-    // 生成票券编号
+    /**
+     * 生成票券编号（改进版，确保唯一性）
+     * 使用Redis序列号 + 时间戳 + 用户ID + 随机数，确保唯一性
+     * @param userId 用户ID
+     * @param date 日期
+     * @return 唯一票券编码
+     */
     private String generateTicketCode(String userId, String date) {
+        try {
+            // 方案1：使用Redis序列号（推荐）
+            String ticketCode = generateTicketCodeWithRedisSequence(userId, date);
+            if (ticketCode != null) {
+                return ticketCode;
+            }
+            
+            // 方案2：使用时间戳 + 纳秒（备选）
+            return generateTicketCodeWithTimestamp(userId, date);
+            
+        } catch (Exception e) {
+            LOGGER.warn("Redis序列号生成失败，使用备选方案: {}", e.getMessage());
+            // 方案3：使用UUID + 时间戳（兜底）
+            return generateTicketCodeWithUUID(userId, date);
+        }
+    }
+    
+    /**
+     * 方案1：使用Redis序列号生成票券编码（推荐）
+     * 格式：T + 日期 + 序列号 + 用户ID后4位 + 随机数
+     */
+    private String generateTicketCodeWithRedisSequence(String userId, String date) {
+        try {
+            String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String userSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
+            
+            // 使用Redis INCR生成序列号
+            String sequenceKey = "ticket:sequence:" + date;
+            Long sequence = stringRedisTemplate.opsForValue().increment(sequenceKey);
+            
+            // 设置序列号过期时间（7天后过期）
+            stringRedisTemplate.expire(sequenceKey, 7, TimeUnit.DAYS);
+            
+            // 生成随机数
+            String randomStr = String.valueOf((int)(Math.random() * 1000));
+            
+            // 格式：T + 日期 + 序列号(6位) + 用户ID后4位 + 随机数(3位)
+            return String.format("T%s%06d%s%03d", dateStr, sequence, userSuffix, Integer.parseInt(randomStr));
+            
+        } catch (Exception e) {
+            LOGGER.error("Redis序列号生成失败: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+    
+    /**
+     * 方案2：使用时间戳 + 纳秒生成票券编码（备选）
+     * 格式：T + 日期 + 时间戳 + 用户ID后4位 + 纳秒后3位
+     */
+    private String generateTicketCodeWithTimestamp(String userId, String date) {
         String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String userHash = Integer.toHexString(userId.hashCode()).substring(0, 4);
-        String randomStr = UUID.randomUUID().toString().substring(0, 6);
-        return "T" + dateStr + userHash + randomStr.toUpperCase();
+        String userSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
+        
+        // 获取当前时间戳和纳秒
+        long timestamp = System.currentTimeMillis();
+        long nanoTime = System.nanoTime();
+        
+        // 格式：T + 日期 + 时间戳后8位 + 用户ID后4位 + 纳秒后3位
+        return String.format("T%s%08d%s%03d", dateStr, timestamp % 100000000, userSuffix, (int)(nanoTime % 1000));
+    }
+    
+    /**
+     * 方案3：使用UUID + 时间戳生成票券编码（兜底）
+     * 格式：T + 日期 + UUID前8位 + 用户ID后4位 + 时间戳后3位
+     */
+    private String generateTicketCodeWithUUID(String userId, String date) {
+        String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String userSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
+        
+        // 生成UUID并取前8位
+        String uuidPrefix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        
+        // 获取时间戳后3位
+        long timestamp = System.currentTimeMillis();
+        int timestampSuffix = (int)(timestamp % 1000);
+        
+        // 格式：T + 日期 + UUID前8位 + 用户ID后4位 + 时间戳后3位
+        return String.format("T%s%s%s%03d", dateStr, uuidPrefix, userSuffix, timestampSuffix);
+    }
+    
+    /**
+     * 验证票券编码唯一性
+     * @param ticketCode 票券编码
+     * @return 是否唯一
+     */
+    private boolean isTicketCodeUnique(String ticketCode) {
+        try {
+            // 检查数据库中是否已存在
+            TicketOrder existingOrder = ticketOrderMapper.selectByTicketCode(ticketCode);
+            if (existingOrder != null) {
+                return false;
+            }
+            
+            // 检查缓存中是否已存在
+            // 这里可以添加缓存检查逻辑
+            
+            return true;
+        } catch (Exception e) {
+            LOGGER.error("验证票券编码唯一性失败: {}", e.getMessage(), e);
+            // 验证失败时，为了安全起见，返回false
+            return false;
+        }
+    }
+    
+    /**
+     * 生成唯一票券编码（带重试机制）
+     * @param userId 用户ID
+     * @param date 日期
+     * @param maxRetries 最大重试次数
+     * @return 唯一票券编码
+     */
+    private String generateUniqueTicketCode(String userId, String date, int maxRetries) {
+        for (int i = 0; i < maxRetries; i++) {
+            String ticketCode = generateTicketCode(userId, date);
+            
+            if (isTicketCodeUnique(ticketCode)) {
+                return ticketCode;
+            }
+            
+            LOGGER.warn("票券编码冲突，重试第{}次: {}", i + 1, ticketCode);
+            
+            // 重试前等待一小段时间，避免连续冲突
+            try {
+                Thread.sleep(10 + (int)(Math.random() * 20));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        
+        // 所有重试都失败，使用时间戳 + 纳秒 + 随机数生成
+        LOGGER.error("票券编码生成重试{}次后仍冲突，使用兜底方案", maxRetries);
+        return generateTicketCodeWithTimestamp(userId, date) + "_" + System.nanoTime();
     }
 
     @Override
@@ -1234,5 +1407,216 @@ public class TicketServiceImpl implements TicketService {
                 request.getUserId(), request.getDate(), e.getMessage(), e);
             throw e;
         }
+    }
+
+    /**
+     * 使用悲观锁购票并生成订单（新方法）
+     * 1. 使用SELECT FOR UPDATE锁住票券记录
+     * 2. 事务控制
+     * 3. 扣减库存
+     * 4. 生成ticket_order订单
+     * @param request 购票请求
+     * @return 购票结果
+     * @throws Exception 购票异常
+     */
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
+    public ApiResponse<PurchaseRecord> purchaseTicketWithPessimisticLockV2(PurchaseRequest request) throws Exception {
+        try {
+            LOGGER.info("开始悲观锁购票V2，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+
+            // 1. 参数验证
+            if (request == null || request.getUserId() == null || request.getDate() == null) {
+                return ApiResponse.error("请求参数不能为空");
+            }
+
+            Long userId = request.getUserId();
+            String purchaseDate = request.getDate();
+
+            // 2. 验证抢购时间
+            validatePurchaseTime(purchaseDate);
+
+            // 3. 检查用户是否已购买
+            if (hasPurchased(userId, purchaseDate)) {
+                return ApiResponse.error("用户已购买该日期的票券");
+            }
+
+            // 4. 使用悲观锁查询票券记录（FOR UPDATE）
+            TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(purchaseDate);
+            if (ticketEntity == null) {
+                return ApiResponse.error("票券不存在");
+            }
+
+            // 5. 检查库存
+            if (ticketEntity.getRemainingCount() <= 0) {
+                return ApiResponse.error("票券已售罄");
+            }
+
+            // 6. 扣减库存
+            int originalRemaining = ticketEntity.getRemainingCount();
+            int originalSold = ticketEntity.getSoldCount();
+            
+            ticketEntity.setRemainingCount(originalRemaining - 1);
+            ticketEntity.setSoldCount(originalSold + 1);
+            ticketEntity.setVersion(ticketEntity.getVersion() + 1);
+            ticketEntity.setUpdateTime(new Date());
+
+            int updateResult = ticketEntityMapper.updateByPrimaryKey(ticketEntity);
+            if (updateResult <= 0) {
+                throw new RuntimeException("库存扣减失败");
+            }
+
+            LOGGER.info("库存扣减成功，日期: {}, 原剩余: {}, 现剩余: {}, 原已售: {}, 现已售: {}", 
+                purchaseDate, originalRemaining, ticketEntity.getRemainingCount(), 
+                originalSold, ticketEntity.getSoldCount());
+
+            // 7. 生成唯一票券编码（使用专业服务）
+            String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId.toString(), purchaseDate);
+
+            // 8. 生成订单编号
+            String orderNo = generateOrderNo(userId, purchaseDate);
+
+            // 9. 创建ticket_order订单
+            TicketOrder ticketOrder = new TicketOrder();
+            ticketOrder.setOrderNo(orderNo);
+            ticketOrder.setUserId(userId);
+            ticketOrder.setTicketId(ticketEntity.getId());
+            ticketOrder.setTicketCode(ticketCode);
+            ticketOrder.setTicketDate(purchaseDate);
+            ticketOrder.setStatus(1); // 待支付
+            ticketOrder.setAmount(0L); // 免费票券，金额为0
+            ticketOrder.setCreateTime(new Date());
+            ticketOrder.setUpdateTime(new Date());
+            ticketOrder.setRemark("悲观锁购票生成");
+
+            int insertResult = ticketOrderMapper.insert(ticketOrder);
+            if (insertResult <= 0) {
+                throw new RuntimeException("订单创建失败");
+            }
+
+            LOGGER.info("订单创建成功，订单号: {}, 用户ID: {}, 票券编码: {}", 
+                orderNo, userId, ticketCode);
+
+            // 10. 更新缓存
+            ticketCacheManager.deleteTicket(purchaseDate);
+            
+            // 添加购买记录到缓存
+            PurchaseRecord purchaseRecord = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
+            ticketCacheManager.addPurchaseRecord(userId, purchaseDate, purchaseRecord);
+
+            // 11. 构建返回结果
+            PurchaseRecord result = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
+
+            LOGGER.info("悲观锁购票V2成功，用户ID: {}, 日期: {}, 票券编码: {}, 订单号: {}",
+                userId, purchaseDate, ticketCode, orderNo);
+
+            return ApiResponse.success(result);
+
+        } catch (Exception e) {
+            LOGGER.error("悲观锁购票V2失败，用户ID: {}, 日期: {}, 错误: {}",
+                request.getUserId(), request.getDate(), e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    // 悲观锁购票,仅处理购票，不做校验
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
+    public PurchaseRecord doPurchaseTicketWithPessimisticLockV2(PurchaseRequest request) throws Exception {
+        try {
+            LOGGER.info("开始悲观锁购票V2，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+
+            Long userId = request.getUserId();
+            String purchaseDate = request.getDate();
+
+            // 4. 使用悲观锁查询票券记录（FOR UPDATE）
+            TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(purchaseDate);
+            if (ticketEntity == null) {
+                throw new BusinessException("票券不存在");
+            }
+
+            // 5. 检查库存
+            if (ticketEntity.getRemainingCount() <= 0) {
+                throw new BusinessException("票券已售罄");
+            }
+
+            // 6. 扣减库存
+            int originalRemaining = ticketEntity.getRemainingCount();
+            int originalSold = ticketEntity.getSoldCount();
+
+            ticketEntity.setRemainingCount(originalRemaining - 1);
+            ticketEntity.setSoldCount(originalSold + 1);
+            ticketEntity.setVersion(ticketEntity.getVersion() + 1);
+            ticketEntity.setUpdateTime(new Date());
+
+            int updateResult = ticketEntityMapper.updateByPrimaryKey(ticketEntity);
+            if (updateResult <= 0) {
+                throw new RuntimeException("库存扣减失败");
+            }
+
+            LOGGER.info("库存扣减成功，日期: {}, 原剩余: {}, 现剩余: {}, 原已售: {}, 现已售: {}",
+                    purchaseDate, originalRemaining, ticketEntity.getRemainingCount(),
+                    originalSold, ticketEntity.getSoldCount());
+
+            // 7. 生成唯一票券编码（使用专业服务）
+            String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId.toString(), purchaseDate);
+
+            // 8. 生成订单编号
+            String orderNo = generateOrderNo(userId, purchaseDate);
+
+            // 9. 创建ticket_order订单
+            TicketOrder ticketOrder = new TicketOrder();
+            ticketOrder.setOrderNo(orderNo);
+            ticketOrder.setUserId(userId);
+            ticketOrder.setTicketId(ticketEntity.getId());
+            ticketOrder.setTicketCode(ticketCode);
+            ticketOrder.setTicketDate(purchaseDate);
+            ticketOrder.setStatus(1); // 待支付
+            ticketOrder.setAmount(0L); // 免费票券，金额为0
+            ticketOrder.setCreateTime(new Date());
+            ticketOrder.setUpdateTime(new Date());
+            ticketOrder.setRemark("悲观锁购票生成");
+
+            int insertResult = ticketOrderMapper.insert(ticketOrder);
+            if (insertResult <= 0) {
+                throw new RuntimeException("订单创建失败");
+            }
+
+            LOGGER.info("订单创建成功，订单号: {}, 用户ID: {}, 票券编码: {}",
+                    orderNo, userId, ticketCode);
+
+            // 10. 更新缓存
+            ticketCacheManager.deleteTicket(purchaseDate);
+
+            // 添加购买记录到缓存
+            PurchaseRecord purchaseRecord = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
+            ticketCacheManager.addPurchaseRecord(userId, purchaseDate, purchaseRecord);
+
+            // 11. 构建返回结果
+            PurchaseRecord result = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
+
+            LOGGER.info("悲观锁购票V2成功，用户ID: {}, 日期: {}, 票券编码: {}, 订单号: {}",
+                    userId, purchaseDate, ticketCode, orderNo);
+
+            return result;
+
+        } catch (Exception e) {
+            LOGGER.error("悲观锁购票V2失败，用户ID: {}, 日期: {}, 错误: {}",
+                    request.getUserId(), request.getDate(), e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * 生成订单编号
+     * 格式：TB + 时间戳 + 用户ID后4位 + 随机数
+     * @param userId 用户ID
+     * @param date 购票日期
+     * @return 订单编号
+     */
+    private String generateOrderNo(Long userId, String date) {
+        long timestamp = System.currentTimeMillis();
+        String userIdSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
+        int random = (int) (Math.random() * 1000);
+        
+        return String.format("TB%d%s%03d", timestamp, userIdSuffix, random);
     }
 }

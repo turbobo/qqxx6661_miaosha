@@ -104,6 +104,15 @@
         ORDER BY create_time DESC
     </select>
 
+    <!-- 根据用户ID和票券日期查询票券订单 -->
+    <select id="selectByUserIdAndDate" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ticket_order
+        WHERE user_id = #{userId} AND ticket_date = #{date}
+        ORDER BY create_time DESC
+        LIMIT 1
+    </select>
+
     <!-- 根据主键删除票券订单 -->
     <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer">
         DELETE FROM ticket_order WHERE id = #{id}

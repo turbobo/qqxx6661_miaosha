@@ -109,4 +109,16 @@ public interface TicketService {
      * @throws Exception 购票异常
      */
     ApiResponse<PurchaseRecord> purchaseTicketWithPessimisticLock(PurchaseRequest request) throws Exception;
+    
+    /**
+     * 使用悲观锁购票并生成订单（新方法）
+     * 1. 使用SELECT FOR UPDATE锁住票券记录
+     * 2. 事务控制
+     * 3. 扣减库存
+     * 4. 生成ticket_order订单
+     * @param request 购票请求
+     * @return 购票结果
+     * @throws Exception 购票异常
+     */
+    ApiResponse<PurchaseRecord> purchaseTicketWithPessimisticLockV2(PurchaseRequest request) throws Exception;
 }
