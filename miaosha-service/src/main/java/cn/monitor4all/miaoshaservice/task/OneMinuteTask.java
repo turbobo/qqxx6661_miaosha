@@ -37,20 +37,20 @@ public class OneMinuteTask {
     private TicketService ticketService;
 
     // 一分钟执行一次
-    @Scheduled(cron="0/1 * * * * ?")//每秒钟执行一次，以空格分隔
-    public void oneMinute() {
-        // 遍历order_message表，代下发状态，重试3次--重试次数字段小于3，还是失败，则去发消息通知通知退回票数（数据库记录+mq）
-        OrderRecord orderRecord = new OrderRecord();
-        orderRecord.setStatus(OrderRecordStatus.NOT_SEND.getStatus());
-        List<OrderRecord> orderRecords = orderService.selectOrderRecordNotSend(orderRecord);
-        if (!CollectionUtils.isEmpty(orderRecords)) {
-
-        }
-
-
-
-        // 库存回退也是有数据库+mq双重保障，删除 用户-商品缓存
-    }
+//    @Scheduled(cron="0/1 * * * * ?")//每秒钟执行一次，以空格分隔
+//    public void oneMinute() {
+//        // 遍历order_message表，代下发状态，重试3次--重试次数字段小于3，还是失败，则去发消息通知通知退回票数（数据库记录+mq）
+//        OrderRecord orderRecord = new OrderRecord();
+//        orderRecord.setStatus(OrderRecordStatus.NOT_SEND.getStatus());
+//        List<OrderRecord> orderRecords = orderService.selectOrderRecordNotSend(orderRecord);
+//        if (!CollectionUtils.isEmpty(orderRecords)) {
+//
+//        }
+//
+//
+//
+//        // 库存回退也是有数据库+mq双重保障，删除 用户-商品缓存
+//    }
     
     // 每天0点更新票券数据
     @Scheduled(cron = "0 0 0 * * ?")

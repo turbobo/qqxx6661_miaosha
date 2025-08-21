@@ -29,7 +29,7 @@ public class TicketCodeGeneratorTest {
      */
     @Test
     public void testSingleCodeGeneration() {
-        String userId = "1001";
+        Long userId = 1001L;
         String date = "2025-01-20";
         
         String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId, date);
@@ -51,7 +51,7 @@ public class TicketCodeGeneratorTest {
      */
     @Test
     public void testBatchCodeGeneration() {
-        String userId = "1002";
+        Long userId = 1002L;
         String date = "2025-01-21";
         int count = 100;
         
@@ -88,7 +88,7 @@ public class TicketCodeGeneratorTest {
      */
     @Test
     public void testConcurrentCodeGeneration() throws InterruptedException {
-        String userId = "1003";
+        Long userId = 1003L;
         String date = "2025-01-22";
         int threadCount = 50;
         int codesPerThread = 10;
@@ -148,14 +148,14 @@ public class TicketCodeGeneratorTest {
      */
     @Test
     public void testDifferentUsersAndDates() {
-        String[] userIds = {"1001", "2001", "3001", "4001", "5001"};
+        Long[] userIds = {1001L, 2001L, 3001L, 4001L, 5001L};
         String[] dates = {"2025-01-20", "2025-01-21", "2025-01-22"};
         
         Set<String> allCodes = new HashSet<>();
         
         LOGGER.info("开始测试不同用户和日期的编码生成");
         
-        for (String userId : userIds) {
+        for (Long userId : userIds) {
             for (String date : dates) {
                 String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId, date);
                 allCodes.add(ticketCode);
@@ -176,7 +176,7 @@ public class TicketCodeGeneratorTest {
      */
     @Test
     public void testCodeUniquenessValidation() {
-        String userId = "1004";
+        Long userId = 1004L;
         String date = "2025-01-23";
         
         // 生成第一个编码

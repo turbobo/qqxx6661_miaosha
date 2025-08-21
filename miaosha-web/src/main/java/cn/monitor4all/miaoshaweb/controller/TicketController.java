@@ -1,6 +1,5 @@
 package cn.monitor4all.miaoshaweb.controller;
 
-import cn.monitor4all.miaoshadao.dao.User;
 import cn.monitor4all.miaoshadao.model.ApiResponse;
 import cn.monitor4all.miaoshadao.model.PurchaseRecord;
 import cn.monitor4all.miaoshadao.model.PurchaseRequest;
@@ -119,16 +118,43 @@ public class TicketController {
      */
     @RequestMapping(value = "/getVerifyHash", method = {RequestMethod.GET})
     @ResponseBody
-    public String getVerifyHash(@RequestParam(value = "date") String date,
-                                @RequestParam(value = "userId") Long userId) {
-        String hash;
+    public ApiResponse<String> getVerifyHash(@RequestParam(value = "date") String date,
+                                            @RequestParam(value = "userId") Long userId) {
         try {
-            hash = userService.getVerifyHash4Ticket(date, userId);
+            LOGGER.info("开始获取验证hash，用户ID: {}, 日期: {}", userId, date);
+            
+            // 参数验证
+            if (userId == null) {
+                LOGGER.warn("用户ID不能为空");
+                return ApiResponse.error("用户ID不能为空");
+            }
+            
+            if (date == null || date.trim().isEmpty()) {
+                LOGGER.warn("日期参数不能为空");
+                return ApiResponse.error("日期参数不能为空");
+            }
+            
+            // 调用服务层获取验证hash
+            String hash = userService.getVerifyHash4Ticket(date, userId);
+            
+            if (hash == null || hash.trim().isEmpty()) {
+                LOGGER.warn("获取验证hash失败，hash值为空");
+                return ApiResponse.error("获取验证hash失败");
+            }
+            
+            LOGGER.info("成功获取验证hash，用户ID: {}, 日期: {}, hash: {}", userId, date, hash);
+            return ApiResponse.success(hash);
+            
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("获取验证hash参数错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
+        } catch (IllegalStateException e) {
+            LOGGER.warn("获取验证hash业务错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
         } catch (Exception e) {
-            LOGGER.error("获取验证hash失败，原因：[{}]", e.getMessage());
-            return "获取验证hash失败";
+            LOGGER.error("获取验证hash系统错误，用户ID: {}, 日期: {}", userId, date, e);
+            return ApiResponse.error("系统错误，获取验证hash失败，请重试");
         }
-        return String.format("请求抢购验证hash值为：%s", hash);
     }
 
 
@@ -197,37 +223,6 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("票券购买V2失败，用户ID: {}, 日期: {}", request.getUserId(), request.getDate(), e);
             return ApiResponse.error("购买失败，请重试");
-        }
-    }
-    
-    /**
-     * 票券购买接口V3：悲观锁购票并生成订单
-     * 使用SELECT FOR UPDATE锁住票券记录，事务控制，扣库存，生成ticket_order
-     * @param request 购票请求
-     * @param httpRequest HTTP请求
-     * @return 购票结果
-     */
-    @PostMapping("/v3/purchase")
-    public ApiResponse<PurchaseRecord> purchaseTicketV3(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
-        try {
-            LOGGER.info("开始处理票券购买请求V3（悲观锁），用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
-
-            // 调用服务层悲观锁购票方法
-            ApiResponse<PurchaseRecord> response = ticketService.purchaseTicketWithPessimisticLockV2(request);
-            
-            if (response.isSuccess()) {
-                LOGGER.info("票券购买V3（悲观锁）成功，用户ID: {}, 日期: {}, 票券编号: {}",
-                        request.getUserId(), request.getDate(), response.getData().getTicketCode());
-            } else {
-                LOGGER.warn("票券购买V3（悲观锁）失败，用户ID: {}, 日期: {}, 错误: {}",
-                        request.getUserId(), request.getDate(), response.getMessage());
-            }
-            
-            return response;
-            
-        } catch (Exception e) {
-            LOGGER.error("票券购买V3（悲观锁）异常，用户ID: {}, 日期: {}", request.getUserId(), request.getDate(), e);
-            return ApiResponse.error("购买失败，请重试: " + e.getMessage());
         }
     }
     

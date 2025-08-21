@@ -12,7 +12,7 @@ public interface TicketCodeGeneratorService {
      * @param date 日期
      * @return 唯一票券编码
      */
-    String generateUniqueTicketCode(String userId, String date);
+    String generateUniqueTicketCode(Long userId, String date);
     
     /**
      * 生成唯一票券编码（带重试机制）
@@ -21,7 +21,7 @@ public interface TicketCodeGeneratorService {
      * @param maxRetries 最大重试次数
      * @return 唯一票券编码
      */
-    String generateUniqueTicketCode(String userId, String date, int maxRetries);
+    String generateUniqueTicketCode(Long userId, String date, int maxRetries);
     
     /**
      * 验证票券编码唯一性

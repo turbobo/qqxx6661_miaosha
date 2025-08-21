@@ -29,7 +29,8 @@ public class OrderMqReceiver {
             // 创建订单
 //            orderService.createOrderByMq(jsonObject.getInteger("sid"),jsonObject.getInteger("userId"));
 
-            orderService.createOrderByMq(jsonObject.getString("orderId"), jsonObject.getInteger("sid"), jsonObject.getLong("userId"));
+
+             orderService.createOrderByMq(jsonObject.getString("orderId"), jsonObject.getInteger("sid"), jsonObject.getLong("userId"));
             // TODO 订单创建成功后，修改 order_message表记录
 
         } catch (Exception e) {

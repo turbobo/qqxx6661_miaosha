@@ -1477,7 +1477,7 @@ public class TicketServiceImpl implements TicketService {
                 originalSold, ticketEntity.getSoldCount());
 
             // 7. 生成唯一票券编码（使用专业服务）
-            String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId.toString(), purchaseDate);
+            String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId, purchaseDate);
 
             // 8. 生成订单编号
             String orderNo = generateOrderNo(userId, purchaseDate);
@@ -1564,7 +1564,7 @@ public class TicketServiceImpl implements TicketService {
                     originalSold, ticketEntity.getSoldCount());
 
             // 7. 生成唯一票券编码（使用专业服务）
-            String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId.toString(), purchaseDate);
+            String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId, purchaseDate);
 
             // 8. 生成订单编号
             String orderNo = generateOrderNo(userId, purchaseDate);

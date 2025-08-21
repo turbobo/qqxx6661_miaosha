@@ -36,12 +36,12 @@ public class TicketCodeGeneratorServiceImpl implements TicketCodeGeneratorServic
     private String currentStrategy = "Redis序列号";
     
     @Override
-    public String generateUniqueTicketCode(String userId, String date) {
+    public String generateUniqueTicketCode(Long userId, String date) {
         return generateUniqueTicketCode(userId, date, 3);
     }
     
     @Override
-    public String generateUniqueTicketCode(String userId, String date, int maxRetries) {
+    public String generateUniqueTicketCode(Long userId, String date, int maxRetries) {
         for (int i = 0; i < maxRetries; i++) {
             String ticketCode = generateTicketCode(userId, date);
             
@@ -101,7 +101,7 @@ public class TicketCodeGeneratorServiceImpl implements TicketCodeGeneratorServic
     /**
      * 生成票券编码（多策略）
      */
-    private String generateTicketCode(String userId, String date) {
+    private String generateTicketCode(Long userId, String date) {
         try {
             // 方案1：使用Redis序列号（推荐）
             String ticketCode = generateTicketCodeWithRedisSequence(userId, date);
@@ -127,7 +127,7 @@ public class TicketCodeGeneratorServiceImpl implements TicketCodeGeneratorServic
      * 格式：T + 日期 + 序列号 + 用户ID后4位 + 随机数
      * 改进：基于上次序列号递增，支持持久化和连续性
      */
-    private String generateTicketCodeWithRedisSequence(String userId, String date) {
+    private String generateTicketCodeWithRedisSequence(Long userId, String date) {
         try {
             String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             String userSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
@@ -155,7 +155,7 @@ public class TicketCodeGeneratorServiceImpl implements TicketCodeGeneratorServic
      * 方案2：使用时间戳 + 纳秒生成票券编码（备选）
      * 格式：T + 日期 + 时间戳 + 用户ID后4位 + 纳秒后3位
      */
-    private String generateTicketCodeWithTimestamp(String userId, String date) {
+    private String generateTicketCodeWithTimestamp(Long userId, String date) {
         String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String userSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
         
@@ -171,7 +171,7 @@ public class TicketCodeGeneratorServiceImpl implements TicketCodeGeneratorServic
      * 方案3：使用UUID + 时间戳生成票券编码（兜底）
      * 格式：T + 日期 + UUID前8位 + 用户ID后4位 + 时间戳后3位
      */
-    private String generateTicketCodeWithUUID(String userId, String date) {
+    private String generateTicketCodeWithUUID(Long userId, String date) {
         String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String userSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
         
