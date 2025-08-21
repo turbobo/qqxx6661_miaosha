@@ -505,7 +505,7 @@ public class TicketServiceImpl implements TicketService {
         // 限流检查
         validRateLimit(request);
 
-        // *********合法性校验：抢购时间内、用户登录、token、黑名单等********
+        // *********合法性校验：抢购时间内、用户登录、token、是否重复抢购、黑名单等********
         validLegalParam(request);
 
         // 获取请求参数
@@ -685,7 +685,7 @@ public class TicketServiceImpl implements TicketService {
      * 例如：单用户 5 秒内只能发起 1 次抢购请求（通过 Redis 记录user:limit:userId的时间戳，超过则拦截）。
      *
      * 用户级限流：秒杀中控制在 1-2 次 / 秒，核心是防恶意请求，保证公平。
-     * 接口级限流：低库存场景按 “库存 ×10-20 倍”，高库存场景按 “系统承载的 70%-80%”，核心是匹配系统能 ---- 博物馆 500张票
+     * 接口级限流：低库存场景按 “库存 ×10-20 倍”，高库存场景按 “系统承载的 70%-80%”，核心是匹配系统能 ---- 博物馆 2000张票
      */
     private void validRateLimit(PurchaseRequest request) {
         // 用户限流：每个用户，1分钟20次抢购
@@ -702,6 +702,13 @@ public class TicketServiceImpl implements TicketService {
         }
     }
 
+    /**
+     * 检查用户是否已经购买过该日期的票券
+     * 先查询购买记录缓存，如果有则返回true，否则查询数据库，如果有则返回true，否则返回false
+     * @param userId 用户ID
+     * @param date 日期
+     * @return
+     */
     @Override
     public boolean hasPurchased(Long userId, String date) {
         try {
@@ -1583,7 +1590,7 @@ public class TicketServiceImpl implements TicketService {
             LOGGER.info("订单创建成功，订单号: {}, 用户ID: {}, 票券编码: {}",
                     orderNo, userId, ticketCode);
 
-            // 10. 更新缓存
+            // 10. 删除缓存
             ticketCacheManager.deleteTicket(purchaseDate);
 
             // 添加购买记录到缓存

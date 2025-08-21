@@ -7,6 +7,7 @@ import cn.monitor4all.miaoshadao.mapper.TicketPurchaseRecordMapper;
 import cn.monitor4all.miaoshadao.model.PurchaseRecord;
 import cn.monitor4all.miaoshadao.model.Ticket;
 import cn.monitor4all.miaoshaservice.service.TicketCacheManager;
+import cn.monitor4all.miaoshaservice.service.AsyncCacheDeleteService;
 import com.alibaba.fastjson.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,20 +100,32 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
             LOGGER.error("票券保存到缓存失败，日期: {}", date, e);
         }
     }
+
+    @Resource
+    private AsyncCacheDeleteService asyncCacheDeleteService;
     
+    //
     @Override
     public void deleteTicket(String date) {
         try {
             String key = TICKET_CACHE_PREFIX + date;
-            Boolean deleted = stringRedisTemplate.delete(key);
             
-            if (Boolean.TRUE.equals(deleted)) {
-                LOGGER.debug("从缓存删除票券成功，日期: {}, key: {}", date, key);
-            } else {
-                LOGGER.debug("缓存中未找到要删除的票券，日期: {}, key: {}", date, key);
-            }
+            // 使用双重异步删除：先线程池，再队列
+            asyncCacheDeleteService.deleteCacheDualAsync(key);
+            
+            LOGGER.info("票券缓存删除任务已提交（双重异步），日期: {}, key: {}", date, key);
+            
         } catch (Exception e) {
-            LOGGER.error("从缓存删除票券失败，日期: {}", date, e);
+            LOGGER.error("提交票券缓存删除任务失败，日期: {}, key: {}", date, TICKET_CACHE_PREFIX + date, e);
+            
+            // 异常时使用队列删除作为兜底
+            try {
+                String key = TICKET_CACHE_PREFIX + date;
+                asyncCacheDeleteService.deleteCacheByQueue(key);
+                LOGGER.info("使用队列删除作为兜底，日期: {}, key: {}", date, key);
+            } catch (Exception ex) {
+                LOGGER.error("队列删除兜底也失败，日期: {}, key: {}", date, TICKET_CACHE_PREFIX + date, ex);
+            }
         }
     }
     
