@@ -14,7 +14,7 @@ import javax.annotation.Resource;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
+import java.io.Serializable;
 
 /**
  * 异步缓存删除服务实现类
@@ -209,7 +209,10 @@ public class AsyncCacheDeleteServiceImpl implements AsyncCacheDeleteService {
     /**
      * 缓存删除消息
      */
-    public static class CacheDeleteMessage {
+    public static class CacheDeleteMessage implements Serializable {
+
+        private static final long serialVersionUID = -4499121283329810037L;
+
         private String cacheKey;
         private long delayMillis;
         private long timestamp;
