@@ -447,11 +447,19 @@
                         this.loading = true;
                         // 注释掉认证相关代码，直接调用API
                         // 使用全局设置的axios默认header，无需手动添加token
-                        const response = await axios.get('http://localhost:8081/api/tickets/list');
+                        // 调用新的接口，获取包含用户购买状态的票券信息
+                        const response = await axios.get('http://localhost:8081/api/tickets/listWithUserStatus', {
+                            params: {
+                                userId: this.currentUserId || null
+                            }
+                        });
                         
                         if (response.data.code === 200) {
                             this.tickets = response.data.data;
                             this.error = '';
+                            
+                            // 更新已购买日期列表
+                            this.updatePurchasedDates();
                         } else {
                             this.error = response.data.message || '加载票券失败';
                         }
@@ -471,6 +479,17 @@
                     } finally {
                         this.loading = false;
                     }
+                },
+                
+                // 更新已购买日期列表
+                updatePurchasedDates() {
+                    this.purchasedDates = [];
+                    for (const ticket of this.tickets) {
+                        if (ticket.userPurchased) {
+                            this.purchasedDates.push(ticket.formattedDate);
+                        }
+                    }
+                    this.LOGGER.info('已购买日期列表更新: {}', this.purchasedDates);
                 },
                 
                 // 处理抢购点击事件

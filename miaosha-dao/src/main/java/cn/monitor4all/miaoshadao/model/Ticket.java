@@ -9,6 +9,9 @@ public class Ticket {
     private int total;
     private int remaining;
     
+    // 添加用户是否已购买的标识
+    private boolean userPurchased;
+    
     // 添加无参构造函数以支持Jackson反序列化
     public Ticket() {
     }
@@ -17,6 +20,7 @@ public class Ticket {
         this.date = date;
         this.total = total;
         this.remaining = total;
+        this.userPurchased = false; // 默认未购买
         
         // 获取星期几
         try {
@@ -63,6 +67,15 @@ public class Ticket {
     
     public void setRemaining(int remaining) {
         this.remaining = remaining;
+    }
+    
+    // 新增字段的getter和setter
+    public boolean isUserPurchased() {
+        return userPurchased;
+    }
+    
+    public void setUserPurchased(boolean userPurchased) {
+        this.userPurchased = userPurchased;
     }
     
     public boolean purchase() {

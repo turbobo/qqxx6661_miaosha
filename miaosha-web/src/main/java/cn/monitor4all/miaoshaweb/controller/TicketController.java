@@ -67,6 +67,31 @@ public class TicketController {
             return ApiResponse.error("获取票券列表失败: " + e.getMessage());
         }
     }
+
+    // 获取最近3天的票券信息（包含用户购买状态）
+    @GetMapping("/listWithUserStatus")
+    public ApiResponse<List<Ticket>> getRecentTicketsWithUserStatus(@RequestParam(required = false) Long userId) {
+        try {
+            LOGGER.info("开始获取最近3天的票券信息（包含用户购买状态），用户ID: {}", userId);
+
+            // 获取带用户购买状态的票券信息
+            List<Ticket> tickets = ticketService.getRecentTicketsWithUserStatus(userId);
+
+            // 如果缓存中没有数据，尝试从数据库加载
+            if (tickets == null || tickets.isEmpty()) {
+                LOGGER.info("缓存中没有票券数据，从数据库加载");
+                ticketService.updateDailyTickets();
+                // 直接获取票券信息，不调用不存在的方法
+                tickets = ticketService.getRecentTicketsWithUserStatus(userId);
+            }
+
+            LOGGER.info("成功获取票券信息（包含用户购买状态），用户ID: {}, 共{}张票券", userId, tickets.size());
+            return ApiResponse.success(tickets);
+        } catch (Exception e) {
+            LOGGER.error("获取票券列表（包含用户购买状态）失败: {}", e.getMessage(), e);
+            return ApiResponse.error("获取票券列表失败: " + e.getMessage());
+        }
+    }
     
     /**
      * 验证抢购时间是否有效

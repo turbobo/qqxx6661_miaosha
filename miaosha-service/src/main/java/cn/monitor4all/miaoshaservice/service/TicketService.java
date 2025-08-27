@@ -18,6 +18,13 @@ public interface TicketService {
      * @return 票券列表
      */
     List<Ticket> getRecentTickets();
+
+    /**
+     * 获取最近3天的票券信息，携带用户是否抢购该票数的结果
+     * @param userId 用户ID，如果为null则返回基础票券信息
+     * @return 票券列表
+     */
+    List<Ticket> getRecentTicketsWithUserStatus(Long userId);
     
     /**
      * 购买票券

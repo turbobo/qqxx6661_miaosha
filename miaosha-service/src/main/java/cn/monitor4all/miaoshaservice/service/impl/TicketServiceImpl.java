@@ -1626,4 +1626,108 @@ public class TicketServiceImpl implements TicketService {
         
         return String.format("TB%d%s%03d", timestamp, userIdSuffix, random);
     }
+
+    @Override
+    public List<Ticket> getRecentTicketsWithUserStatus(Long userId) {
+        try {
+            // 获取基础票券信息
+            List<Ticket> tickets = getRecentTickets();
+            
+            // 如果用户未登录，直接返回基础信息
+            if (userId == null) {
+                LOGGER.info("用户未登录，返回基础票券信息");
+                return tickets;
+            }
+            
+            // 为每个票券添加用户购买状态
+            for (Ticket ticket : tickets) {
+                boolean hasPurchased = checkUserPurchaseStatus(userId, ticket.getDate());
+                ticket.setUserPurchased(hasPurchased);
+                LOGGER.debug("票券日期: {}, 用户ID: {}, 已购买: {}", ticket.getDate(), userId, hasPurchased);
+            }
+            
+            LOGGER.info("获取票券信息成功，用户ID: {}, 票券数量: {}", userId, tickets.size());
+            return tickets;
+            
+        } catch (Exception e) {
+            LOGGER.error("获取带用户状态的票券信息失败，用户ID: {}", userId, e);
+            // 如果出错，返回基础票券信息
+            return getRecentTickets();
+        }
+    }
+    
+    /**
+     * 检查用户是否已购买指定日期的票券
+     * 优先从缓存查询，缓存未命中则从数据库ticket_order表查询
+     * @param userId 用户ID
+     * @param date 日期
+     * @return 是否已购买
+     */
+    private boolean checkUserPurchaseStatus(Long userId, String date) {
+        try {
+            if (userId == null) {
+                return false;
+            }
+            
+            // 1. 先从缓存查询用户购买状态
+            boolean fromCache = checkUserPurchaseStatusFromCache(userId, date);
+            if (fromCache) {
+                LOGGER.debug("从缓存查询到用户购买状态，用户ID: {}, 日期: {}, 已购买: true", userId, date);
+                return true;
+            }
+            
+            // 2. 缓存中没有，查询数据库ticket_order表
+            LOGGER.debug("缓存中未找到用户购买记录，尝试从数据库查询，用户ID: {}, 日期: {}", userId, date);
+            TicketOrder ticketOrder = ticketOrderMapper.selectByUserIdAndDate(userId, date);
+            
+            boolean hasPurchased = ticketOrder != null;
+            
+            // 3. 将查询结果写入缓存
+            String cacheKey = CacheKey.USER_HAS_ORDER.getKey() + "_" + date + "_" + userId;
+            if (hasPurchased) {
+                stringRedisTemplate.opsForValue().set(cacheKey, "1", 12, TimeUnit.HOURS);
+                LOGGER.debug("用户已购买，写入缓存，用户ID: {}, 日期: {}, 缓存键: {}", userId, date, cacheKey);
+            } else {
+                stringRedisTemplate.opsForValue().set(cacheKey, "0", 12, TimeUnit.HOURS);
+                LOGGER.debug("用户未购买，写入缓存，用户ID: {}, 日期: {}, 缓存键: {}", userId, date, cacheKey);
+            }
+            
+            LOGGER.debug("从数据库查询用户购买状态，用户ID: {}, 日期: {}, 已购买: {}", userId, date, hasPurchased);
+            return hasPurchased;
+            
+        } catch (Exception e) {
+            LOGGER.error("查询用户购买状态失败，用户ID: {}, 日期: {}", userId, date, e);
+            return false;
+        }
+    }
+    
+    /**
+     * 从缓存查询用户购买状态
+     * @param userId 用户ID
+     * @param date 日期
+     * @return 是否已购买
+     */
+    private boolean checkUserPurchaseStatusFromCache(Long userId, String date) {
+        try {
+            if (userId == null) {
+                return false;
+            }
+            
+            // 从Redis缓存查询
+            String cacheKey = CacheKey.USER_HAS_ORDER.getKey() + "_" + date + "_" + userId;
+            String cacheValue = stringRedisTemplate.opsForValue().get(cacheKey);
+            
+            if (cacheValue != null) {
+                boolean hasPurchased = "1".equals(cacheValue);
+                LOGGER.debug("从缓存查询用户购买状态，用户ID: {}, 日期: {}, 已购买: {}", userId, date, hasPurchased);
+                return hasPurchased;
+            }
+            
+            return false;
+            
+        } catch (Exception e) {
+            LOGGER.error("从缓存查询用户购买状态失败，用户ID: {}, 日期: {}", userId, date, e);
+            return false;
+        }
+    }
 }
