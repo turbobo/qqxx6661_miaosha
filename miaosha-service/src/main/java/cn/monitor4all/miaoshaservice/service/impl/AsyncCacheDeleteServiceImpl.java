@@ -95,20 +95,23 @@ public class AsyncCacheDeleteServiceImpl implements AsyncCacheDeleteService {
             deleteMessage.setTimestamp(System.currentTimeMillis());
             deleteMessage.setSource(applicationName);
             
-                    // 发送到队列
-        if (delayMillis > 0) {
-            // 延迟删除，使用延迟队列
-            amqpTemplate.convertAndSend(CACHE_DELETE_EXCHANGE, CACHE_DELETE_DELAY_ROUTING_KEY, 
-                deleteMessage, message -> {
-                    message.getMessageProperties().setDelay((int) delayMillis);
-                    return message;
-                });
-            LOGGER.debug("延迟删除消息已发送到队列，缓存键: {}, 延迟: {}ms", cacheKey, delayMillis);
-        } else {
-            // 立即删除
-            amqpTemplate.convertAndSend(CACHE_DELETE_EXCHANGE, CACHE_DELETE_ROUTING_KEY, deleteMessage);
-            LOGGER.debug("立即删除消息已发送到队列，缓存键: {}", cacheKey);
-        }
+            // 将消息对象转换为JSON字符串发送
+            String messageJson = JSON.toJSONString(deleteMessage);
+            
+            // 发送到队列
+            if (delayMillis > 0) {
+                // 延迟删除，使用延迟队列
+                amqpTemplate.convertAndSend(CACHE_DELETE_EXCHANGE, CACHE_DELETE_DELAY_ROUTING_KEY, 
+                    messageJson, message -> {
+                        message.getMessageProperties().setDelay((int) delayMillis);
+                        return message;
+                    });
+                LOGGER.debug("延迟删除消息已发送到队列，缓存键: {}, 延迟: {}ms", cacheKey, delayMillis);
+            } else {
+                // 立即删除
+                amqpTemplate.convertAndSend(CACHE_DELETE_EXCHANGE, CACHE_DELETE_ROUTING_KEY, messageJson);
+                LOGGER.debug("立即删除消息已发送到队列，缓存键: {}", cacheKey);
+            }
             
         } catch (Exception e) {
             LOGGER.error("发送队列删除消息失败，缓存键: {}, 延迟: {}ms", cacheKey, delayMillis, e);
