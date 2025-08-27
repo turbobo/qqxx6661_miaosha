@@ -583,26 +583,74 @@ public class TicketServiceImpl implements TicketService {
      */
     // 默认开启一个事务
     @Override
-    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
-    public PurchaseRecord purchaseTicketV2(PurchaseRequest request) throws Exception {
-        try {
-            // 请求参数校验
-            validParam(request);
+    public ApiResponse<PurchaseRecord> purchaseTicketV2(PurchaseRequest request) throws Exception {
 
-            // 合法性校验
-            validLegalParam(request);
+        multiValidParam(request);
 
-            // 限流检查
-            validRateLimit(request);
+        // 获取请求参数
+        Long userId = request.getUserId();
+        String purchaseDate = request.getDate();
 
-            // 调用原有的购买逻辑
-            return purchaseTicket(request).getData();
+        // 接口限流
+        // 3、用户、票数校验
+        // 4、悲观锁更新票券库存
+        // 5、生成订单 ----> 同步创建访客预约记录，下发门禁等设备权限，通过rpc，失败则写入重试表；仍然失败，管理员可以手动创建访客预约
+        // 6、返回选购成功
+        // 7、查询订单
 
-        } catch (Exception e) {
-            LOGGER.error("V2购买票券失败，用户ID: {}, 日期: {}, 错误: {}",
-                request.getUserId(), request.getDate(), e.getMessage(), e);
-            throw e;
+
+
+        // 从数据库获取票券信息（使用悲观锁）
+        PurchaseRecord purchaseRecord = doPurchaseTicketWithPessimisticLockV2(request);
+       /* TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(purchaseDate);
+        if (ticketEntity == null) {
+            throw new IllegalStateException("该日期的票券不存在");
         }
+
+        // 检查是否售罄
+        if (ticketEntity.getRemainingCount() <= 0) {
+            throw new IllegalStateException("该日期的票券已售罄");
+        }
+
+        // 更新库存（乐观锁）
+        ticketEntity.setRemainingCount(ticketEntity.getRemainingCount() - 1);
+        ticketEntity.setSoldCount(ticketEntity.getSoldCount() + 1);
+        boolean updated = updateTicketStockByOptimistic(ticketEntity);
+        if (!updated) {
+            throw new IllegalStateException("票券购买失败，请重试 (库存版本冲突)");
+        }
+
+        // 生成票券编号
+        String ticketCode = generateTicketCode(userId.toString(), purchaseDate);
+
+        // 保存购买记录到数据库
+        TicketPurchaseRecord recordEntity = new TicketPurchaseRecord(userId, purchaseDate, ticketCode);
+        recordEntity.setTicketId(ticketEntity.getId());
+        recordEntity.setOrderId(UUID.randomUUID().toString());
+        boolean recordSaved = savePurchaseRecord(recordEntity);
+        if (!recordSaved) {
+            throw new IllegalStateException("购买记录保存失败");
+        }
+
+        // 更新Redis缓存
+        ticketCacheManager.deleteTicket(purchaseDate);
+
+        // 更新票券列表缓存
+        List<Ticket> ticketList = ticketCacheManager.getTicketList();
+        if (ticketList != null) {
+            ticketList.removeIf(t -> t.getDate().equals(purchaseDate));
+            Ticket updatedTicket = new Ticket(purchaseDate, ticketEntity.getTotalCount());
+            updatedTicket.setRemaining(ticketEntity.getRemainingCount() - 1);
+            ticketList.add(updatedTicket);
+            ticketCacheManager.saveTicketList(ticketList);
+        }
+
+        // 返回前端模型
+        PurchaseRecord record = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
+        ticketCacheManager.addPurchaseRecord(userId, purchaseDate, record);*/
+
+        LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
+        return ApiResponse.success(purchaseRecord);
     }
 
 
@@ -611,25 +659,15 @@ public class TicketServiceImpl implements TicketService {
      * 请求参数校验
      * @param request
      */
-    private void validParam(PurchaseRequest request) {
-        // 日期校验
-        String purchaseDate = request.getDate();
-        if (purchaseDate == null || purchaseDate.isEmpty()) {
-            LOGGER.warn("日期格式错误，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
-            throw new IllegalArgumentException("日期格式错误或日期不能为空");
-        }
+    private void multiValidParam(PurchaseRequest request) throws Exception {
+        // *********入参为空校验********
+        validNullParam(request);
 
-        // 检查日期是否有效（不能购买过去的日期）
-        if (LocalDate.parse(purchaseDate).isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException("不能购买过去的日期");
-        }
+        // *********合法性校验：抢购时间内、用户登录、token、是否重复抢购、黑名单等********
+        validLegalParam(request);
 
-        // 使用前端传递的userId，允许匿名用户
-        Long userId = request.getUserId();
-        if (Objects.isNull(userId)) {
-            request.setUserId(User.ANONYMOUS); // 默认匿名用户
-            LOGGER.info("用户ID为空，使用默认匿名用户ID: {}", userId);
-        }
+        // 限流检查
+        validRateLimit(request);
     }
 
     // 校验参数不能为空
