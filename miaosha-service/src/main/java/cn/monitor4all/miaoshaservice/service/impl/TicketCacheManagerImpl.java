@@ -15,6 +15,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -132,19 +134,73 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
     @Override
     public List<Ticket> getTicketList() {
         try {
-            String ticketListJson = stringRedisTemplate.opsForValue().get(TICKET_LIST_CACHE_KEY);
+            // 先尝试从缓存获取票券列表
+            List<Ticket> tickets = getTicketsFromRecentDates();
             
-            if (ticketListJson != null) {
-                List<Ticket> tickets = JSON.parseArray(ticketListJson, Ticket.class);
-                LOGGER.debug("从缓存获取票券列表成功，数量: {}", tickets != null ? tickets.size() : 0);
-                return tickets;
-            }
+//            if () {
+//                List<Ticket> tickets = JSON.parseArray(ticketListJson, Ticket.class);
+//                LOGGER.debug("从缓存获取票券列表成功，数量: {}", tickets != null ? tickets.size() : 0);
+//                return tickets;
+//            }
+//
+//            // 如果缓存中没有票券列表，则从最近3天的日期分别获取票券信息
+//            LOGGER.debug("缓存中未找到票券列表，尝试从最近3天日期分别获取");
+//            List<Ticket> tickets = getTicketsFromRecentDates();
+//
+//            if (tickets != null && !tickets.isEmpty()) {
+//                // 将获取到的票券列表保存到缓存
+//                saveTicketList(tickets);
+//                LOGGER.info("从最近3天日期获取票券信息成功，数量: {}, 已保存到缓存", tickets.size());
+//            }
             
-            LOGGER.debug("缓存中未找到票券列表");
-            return null;
+            return tickets;
         } catch (Exception e) {
             LOGGER.error("从缓存获取票券列表失败", e);
             return null;
+        }
+    }
+    
+    /**
+     * 从最近3天日期分别获取票券信息
+     * @return 票券列表
+     */
+    private List<Ticket> getTicketsFromRecentDates() {
+        try {
+            // 计算最近3天的日期
+            LocalDate today = LocalDate.now();
+            String todayStr = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String tomorrowStr = today.plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String dayAfterTomorrowStr = today.plusDays(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            
+            LOGGER.debug("开始获取最近3天票券信息，日期: {}, {}, {}", todayStr, tomorrowStr, dayAfterTomorrowStr);
+            
+            List<Ticket> tickets = new ArrayList<>();
+            
+            // 分别获取每个日期的票券信息
+            Ticket todayTicket = getTicketWithFallback(todayStr);
+            if (todayTicket != null) {
+                tickets.add(todayTicket);
+                LOGGER.debug("获取今日票券成功: {}", todayTicket.getDate());
+            }
+            
+            Ticket tomorrowTicket = getTicketWithFallback(tomorrowStr);
+            if (tomorrowTicket != null) {
+                tickets.add(tomorrowTicket);
+                LOGGER.debug("获取明日票券成功: {}", tomorrowTicket.getDate());
+            }
+            
+            Ticket dayAfterTomorrowTicket = getTicketWithFallback(dayAfterTomorrowStr);
+            if (dayAfterTomorrowTicket != null) {
+                tickets.add(dayAfterTomorrowTicket);
+                LOGGER.debug("获取后日票券成功: {}", dayAfterTomorrowTicket.getDate());
+            }
+            
+            LOGGER.info("从最近3天日期获取票券信息完成，成功获取{}张票券", tickets.size());
+            return tickets;
+            
+        } catch (Exception e) {
+            LOGGER.error("从最近3天日期获取票券信息失败", e);
+            return new ArrayList<>();
         }
     }
     

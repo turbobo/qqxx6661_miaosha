@@ -442,11 +442,12 @@ public class TicketServiceImpl implements TicketService {
         try {
             // 从Redis获取最近3天的票券数据
             List<Ticket> cachedTickets = ticketCacheManager.getTicketList();
-            if (cachedTickets != null && !cachedTickets.isEmpty()) {
+            if (cachedTickets != null && cachedTickets.size() != 3) {
                 LOGGER.info("从Redis获取最近3天的票券");
                 return cachedTickets;
             }
 
+            // 缓存数据不完整，从数据库获取
             // 计算最近3天的日期范围
             LocalDate today = LocalDate.now();
             String todayStr = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
