@@ -1559,6 +1559,9 @@ public class TicketServiceImpl implements TicketService {
                 throw new RuntimeException("库存扣减失败");
             }
 
+            // 10. 删除缓存
+            ticketCacheManager.deleteTicket(purchaseDate);
+
             LOGGER.info("库存扣减成功，日期: {}, 原剩余: {}, 现剩余: {}, 原已售: {}, 现已售: {}",
                     purchaseDate, originalRemaining, ticketEntity.getRemainingCount(),
                     originalSold, ticketEntity.getSoldCount());
@@ -1589,9 +1592,6 @@ public class TicketServiceImpl implements TicketService {
 
             LOGGER.info("订单创建成功，订单号: {}, 用户ID: {}, 票券编码: {}",
                     orderNo, userId, ticketCode);
-
-            // 10. 删除缓存
-            ticketCacheManager.deleteTicket(purchaseDate);
 
             // 添加购买记录到缓存
             PurchaseRecord purchaseRecord = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);

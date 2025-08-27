@@ -21,8 +21,7 @@ public interface TicketService {
     
     /**
      * 购买票券
-     * @param userId 用户ID
-     * @param date 日期
+     * @param request 购票请求
      * @return 购买记录，如果购买失败返回null
      */
     ApiResponse<PurchaseRecord> purchaseTicket(PurchaseRequest request) throws Exception;
