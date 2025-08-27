@@ -500,15 +500,8 @@ public class TicketServiceImpl implements TicketService {
     @Override
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public ApiResponse<PurchaseRecord> purchaseTicket(PurchaseRequest request) throws Exception {
-        // *********入参为空校验********
-        validNullParam(request);
 
-        // *********合法性校验：抢购时间内、用户登录、token、是否重复抢购、黑名单等********
-        validLegalParam(request);
-
-        // 限流检查
-        validRateLimit(request);
-
+        multiValidParam(request);
 
         // 获取请求参数
         Long userId = request.getUserId();
@@ -590,64 +583,8 @@ public class TicketServiceImpl implements TicketService {
         // 获取请求参数
         Long userId = request.getUserId();
         String purchaseDate = request.getDate();
+        PurchaseRecord purchaseRecord = doPurchaseTicketWithOptimisticLock(request);
 
-        // 接口限流
-        // 3、用户、票数校验
-        // 4、悲观锁更新票券库存
-        // 5、生成订单 ----> 同步创建访客预约记录，下发门禁等设备权限，通过rpc，失败则写入重试表；仍然失败，管理员可以手动创建访客预约
-        // 6、返回选购成功
-        // 7、查询订单
-
-
-
-        // 从数据库获取票券信息（使用悲观锁）
-        PurchaseRecord purchaseRecord = doPurchaseTicketWithPessimisticLockV2(request);
-       /* TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(purchaseDate);
-        if (ticketEntity == null) {
-            throw new IllegalStateException("该日期的票券不存在");
-        }
-
-        // 检查是否售罄
-        if (ticketEntity.getRemainingCount() <= 0) {
-            throw new IllegalStateException("该日期的票券已售罄");
-        }
-
-        // 更新库存（乐观锁）
-        ticketEntity.setRemainingCount(ticketEntity.getRemainingCount() - 1);
-        ticketEntity.setSoldCount(ticketEntity.getSoldCount() + 1);
-        boolean updated = updateTicketStockByOptimistic(ticketEntity);
-        if (!updated) {
-            throw new IllegalStateException("票券购买失败，请重试 (库存版本冲突)");
-        }
-
-        // 生成票券编号
-        String ticketCode = generateTicketCode(userId.toString(), purchaseDate);
-
-        // 保存购买记录到数据库
-        TicketPurchaseRecord recordEntity = new TicketPurchaseRecord(userId, purchaseDate, ticketCode);
-        recordEntity.setTicketId(ticketEntity.getId());
-        recordEntity.setOrderId(UUID.randomUUID().toString());
-        boolean recordSaved = savePurchaseRecord(recordEntity);
-        if (!recordSaved) {
-            throw new IllegalStateException("购买记录保存失败");
-        }
-
-        // 更新Redis缓存
-        ticketCacheManager.deleteTicket(purchaseDate);
-
-        // 更新票券列表缓存
-        List<Ticket> ticketList = ticketCacheManager.getTicketList();
-        if (ticketList != null) {
-            ticketList.removeIf(t -> t.getDate().equals(purchaseDate));
-            Ticket updatedTicket = new Ticket(purchaseDate, ticketEntity.getTotalCount());
-            updatedTicket.setRemaining(ticketEntity.getRemainingCount() - 1);
-            ticketList.add(updatedTicket);
-            ticketCacheManager.saveTicketList(ticketList);
-        }
-
-        // 返回前端模型
-        PurchaseRecord record = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
-        ticketCacheManager.addPurchaseRecord(userId, purchaseDate, record);*/
 
         LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
         return ApiResponse.success(purchaseRecord);
@@ -1651,6 +1588,147 @@ public class TicketServiceImpl implements TicketService {
             throw e;
         }
     }
+
+
+    /**
+     * 乐观锁购票
+     *
+     * 1. 优先选乐观锁的场景
+     * 高并发、低冲突：如电商商品库存更新、秒杀业务、用户积分修改（大部分时间无冲突，偶尔冲突可通过重试解决）；
+     * 读多写少：如新闻资讯阅读、商品详情查询（读操作无需锁，写操作少，冲突概率低）；
+     * 分布式系统：跨数据库、跨服务的并发操作（悲观锁无法跨节点锁定，乐观锁通过版本号可实现分布式校验）。
+     * 2. 优先选悲观锁的场景
+     * 低并发、高冲突：如金融交易（转账、支付），冲突概率高，需确保操作原子性，避免重试导致的重复交易；
+     * 写多读少：如订单状态更新（大量事务同时修改订单状态，冲突频繁，悲观锁可避免重试开销）；
+     * 数据一致性要求极高：如库存不允许超卖、余额不允许负数（悲观锁锁定后操作，可 100% 避免并发问题，无需担心重试漏判）。
+     */
+    public PurchaseRecord doPurchaseTicketWithOptimisticLock(PurchaseRequest request) throws Exception {
+        try {
+            LOGGER.info("开始乐观锁购票购票，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+
+            Long userId = request.getUserId();
+            String purchaseDate = request.getDate();
+
+            // 4. 使用乐观锁扣减库存，支持重试机制
+            TicketEntity ticketEntity = null;
+            int maxRetries = 3;
+            int retryCount = 0;
+            boolean stockUpdated = false;
+            int originalRemaining = 0;
+            int originalSold = 0;
+
+            while (retryCount < maxRetries && !stockUpdated) {
+                try {
+                    // 查询票券信息（不使用FOR UPDATE）
+                    ticketEntity = ticketEntityMapper.selectByDate(purchaseDate);
+                    if (ticketEntity == null) {
+                        throw new BusinessException("票券不存在");
+                    }
+
+                    // 检查库存
+                    if (ticketEntity.getRemainingCount() <= 0) {
+                        throw new BusinessException("票券已售罄");
+                    }
+
+                    // 准备扣减库存（乐观锁）
+                    originalRemaining = ticketEntity.getRemainingCount();
+                    originalSold = ticketEntity.getSoldCount();
+                    int originalVersion = ticketEntity.getVersion();
+
+                    ticketEntity.setRemainingCount(originalRemaining - 1);
+                    ticketEntity.setSoldCount(originalSold + 1);
+                    ticketEntity.setUpdateTime(new Date());
+
+                    // 使用乐观锁更新库存（version字段自动处理）
+                    int updateResult = ticketEntityMapper.updateStockByOptimistic(ticketEntity);
+                    if (updateResult > 0) {
+                        stockUpdated = true;
+                        LOGGER.info("乐观锁库存扣减成功，日期: {}, 原剩余: {}, 现剩余: {}, 原已售: {}, 现已售: {}, 版本: {}->{}",
+                                purchaseDate, originalRemaining, ticketEntity.getRemainingCount(),
+                                originalSold, ticketEntity.getSoldCount(), originalVersion, ticketEntity.getVersion());
+                    } else {
+                        // 乐观锁更新失败，版本冲突
+                        retryCount++;
+                        if (retryCount < maxRetries) {
+                            LOGGER.warn("乐观锁更新失败，版本冲突，重试第{}次，用户ID: {}, 日期: {}", 
+                                      retryCount, userId, purchaseDate);
+                            // 短暂等待后重试
+                            Thread.sleep(10 + (int)(Math.random() * 20));
+                        } else {
+                            throw new RuntimeException("乐观锁更新失败，重试" + maxRetries + "次后仍失败");
+                        }
+                    }
+                } catch (Exception e) {
+                    if (e instanceof BusinessException) {
+                        throw e; // 业务异常直接抛出
+                    }
+                    retryCount++;
+                    if (retryCount >= maxRetries) {
+                        throw new RuntimeException("乐观锁购票失败，重试" + maxRetries + "次后仍失败: " + e.getMessage(), e);
+                    }
+                    LOGGER.warn("乐观锁购票异常，重试第{}次，用户ID: {}, 日期: {}, 错误: {}", 
+                              retryCount, userId, purchaseDate, e.getMessage());
+                    Thread.sleep(10 + (int)(Math.random() * 20));
+                }
+            }
+
+            if (!stockUpdated) {
+                throw new RuntimeException("乐观锁库存扣减失败，重试" + maxRetries + "次后仍失败");
+            }
+
+            // 10. 删除缓存
+            ticketCacheManager.deleteTicket(purchaseDate);
+
+            LOGGER.info("库存扣减成功，日期: {}, 原剩余: {}, 现剩余: {}, 原已售: {}, 现已售: {}",
+                    purchaseDate, originalRemaining, ticketEntity.getRemainingCount(),
+                    originalSold, ticketEntity.getSoldCount());
+
+            // 7. 生成唯一票券编码（使用专业服务）
+            String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId, purchaseDate);
+
+            // 8. 生成订单编号
+            String orderNo = generateOrderNo(userId, purchaseDate);
+
+            // 9. 创建ticket_order订单
+            TicketOrder ticketOrder = new TicketOrder();
+            ticketOrder.setOrderNo(orderNo);
+            ticketOrder.setUserId(userId);
+            ticketOrder.setTicketId(ticketEntity.getId());
+            ticketOrder.setTicketCode(ticketCode);
+            ticketOrder.setTicketDate(purchaseDate);
+            ticketOrder.setStatus(1); // 待支付
+            ticketOrder.setAmount(0L); // 免费票券，金额为0
+            ticketOrder.setCreateTime(new Date());
+            ticketOrder.setUpdateTime(new Date());
+            ticketOrder.setRemark("乐观锁购票生成");
+
+            int insertResult = ticketOrderMapper.insert(ticketOrder);
+            if (insertResult <= 0) {
+                throw new RuntimeException("订单创建失败");
+            }
+
+            LOGGER.info("订单创建成功，订单号: {}, 用户ID: {}, 票券编码: {}",
+                    orderNo, userId, ticketCode);
+
+            // 添加购买记录到缓存
+            PurchaseRecord purchaseRecord = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
+            ticketCacheManager.addPurchaseRecord(userId, purchaseDate, purchaseRecord);
+
+            // 11. 构建返回结果
+            PurchaseRecord result = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
+
+            LOGGER.info("乐观锁购票成功，用户ID: {}, 日期: {}, 票券编码: {}, 订单号: {}",
+                    userId, purchaseDate, ticketCode, orderNo);
+
+            return result;
+
+        } catch (Exception e) {
+            LOGGER.error("乐观锁购票失败，用户ID: {}, 日期: {}, 错误: {}",
+                    request.getUserId(), request.getDate(), e.getMessage(), e);
+            throw e;
+        }
+    }
+
 
     /**
      * 生成订单编号

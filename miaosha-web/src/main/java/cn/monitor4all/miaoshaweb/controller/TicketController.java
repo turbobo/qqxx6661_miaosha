@@ -203,7 +203,7 @@ public class TicketController {
     @PostMapping("/v1/purchase")
     public ApiResponse<PurchaseRecord> purchaseTicket(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
         try {
-            LOGGER.info("开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+            LOGGER.info("V1开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
 
             // 调用服务层购买票券
             ApiResponse<PurchaseRecord> response = ticketService.purchaseTicket(request);
@@ -226,10 +226,7 @@ public class TicketController {
     }
 
     /**
-     * 轮询查询结果（异步场景）：
-     * 若后端采用 “请求入队 + 异步处理” 模式（见后端设计），前端需通过轮询查询抢购结果，而非阻塞等待。
-     * 轮询频率：初期可 1-2 秒一次，3-5 次后降低频率（如 3-5 秒一次），避免高频请求浪费资源。
-     * 超时控制：设置轮询总时长（如 30 秒），超时未返回结果则提示 “抢购超时，请重试”。
+     * 同步购买 乐观锁
      * @param request
      * @param httpRequest
      * @return
@@ -237,19 +234,25 @@ public class TicketController {
     @PostMapping("/v2/purchase")
     public ApiResponse<PurchaseRecord> purchaseTicketV2(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
         try {
-            LOGGER.info("开始处理票券购买请求V2，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+            LOGGER.info("V2开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
 
-            // 调用服务层购买票券V2版本
-            PurchaseRecord record = ticketService.purchaseTicketV2(request);
-            
-            LOGGER.info("票券购买V2成功，用户ID: {}, 日期: {}, 票券编号: {}",
-                    request.getUserId(), request.getDate(), record.getTicketCode());
-            
-            return ApiResponse.success(record);
-            
+            // 调用服务层购买票券
+            ApiResponse<PurchaseRecord> response = ticketService.purchaseTicketV2(request);
+
+            LOGGER.info("票券购买成功，用户ID: {}, 日期: {}, 票券编号: {}",
+                    request.getUserId(), request.getDate(), response.getData().getTicketCode());
+
+            return response;
+
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("票券购买参数错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
+        } catch (IllegalStateException e) {
+            LOGGER.warn("票券购买业务错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
         } catch (Exception e) {
-            LOGGER.error("票券购买V2失败，用户ID: {}, 日期: {}", request.getUserId(), request.getDate(), e);
-            return ApiResponse.error("购买失败，请重试");
+            LOGGER.error("票券购买系统错误: {}", e.getMessage(), e);
+            return ApiResponse.error("系统错误，购买失败，请重试");
         }
     }
     

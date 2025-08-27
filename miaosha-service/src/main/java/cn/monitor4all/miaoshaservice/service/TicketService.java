@@ -34,7 +34,7 @@ public interface TicketService {
     ApiResponse<PurchaseRecord> purchaseTicket(PurchaseRequest request) throws Exception;
 
 
-    PurchaseRecord purchaseTicketV2(PurchaseRequest request) throws Exception;
+    ApiResponse<PurchaseRecord> purchaseTicketV2(PurchaseRequest request) throws Exception;
 
     /**
      * 检查用户是否已购买指定日期的票券
