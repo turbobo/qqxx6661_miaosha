@@ -106,7 +106,7 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
     @Resource
     private AsyncCacheDeleteService asyncCacheDeleteService;
     
-    //
+    // 使用双重异步删除：先线程池，再队列
     @Override
     public void deleteTicket(String date) {
         try {
@@ -429,6 +429,27 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
             }
         } catch (Exception e) {
             LOGGER.error("购买记录同步到缓存失败，用户ID: {}", userId, e);
+        }
+    }
+    
+    @Override
+    public void deletePurchaseRecord(Long userId, String date) {
+        try {
+            String key = PURCHASE_RECORD_CACHE_PREFIX + userId + ":" + date;
+            stringRedisTemplate.delete(key);
+            LOGGER.debug("购买记录缓存删除成功，用户ID: {}, 日期: {}, key: {}", userId, date, key);
+        } catch (Exception e) {
+            LOGGER.error("购买记录缓存删除失败，用户ID: {}, 日期: {}", userId, date, e);
+        }
+    }
+    
+    @Override
+    public void deleteTicketList() {
+        try {
+            stringRedisTemplate.delete(TICKET_LIST_CACHE_KEY);
+            LOGGER.debug("票券列表缓存删除成功，key: {}", TICKET_LIST_CACHE_KEY);
+        } catch (Exception e) {
+            LOGGER.error("票券列表缓存删除失败", e);
         }
     }
     

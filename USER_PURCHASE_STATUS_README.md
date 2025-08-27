@@ -154,6 +154,19 @@ GET /api/tickets/listWithUserStatus?userId=123
 
 # 获取基础票券列表（不包含用户状态）
 GET /api/tickets/list
+
+# 取消购票
+POST /api/tickets/v1/cancel
+Content-Type: application/json
+
+{
+    "userId": 123,
+    "orderNo": "TB1234567890",
+    "ticketCode": "T202401151234567890",
+    "date": "2024-01-15",
+    "cancelReason": "行程变更",
+    "verifyHash": "abc123def456"
+}
 ```
 
 ### 2. 前端集成
@@ -169,6 +182,16 @@ if (ticket.userPurchased) {
     button.disabled = true;
     button.classList.add('bg-gray-200');
 }
+
+// 取消购票
+const cancelResponse = await axios.post('/api/tickets/v1/cancel', {
+    userId: currentUserId,
+    orderNo: orderNo,
+    ticketCode: ticketCode,
+    date: ticketDate,
+    cancelReason: '行程变更',
+    verifyHash: generateVerifyHash()
+});
 ```
 
 ## 数据库表结构

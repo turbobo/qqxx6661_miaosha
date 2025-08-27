@@ -91,4 +91,16 @@ public interface TicketCacheManager {
      * @return 是否连接正常
      */
     boolean isRedisConnected();
+    
+    /**
+     * 删除购买记录缓存
+     * @param userId 用户ID
+     * @param date 购买日期
+     */
+    void deletePurchaseRecord(Long userId, String date);
+    
+    /**
+     * 删除票券列表缓存
+     */
+    void deleteTicketList();
 }

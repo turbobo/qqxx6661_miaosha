@@ -5,6 +5,8 @@ import cn.monitor4all.miaoshadao.model.PurchaseRecord;
 import cn.monitor4all.miaoshadao.model.PurchaseRequest;
 import cn.monitor4all.miaoshadao.model.Ticket;
 import cn.monitor4all.miaoshadao.model.UpdateTicketsRequest;
+import cn.monitor4all.miaoshadao.model.CancelPurchaseRequest;
+import cn.monitor4all.miaoshadao.model.CancelPurchaseResponse;
 import cn.monitor4all.miaoshaservice.service.MiaoshaStatusService;
 import cn.monitor4all.miaoshaservice.service.TicketOptimisticUpdateService;
 import cn.monitor4all.miaoshaservice.service.TicketService;
@@ -461,5 +463,41 @@ public class TicketController {
             return ApiResponse.error("获取重试统计信息失败: " + e.getMessage());
         }
     }
-    
+
+
+    /**
+     * 取消购票接口
+     * 1. 验证取消条件
+     * 2. 恢复票券库存
+     * 3. 更新订单状态
+     * 4. 更新相关缓存
+     * @param request 取消购票请求
+     * @param httpRequest HTTP请求对象
+     * @return 取消购票结果
+     */
+    @PostMapping("/v1/cancel")
+    public ApiResponse<CancelPurchaseResponse> cancelPurchase(@RequestBody CancelPurchaseRequest request, HttpServletRequest httpRequest) {
+        try {
+            LOGGER.info("开始处理票券取消请求，用户ID: {}, 订单号: {}, 票券编码: {}", 
+                       request.getUserId(), request.getOrderNo(), request.getTicketCode());
+
+            // 调用服务层取消购票
+            CancelPurchaseResponse response = ticketService.cancelPurchase(request);
+            
+            LOGGER.info("票券取消成功，用户ID: {}, 订单号: {}, 票券编码: {}",
+                       request.getUserId(), request.getOrderNo(), request.getTicketCode());
+            
+            return ApiResponse.success(response);
+            
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("票券取消参数错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
+        } catch (IllegalStateException e) {
+            LOGGER.warn("票券取消业务错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
+        } catch (Exception e) {
+            LOGGER.error("票券取消系统错误: {}", e.getMessage(), e);
+            return ApiResponse.error("系统错误，取消失败，请重试");
+        }
+    }
 }

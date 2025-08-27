@@ -127,4 +127,16 @@ public interface TicketService {
      * @throws Exception 购票异常
      */
     ApiResponse<PurchaseRecord> purchaseTicketWithPessimisticLockV2(PurchaseRequest request) throws Exception;
+    
+    /**
+     * 取消购票
+     * 1. 验证取消条件
+     * 2. 恢复票券库存
+     * 3. 更新订单状态
+     * 4. 更新相关缓存
+     * @param request 取消购票请求
+     * @return 取消购票结果
+     * @throws Exception 取消购票异常
+     */
+    CancelPurchaseResponse cancelPurchase(CancelPurchaseRequest request) throws Exception;
 }

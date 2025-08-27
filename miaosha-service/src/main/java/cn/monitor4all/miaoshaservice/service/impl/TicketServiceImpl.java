@@ -1732,4 +1732,229 @@ public class TicketServiceImpl implements TicketService {
             return false;
         }
     }
+
+    /**
+     * 验证取消条件
+     * @param order 订单信息
+     * @param request 取消购票请求
+     */
+    private void validateCancelConditions(TicketOrder order, CancelPurchaseRequest request) {
+        // 1. 权限验证：只能取消自己的订单
+        if (!order.getUserId().equals(request.getUserId())) {
+            throw new IllegalStateException("只能取消自己的订单");
+        }
+        
+        // 2. 状态验证：只能取消待支付或已支付的订单
+        if (order.getStatus() != 1 && order.getStatus() != 2) {
+            throw new IllegalStateException("只能取消待支付或已支付的订单");
+        }
+        
+        // 3. 时间验证：只能在购票后24小时内取消
+        Date createTime = order.getCreateTime();
+        Date now = new Date();
+        long timeDiff = now.getTime() - createTime.getTime();
+        long hoursDiff = timeDiff / (1000 * 60 * 60);
+        
+        if (hoursDiff > 24) {
+            throw new IllegalStateException("购票超过24小时，无法取消");
+        }
+        
+        // 4. 活动状态验证：秒杀活动暂停时不允许取消
+        try {
+            if (miaoshaStatusService.isMiaoshaPaused()) {
+                throw new IllegalStateException("秒杀活动正在维护中，无法取消购票");
+            }
+        } catch (Exception e) {
+            LOGGER.warn("检查秒杀活动状态失败，继续执行: {}", e.getMessage());
+        }
+    }
+    
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CancelPurchaseResponse cancelPurchase(CancelPurchaseRequest request) throws Exception {
+        try {
+            LOGGER.info("开始处理取消购票请求，用户ID: {}, 订单号: {}, 票券编码: {}", 
+                       request.getUserId(), request.getOrderNo(), request.getTicketCode());
+
+            // 1. 参数验证
+            validateCancelRequest(request);
+            
+            // 2. 查询订单信息
+            TicketOrder order = getOrderByRequest(request);
+            if (order == null) {
+                throw new IllegalArgumentException("订单不存在");
+            }
+            
+            // 3. 验证取消条件
+            validateCancelConditions(order, request);
+            
+            // 4. 执行取消操作
+            CancelPurchaseResponse response = executeCancel(order, request);
+            
+            // 5. 更新缓存
+            updateCacheAfterCancel(order);
+            
+            LOGGER.info("取消购票成功，用户ID: {}, 订单号: {}, 票券编码: {}", 
+                       order.getUserId(), order.getOrderNo(), order.getTicketCode());
+            
+            return response;
+            
+        } catch (Exception e) {
+            LOGGER.error("取消购票失败，用户ID: {}, 订单号: {}, 票券编码: {}", 
+                        request.getUserId(), request.getOrderNo(), request.getTicketCode(), e);
+            throw e;
+        }
+    }
+    
+    /**
+     * 验证取消购票请求参数
+     * @param request 取消购票请求
+     */
+    private void validateCancelRequest(CancelPurchaseRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("请求参数不能为空");
+        }
+        
+        if (request.getUserId() == null) {
+            throw new IllegalArgumentException("用户ID不能为空");
+        }
+        
+        // 至少需要提供一种查询方式
+        if (request.getOrderNo() == null && request.getTicketCode() == null && request.getDate() == null) {
+            throw new IllegalArgumentException("至少需要提供订单号、票券编码或日期中的一种");
+        }
+        
+        if (request.getCancelReason() == null || request.getCancelReason().trim().isEmpty()) {
+            throw new IllegalArgumentException("取消原因不能为空");
+        }
+        
+        if (request.getVerifyHash() == null || request.getVerifyHash().trim().isEmpty()) {
+            throw new IllegalArgumentException("验证哈希不能为空");
+        }
+    }
+    
+    /**
+     * 根据请求参数查询订单信息
+     * @param request 取消购票请求
+     * @return 订单信息
+     */
+    private TicketOrder getOrderByRequest(CancelPurchaseRequest request) {
+        // 优先通过订单号查询
+        if (request.getOrderNo() != null) {
+            return ticketOrderMapper.selectByOrderNo(request.getOrderNo());
+        }
+        
+        // 其次通过票券编码查询
+        if (request.getTicketCode() != null) {
+            return ticketOrderMapper.selectByTicketCode(request.getTicketCode());
+        }
+        
+        // 最后通过用户ID+日期查询
+        if (request.getUserId() != null && request.getDate() != null) {
+            return ticketOrderMapper.selectByUserIdAndDate(request.getUserId(), request.getDate());
+        }
+        
+        throw new IllegalArgumentException("缺少必要的查询参数");
+    }
+    
+    /**
+     * 执行取消操作
+     * @param order 订单信息
+     * @param request 取消购票请求
+     * @return 取消购票响应
+     */
+    private CancelPurchaseResponse executeCancel(TicketOrder order, CancelPurchaseRequest request) {
+        // 1. 恢复票券库存
+        restoreTicketStock(order);
+        
+        // 2. 更新订单状态
+        updateOrderStatus(order, request.getCancelReason());
+        
+        // 3. 构建响应
+        String cancelTime = new Date().toString();
+        Integer refundAmount = order.getAmount() != null ? order.getAmount().intValue() : 0;
+        
+        return new CancelPurchaseResponse(
+            order.getOrderNo(),
+            order.getTicketCode(),
+            cancelTime,
+            request.getCancelReason(),
+            refundAmount,
+            "已取消"
+        );
+    }
+    
+    /**
+     * 恢复票券库存
+     * @param order 订单信息
+     */
+    private void restoreTicketStock(TicketOrder order) {
+        // 1. 使用悲观锁查询票券信息
+        TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(order.getTicketDate());
+        if (ticketEntity == null) {
+            throw new RuntimeException("票券不存在，无法恢复库存");
+        }
+        
+        // 2. 恢复库存
+        ticketEntity.setRemainingCount(ticketEntity.getRemainingCount() + 1);
+        ticketEntity.setSoldCount(ticketEntity.getSoldCount() - 1);
+        ticketEntity.setVersion(ticketEntity.getVersion() + 1);
+        ticketEntity.setUpdateTime(new Date());
+        
+        // 3. 更新数据库 TODO 乐观锁，version不需要在业务层加1
+        int result = ticketEntityMapper.updateByPrimaryKey(ticketEntity);
+        if (result <= 0) {
+            throw new RuntimeException("库存恢复失败");
+        }
+        
+        LOGGER.info("库存恢复成功，日期: {}, 原剩余: {}, 现剩余: {}, 原已售: {}, 现已售: {}", 
+                   order.getTicketDate(), ticketEntity.getRemainingCount() - 1, 
+                   ticketEntity.getRemainingCount(), ticketEntity.getSoldCount() + 1, 
+                   ticketEntity.getSoldCount());
+    }
+    
+    /**
+     * 更新订单状态
+     * @param order 订单信息
+     * @param cancelReason 取消原因
+     */
+    private void updateOrderStatus(TicketOrder order, String cancelReason) {
+        order.setStatus(3); // 已取消
+        order.setUpdateTime(new Date());
+        order.setRemark("用户取消：" + cancelReason);
+        
+        int result = ticketOrderMapper.updateByPrimaryKey(order);
+        if (result <= 0) {
+            throw new RuntimeException("订单状态更新失败");
+        }
+        
+        LOGGER.info("订单状态更新成功，订单号: {}, 新状态: 已取消", order.getOrderNo());
+    }
+    
+    /**
+     * 取消购票后更新缓存
+     * @param order 订单信息
+     */
+    private void updateCacheAfterCancel(TicketOrder order) {
+        try {
+            // 1. 清除用户购买状态缓存
+            String cacheKey = CacheKey.USER_HAS_ORDER.getKey() + "_" + order.getTicketDate() + "_" + order.getUserId();
+            stringRedisTemplate.delete(cacheKey);
+            
+            // 2. 清除购买记录缓存
+            ticketCacheManager.deletePurchaseRecord(order.getUserId(), order.getTicketDate());
+            
+            // 3. 清除票券库存缓存
+            ticketCacheManager.deleteTicket(order.getTicketDate());
+            
+            // 4. 清除票券列表缓存
+//            ticketCacheManager.deleteTicketList();
+            
+            LOGGER.debug("缓存更新完成，订单号: {}, 票券日期: {}", order.getOrderNo(), order.getTicketDate());
+            
+        } catch (Exception e) {
+            LOGGER.warn("缓存更新失败，订单号: {}, 票券日期: {}", order.getOrderNo(), order.getTicketDate(), e);
+            // 缓存更新失败不影响主流程
+        }
+    }
 }
