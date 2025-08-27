@@ -36,7 +36,7 @@ public class TicketServiceImpl implements TicketService {
 
     // 抢购时间常量
     private static final LocalTime START_TIME = LocalTime.of(8, 0); // 上午9点开始
-    private static final LocalTime END_TIME = LocalTime.of(16, 0);  // 晚上11点结束
+    private static final LocalTime END_TIME = LocalTime.of(17, 0);  // 晚上11点结束
 
     @Resource
     private TicketEntityMapper ticketEntityMapper;
@@ -502,11 +502,12 @@ public class TicketServiceImpl implements TicketService {
         // *********入参为空校验********
         validNullParam(request);
 
+        // *********合法性校验：抢购时间内、用户登录、token、是否重复抢购、黑名单等********
+        validLegalParam(request);
+
         // 限流检查
         validRateLimit(request);
 
-        // *********合法性校验：抢购时间内、用户登录、token、是否重复抢购、黑名单等********
-        validLegalParam(request);
 
         // 获取请求参数
         Long userId = request.getUserId();
@@ -644,6 +645,9 @@ public class TicketServiceImpl implements TicketService {
             throw new IllegalArgumentException("参数不完整");
         }
 
+        // 检查当前时间是否处于抢购时间内
+        validateCurrentTimeInPurchaseWindow();
+
         // 验证码、哈希值 校验
         // 验证hash值合法性
         String hashKey = CacheKey.HASH_KEY.getKey() + "_" + request.getDate() + "_" + request.getUserId();
@@ -653,9 +657,6 @@ public class TicketServiceImpl implements TicketService {
             throw new IllegalArgumentException("hash值与Redis中不符合");
         }
         LOGGER.info("验证hash值合法性成功");
-
-        // 检查当前时间是否处于抢购时间内
-        validateCurrentTimeInPurchaseWindow();
 
         // 用户校验
         validationService.validateUserWithException(request.getUserId());
