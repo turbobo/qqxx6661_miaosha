@@ -133,7 +133,7 @@ public class SequenceGeneratorServiceImpl implements SequenceGeneratorService {
             Long result = stringRedisTemplate.execute(script, 
                 Arrays.asList(key), 
                 String.valueOf(step), 
-                String.valueOf(7 * 24 * 3600)); // 7天过期
+                String.valueOf(1 * 24 * 3600)); // 1天过期
             
             if (result != null) {
                 LOGGER.debug("Lua脚本生成序列号成功，业务键: {}, 序列号: {}", businessKey, result);
@@ -157,7 +157,7 @@ public class SequenceGeneratorServiceImpl implements SequenceGeneratorService {
             Long result = stringRedisTemplate.opsForValue().increment(key, step);
             
             // 设置过期时间
-            stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
+            stringRedisTemplate.expire(key, 1, TimeUnit.DAYS);
             
             if (result != null) {
                 LOGGER.debug("Redis INCR生成序列号成功，业务键: {}, 序列号: {}", businessKey, result);
@@ -197,7 +197,7 @@ public class SequenceGeneratorServiceImpl implements SequenceGeneratorService {
             
             // 更新到Redis（作为持久化）
             stringRedisTemplate.opsForValue().set(key, String.valueOf(next));
-            stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
+            stringRedisTemplate.expire(key, 1, TimeUnit.DAYS);
             
             LOGGER.debug("内存计数器生成序列号成功，业务键: {}, 序列号: {}", businessKey, next);
             return next;

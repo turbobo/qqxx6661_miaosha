@@ -124,24 +124,29 @@ public class TicketCodeGeneratorServiceImpl implements TicketCodeGeneratorServic
     
     /**
      * 方案1：使用Redis序列号生成票券编码（推荐）
-     * 格式：T + 日期 + 序列号 + 用户ID后4位 + 随机数
+     * 格式：T + 当前日期 + 序列号 + 用户ID后4位 + 随机数
      * 改进：基于上次序列号递增，支持持久化和连续性
+     * 业务键使用CacheKey.TICKET_SEQUENCE枚举，日期使用当前日期
      */
     private String generateTicketCodeWithRedisSequence(Long userId, String date) {
         try {
-            String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            // 获取当前日期，而不是使用传入的date参数
+            String currentDateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             String userSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
             
-            // 使用专业的序列号生成服务
-            long sequence = sequenceGeneratorService.getNextSequence(date);
+            // 使用currentDateStr作为业务键，1天有效，当天购票的序列号会递增
+            String businessKey = currentDateStr;
+            
+            // 使用专业的序列号生成服务，传入业务键
+            long sequence = sequenceGeneratorService.getNextSequence(businessKey);
             
             // 生成随机数
             String randomStr = String.valueOf((int)(Math.random() * 1000));
             
-            // 格式：T + 日期 + 序列号(6位) + 用户ID后4位 + 随机数(3位)
-            String ticketCode = String.format("T%s%06d%s%03d", dateStr, sequence, userSuffix, Integer.parseInt(randomStr));
+            // 格式：T + 当前日期 + 序列号(6位) + 用户ID后4位 + 随机数(3位)
+            String ticketCode = String.format("T%s%06d%s%03d", currentDateStr, sequence, userSuffix, Integer.parseInt(randomStr));
             
-            LOGGER.debug("生成票券编码，日期: {}, 序列号: {}, 编码: {}", date, sequence, ticketCode);
+            LOGGER.debug("生成票券编码，业务键: {}, 当前日期: {}, 序列号: {}, 编码: {}", businessKey, currentDateStr, sequence, ticketCode);
             
             return ticketCode;
             
