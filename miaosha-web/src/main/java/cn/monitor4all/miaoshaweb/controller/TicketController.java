@@ -231,13 +231,13 @@ public class TicketController {
      * @param httpRequest
      * @return
      */
-    @PostMapping("/v2/purchase")
+    @PostMapping("/v1/purchase/optimistic")
     public ApiResponse<PurchaseRecord> purchaseTicketV2(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
         try {
-            LOGGER.info("V2开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+            LOGGER.info("V1乐观锁开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
 
             // 调用服务层购买票券
-            ApiResponse<PurchaseRecord> response = ticketService.purchaseTicketV2(request);
+            ApiResponse<PurchaseRecord> response = ticketService.purchaseTicketV1WithOptimisticLock(request);
 
             LOGGER.info("票券购买成功，用户ID: {}, 日期: {}, 票券编号: {}",
                     request.getUserId(), request.getDate(), response.getData().getTicketCode());

@@ -576,7 +576,7 @@ public class TicketServiceImpl implements TicketService {
      */
     // 默认开启一个事务
     @Override
-    public ApiResponse<PurchaseRecord> purchaseTicketV2(PurchaseRequest request) throws Exception {
+    public ApiResponse<PurchaseRecord> purchaseTicketV1WithOptimisticLock(PurchaseRequest request) throws Exception {
 
         multiValidParam(request);
 
@@ -1602,6 +1602,7 @@ public class TicketServiceImpl implements TicketService {
      * 写多读少：如订单状态更新（大量事务同时修改订单状态，冲突频繁，悲观锁可避免重试开销）；
      * 数据一致性要求极高：如库存不允许超卖、余额不允许负数（悲观锁锁定后操作，可 100% 避免并发问题，无需担心重试漏判）。
      */
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public PurchaseRecord doPurchaseTicketWithOptimisticLock(PurchaseRequest request) throws Exception {
         try {
             LOGGER.info("开始乐观锁购票购票，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
