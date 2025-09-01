@@ -728,16 +728,23 @@
                             verifyHash: verifyHash
                         });
                         
-                        if (response.data.code === 200) {
-                            if (this.selectedPurchaseApi === 'async') {
-                                // 异步抢购，开始轮询查询结果
-                                const result = response.data.data;
-                                this.asyncRequestId = result.requestId;
-                                this.LOGGER.info('异步抢购请求已提交，请求ID: {}, 开始轮询查询结果', this.asyncRequestId);
-                                
-                                // 开始轮询
-                                this.startPolling();
-                            } else {
+                                                 if (response.data.code === 200) {
+                             if (this.selectedPurchaseApi === 'async') {
+                                 // 异步抢购，检查requestId
+                                 const result = response.data.data;
+                                 this.asyncRequestId = result.requestId;
+                                 
+                                 if (!this.asyncRequestId) {
+                                     // requestId为空，直接结束并提示失败
+                                     this.failMessage = '抢购失败，请重试';
+                                     this.showFailModal = true;
+                                     this.LOGGER.warn('异步抢购失败，requestId为空');
+                                 } else {
+                                     // requestId不为空，开始轮询
+                                     this.LOGGER.info('异步抢购请求已提交，请求ID: {}, 开始轮询查询结果', this.asyncRequestId);
+                                     this.startPolling();
+                                 }
+                             } else {
                                 // 同步抢购成功
                                 const record = response.data.data;
                                 this.successTicketDate = this.selectedTicket.formattedDate;
@@ -780,8 +787,11 @@
                         
                         this.showFailModal = true;
                     } finally {
-                        // 无论成功还是失败，都要重置抢购状态
-                        this.isPurchasing = false;
+                        // 只有非异步抢购时才重置抢购状态
+                        // 异步抢购的状态由轮询机制管理
+                        if (this.selectedPurchaseApi !== 'async') {
+                            this.isPurchasing = false;
+                        }
                     }
                 },
                 
@@ -802,25 +812,29 @@
                     this.isPolling = true;
                     this.LOGGER.info('开始轮询查询异步抢购结果，请求ID: {}', this.asyncRequestId);
                     
-                    // 设置轮询间隔为2秒
+                    // 显示"抢购中"加载提示
+                    this.isPurchasing = true;
+                    
+                    // 设置轮询间隔为1秒
                     this.pollingInterval = setInterval(async () => {
                         await this.pollPurchaseResult();
-                    }, 2000);
+                    }, 1000);
                     
-                    // 设置超时时间（5分钟）
+                    // 设置超时时间（3分钟）
                     setTimeout(() => {
                         if (this.isPolling) {
                             this.stopPolling();
-                            this.failMessage = '排队超时，请稍后再试';
+                            this.failMessage = '抢购超时，请稍后重试';
                             this.showFailModal = true;
                             this.LOGGER.warn('异步抢购轮询超时，请求ID: {}', this.asyncRequestId);
                         }
-                    }, 5 * 60 * 1000);
+                    }, 3 * 60 * 1000);
                 },
                 
                 // 停止轮询
                 stopPolling() {
                     this.isPolling = false;
+                    this.isPurchasing = false; // 关闭"抢购中"加载状态
                     if (this.pollingInterval) {
                         clearInterval(this.pollingInterval);
                         this.pollingInterval = null;
