@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import cn.monitor4all.miaoshadao.utils.CacheKey;
 
 /**
  * 票券缓存管理器实现类
@@ -503,5 +504,15 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
         ticket.setRemaining(ticketEntity.getRemainingCount());
         
         return ticket;
+    }
+
+    @Override
+    public void clearUserPurchaseStatus(Long userId, String date) {
+        String key = CacheKey.USER_HAS_ORDER.getKey() + "_" + date + "_" + userId;
+
+        // 使用双重异步删除：先线程池，再队列
+        asyncCacheDeleteService.deleteCacheDualAsync(key);
+
+        LOGGER.info("Cleared user purchase status cache for userId: {}, date: {}", userId, date);
     }
 }

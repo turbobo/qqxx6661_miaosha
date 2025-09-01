@@ -2223,6 +2223,7 @@ public class TicketServiceImpl implements TicketService {
             ticketCacheManager.deleteTicket(order.getTicketDate());
 
             // 清除购票状态 CacheKey.USER_HAS_ORDER.getKey() + "_" + date + "_" + userId
+            ticketCacheManager.clearUserPurchaseStatus(order.getUserId(), order.getTicketDate());
 
             // 4. 清除票券列表缓存
 //            ticketCacheManager.deleteTicketList();

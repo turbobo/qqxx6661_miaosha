@@ -103,4 +103,7 @@ public interface TicketCacheManager {
      * 删除票券列表缓存
      */
     void deleteTicketList();
+
+    // 清除购票状态缓存
+    void clearUserPurchaseStatus(Long userId, String date);
 }
