@@ -38,7 +38,7 @@ public class TicketServiceImpl implements TicketService {
 
     // 抢购时间常量
     private static final LocalTime START_TIME = LocalTime.of(8, 0); // 上午9点开始
-    private static final LocalTime END_TIME = LocalTime.of(17, 0);  // 晚上11点结束
+    private static final LocalTime END_TIME = LocalTime.of(18, 0);  // 晚上11点结束
 
     @Resource
     private TicketEntityMapper ticketEntityMapper;
@@ -1858,6 +1858,26 @@ public class TicketServiceImpl implements TicketService {
         }
     }
 
+    /**
+     * 异步乐观锁购票，不需要限流检查
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
+    public PurchaseRecord asyncPurchaseTicketWithOptimisticLock(PurchaseRequest request) throws Exception {
+        // *********入参为空校验********
+        validNullParam(request);
+
+        // *********合法性校验：抢购时间内、用户登录、token、是否重复抢购、黑名单等********
+        validLegalParam(request);
+
+        PurchaseRecord purchaseRecord = doPurchaseTicketWithOptimisticLock(request);
+
+        return purchaseRecord;
+    }
+
 
     /**
      * 生成订单编号
@@ -2074,13 +2094,13 @@ public class TicketServiceImpl implements TicketService {
             throw new IllegalArgumentException("至少需要提供订单号、票券编码或日期中的一种");
         }
 
-        if (request.getCancelReason() == null || request.getCancelReason().trim().isEmpty()) {
-            throw new IllegalArgumentException("取消原因不能为空");
-        }
+//        if (request.getCancelReason() == null || request.getCancelReason().trim().isEmpty()) {
+//            throw new IllegalArgumentException("取消原因不能为空");
+//        }
 
-        if (request.getVerifyHash() == null || request.getVerifyHash().trim().isEmpty()) {
-            throw new IllegalArgumentException("验证哈希不能为空");
-        }
+//        if (request.getVerifyHash() == null || request.getVerifyHash().trim().isEmpty()) {
+//            throw new IllegalArgumentException("验证哈希不能为空");
+//        }
     }
 
     /**
@@ -2202,6 +2222,8 @@ public class TicketServiceImpl implements TicketService {
             // 3. 清除票券库存缓存
             ticketCacheManager.deleteTicket(order.getTicketDate());
 
+            // 清除购票状态 CacheKey.USER_HAS_ORDER.getKey() + "_" + date + "_" + userId
+
             // 4. 清除票券列表缓存
 //            ticketCacheManager.deleteTicketList();
 
@@ -2211,5 +2233,33 @@ public class TicketServiceImpl implements TicketService {
             LOGGER.warn("缓存更新失败，订单号: {}, 票券日期: {}", order.getOrderNo(), order.getTicketDate(), e);
             // 缓存更新失败不影响主流程
         }
+    }
+
+    @Override
+    public ApiResponse<List<TicketOrder>> getOrdersByUserId(Long userId) {
+        if (userId == null) {
+            return ApiResponse.error("用户ID不能为空");
+        }
+        List<TicketOrder> orders = ticketOrderMapper.selectByUserId(userId);
+        return ApiResponse.success(orders);
+    }
+
+    @Override
+    public ApiResponse<TicketOrder> getOrderById(Long orderId) {
+        if (orderId == null) {
+            return ApiResponse.error("订单ID不能为空");
+        }
+        TicketOrder order = ticketOrderMapper.selectById(orderId);
+        if (order == null) {
+            return ApiResponse.error("订单不存在");
+        }
+        return ApiResponse.success(order);
+    }
+
+    // Add at the end of the class
+    public void clearUserPurchaseStatus(Long userId, String date) {
+        String key = CacheKey.USER_HAS_ORDER.getKey() + "_" + date + "_" + userId;
+        stringRedisTemplate.delete(key);
+        LOGGER.info("Cleared user purchase status cache for userId: {}, date: {}", userId, date);
     }
 }

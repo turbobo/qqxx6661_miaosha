@@ -108,7 +108,7 @@
     <select id="selectByUserIdAndDate" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM ticket_order
-        WHERE user_id = #{userId} AND ticket_date = #{date}
+        WHERE user_id = #{userId} AND ticket_date = #{date} AND status in (1, 2)
         ORDER BY create_time DESC
         LIMIT 1
     </select>
@@ -122,5 +122,10 @@
     <delete id="deleteByOrderNo" parameterType="java.lang.String">
         DELETE FROM ticket_order WHERE order_no = #{orderNo}
     </delete>
+
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM ticket_order WHERE id = #{orderId}
+    </select>
 
 </mapper>

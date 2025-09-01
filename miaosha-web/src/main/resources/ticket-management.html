@@ -223,7 +223,7 @@
         // 加载票券列表
         async function loadTickets() {
             try {
-                const response = await fetch('/tickets/list');
+                const response = await fetch('http://localhost:8081/tickets/list');
                 const data = await response.json();
                 
                 if (data.code === 200) {
@@ -267,7 +267,7 @@
         // 刷新统计信息
         async function refreshStats() {
             try {
-                const response = await fetch('/tickets/stats');
+                const response = await fetch('http://localhost:8081/tickets/stats');
                 const data = await response.json();
                 
                 if (data.code === 200) {
@@ -287,7 +287,7 @@
         // 获取秒杀状态
         async function getMiaoshaStatus() {
             try {
-                const response = await fetch('/tickets/miaosha/status');
+                const response = await fetch('http://localhost:8081/tickets/miaosha/status');
                 const data = await response.json();
                 
                 if (data.code === 200) {
@@ -318,7 +318,7 @@
             }
             
             try {
-                const response = await fetch(`/tickets/getVerifyHash?date=${date}&userId=${userId}`);
+                const response = await fetch(`http://localhost:8081/tickets/getVerifyHash?date=${date}&userId=${userId}`);
                 const result = await response.text();
                 
                 if (result.includes('获取验证hash失败')) {
@@ -348,7 +348,7 @@
             updateProgress(50);
             
             try {
-                const response = await fetch('/tickets/v1/purchase', {
+                const response = await fetch('http://localhost:8081/tickets/v1/purchase', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -392,7 +392,7 @@
             updateProgress(20);
             
             try {
-                const response = await fetch('/tickets/v2/purchase', {
+                const response = await fetch('http://localhost:8081/tickets/v2/purchase', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -463,7 +463,7 @@
             }
             
             try {
-                const response = await fetch(`/tickets/v2/purchase/result?messageId=${currentMessageId}`);
+                const response = await fetch(`http://localhost:8081/tickets/v2/purchase/result?messageId=${currentMessageId}`);
                 const data = await response.json();
                 
                 if (data.code === 200) {
@@ -525,7 +525,7 @@
             }
             
             try {
-                const response = await fetch(`/tickets/validateTime?date=${date}`);
+                const response = await fetch(`http://localhost:8081/tickets/validateTime?date=${date}`);
                 const data = await response.json();
                 
                 if (data.code === 200) {
@@ -548,7 +548,7 @@
             }
             
             try {
-                const response = await fetch(`/tickets/validateTicketCount?date=${date}`);
+                const response = await fetch(`http://localhost:8081/tickets/validateTicketCount?date=${date}`);
                 const data = await response.json();
                 
                 if (data.code === 200) {
@@ -565,7 +565,7 @@
         // 管理员功能
         async function updateDailyTickets() {
             try {
-                const response = await fetch('/tickets/admin/updateDailyTickets', { method: 'POST' });
+                const response = await fetch('http://localhost:8081/tickets/admin/updateDailyTickets', { method: 'POST' });
                 const data = await response.json();
                 
                 if (data.code === 200) {
@@ -582,7 +582,7 @@
         
         async function pauseMiaosha() {
             try {
-                const response = await fetch('/tickets/admin/pauseMiaosha', { method: 'POST' });
+                const response = await fetch('http://localhost:8081/tickets/admin/pauseMiaosha', { method: 'POST' });
                 const data = await response.json();
                 
                 if (data.code === 200) {
@@ -598,7 +598,7 @@
         
         async function resumeMiaosha() {
             try {
-                const response = await fetch('/tickets/admin/resumeMiaosha', { method: 'POST' });
+                const response = await fetch('http://localhost:8081/tickets/admin/resumeMiaosha', { method: 'POST' });
                 const data = await response.json();
                 
                 if (data.code === 200) {
@@ -624,7 +624,7 @@
             }
             
             try {
-                const response = await fetch('/tickets/admin/updateTicketsWithPessimistic', {
+                const response = await fetch('http://localhost:8081/tickets/admin/updateTicketsWithPessimistic', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -663,7 +663,7 @@
             }
             
             try {
-                const response = await fetch('/tickets/admin/updateTicketsWithOptimistic', {
+                const response = await fetch('http://localhost:8081/tickets/admin/updateTicketsWithOptimistic', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -692,7 +692,7 @@
         
         async function getOptimisticRetryStats() {
             try {
-                const response = await fetch('/tickets/admin/optimisticRetryStats');
+                const response = await fetch('http://localhost:8081/tickets/admin/optimisticRetryStats');
                 const data = await response.json();
                 
                 if (data.code === 200) {

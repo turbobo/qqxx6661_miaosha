@@ -52,6 +52,8 @@ public interface TicketOrderMapper {
      */
     List<TicketOrder> selectByUserId(Long userId);
     
+    TicketOrder selectById(Long orderId);
+    
     /**
      * 根据票券编码查询票券订单
      *

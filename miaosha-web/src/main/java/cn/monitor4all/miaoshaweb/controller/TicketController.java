@@ -7,6 +7,7 @@ import cn.monitor4all.miaoshadao.model.Ticket;
 import cn.monitor4all.miaoshadao.model.UpdateTicketsRequest;
 import cn.monitor4all.miaoshadao.model.CancelPurchaseRequest;
 import cn.monitor4all.miaoshadao.model.CancelPurchaseResponse;
+import cn.monitor4all.miaoshadao.dao.TicketOrder;
 import cn.monitor4all.miaoshaservice.service.MiaoshaStatusService;
 import cn.monitor4all.miaoshaservice.service.TicketOptimisticUpdateService;
 import cn.monitor4all.miaoshaservice.service.TicketService;
@@ -626,5 +627,15 @@ public class TicketController {
             long endTime = System.currentTimeMillis();
             LOGGER.info("票券取消接口响应时间: {}ms", endTime - startTime);
         }
+    }
+
+    @GetMapping("/v1/order/list")
+    public ApiResponse<List<TicketOrder>> getOrderList(@RequestParam Long userId) {
+        return ticketService.getOrdersByUserId(userId);
+    }
+
+    @GetMapping("/v1/order/detail")
+    public ApiResponse<TicketOrder> getOrderDetail(@RequestParam Long orderId) {
+        return ticketService.getOrderById(orderId);
     }
 }

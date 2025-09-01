@@ -1,6 +1,7 @@
 package cn.monitor4all.miaoshaservice.service;
 
 import cn.monitor4all.miaoshadao.dao.TicketEntity;
+import cn.monitor4all.miaoshadao.dao.TicketOrder;
 import cn.monitor4all.miaoshadao.dao.TicketPurchaseRecord;
 import cn.monitor4all.miaoshadao.model.*;
 
@@ -36,7 +37,7 @@ public interface TicketService {
 
     ApiResponse<PurchaseRecord> purchaseTicketV1WithOptimisticLock(PurchaseRequest request) throws Exception;
 
-    PurchaseRecord doPurchaseTicketWithOptimisticLock(PurchaseRequest request) throws Exception;
+    PurchaseRecord asyncPurchaseTicketWithOptimisticLock(PurchaseRequest request) throws Exception;
 
 
     ApiResponse<Map<String, Object>> purchaseTicketV2(PurchaseRequest request);
@@ -153,4 +154,8 @@ public interface TicketService {
      * @return 抢购结果
      */
     ApiResponse<Map<String, Object>> getPurchaseResult(String requestId, Long userId, String date);
+
+    ApiResponse<List<TicketOrder>> getOrdersByUserId(Long userId);
+
+    ApiResponse<TicketOrder> getOrderById(Long orderId);
 }
