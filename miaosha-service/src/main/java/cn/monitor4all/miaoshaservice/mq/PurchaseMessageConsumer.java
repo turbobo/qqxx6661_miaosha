@@ -55,7 +55,7 @@ public class PurchaseMessageConsumer {
             LOGGER.info("开始处理异步抢购请求，请求ID: {}, 用户ID: {}, 日期: {}", requestId, userId, date);
             
             // 调用乐观锁抢购方法
-            ticketService.purchaseTicketV1WithOptimisticLock(request);
+            ticketService.asyncPurchaseTicketWithOptimisticLock(request);
             
             LOGGER.info("异步抢购处理完成，请求ID: {}", requestId);
             
