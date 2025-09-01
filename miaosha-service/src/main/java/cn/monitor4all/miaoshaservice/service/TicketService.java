@@ -36,6 +36,9 @@ public interface TicketService {
 
     ApiResponse<PurchaseRecord> purchaseTicketV1WithOptimisticLock(PurchaseRequest request) throws Exception;
 
+
+    ApiResponse<Map<String, Object>> purchaseTicketV2(PurchaseRequest request);
+
     /**
      * 检查用户是否已购买指定日期的票券
      * @param userId 用户ID
@@ -139,4 +142,13 @@ public interface TicketService {
      * @throws Exception 取消购票异常
      */
     CancelPurchaseResponse cancelPurchase(CancelPurchaseRequest request) throws Exception;
+    
+    /**
+     * 查询异步抢购结果
+     * @param requestId 请求ID
+     * @param userId 用户ID
+     * @param date 日期
+     * @return 抢购结果
+     */
+    ApiResponse<Map<String, Object>> getPurchaseResult(String requestId, Long userId, String date);
 }

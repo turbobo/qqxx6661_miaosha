@@ -283,6 +283,65 @@ public class TicketController {
             LOGGER.info("V1乐观锁票券购买接口响应时间: {}ms", endTime - startTime);
         }
     }
+
+    // 异步处理 + 乐观锁
+    @PostMapping("/v2/purchase/optimistic")
+    public ApiResponse<Map<String, Object>> purchaseTicketV2(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
+        long startTime = System.currentTimeMillis();
+        try {
+            LOGGER.info("V2异步抢购开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+
+            // 调用服务层异步抢购
+            ApiResponse<Map<String, Object>> response = ticketService.purchaseTicketV2(request);
+
+            return response;
+
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("票券购买参数错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
+        } catch (IllegalStateException e) {
+            LOGGER.warn("票券购买业务错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
+        } catch (Exception e) {
+            LOGGER.error("票券购买系统错误: {}", e.getMessage(), e);
+            return ApiResponse.error("系统错误，购买失败，请重试");
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("V2异步抢购接口响应时间: {}ms", endTime - startTime);
+        }
+    }
+    
+    /**
+     * 查询异步抢购结果
+     * @param requestId 请求ID
+     * @param userId 用户ID
+     * @param date 日期
+     * @return 抢购结果
+     */
+    @GetMapping("/v2/purchaseResult")
+    public ApiResponse<Map<String, Object>> getPurchaseResult(
+            @RequestParam String requestId,
+            @RequestParam Long userId,
+            @RequestParam String date) {
+        long startTime = System.currentTimeMillis();
+        try {
+            LOGGER.info("查询异步抢购结果，请求ID: {}, 用户ID: {}, 日期: {}", requestId, userId, date);
+            
+            ApiResponse<Map<String, Object>> response = ticketService.getPurchaseResult(requestId, userId, date);
+            
+            LOGGER.info("查询异步抢购结果完成，请求ID: {}, 状态: {}", requestId, 
+                response.getData() != null ? response.getData().get("status") : "null");
+            
+            return response;
+            
+        } catch (Exception e) {
+            LOGGER.error("查询异步抢购结果失败: {}", e.getMessage(), e);
+            return ApiResponse.error("查询抢购结果失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("查询异步抢购结果接口响应时间: {}ms", endTime - startTime);
+        }
+    }
     
     // 测试接口：手动更新票券数据
     @PostMapping("/admin/updateDailyTickets")
@@ -529,7 +588,7 @@ public class TicketController {
 
 
     /**
-     * 取消购票接口
+     * TODO 取消购票接口
      * 1. 验证取消条件
      * 2. 恢复票券库存
      * 3. 更新订单状态

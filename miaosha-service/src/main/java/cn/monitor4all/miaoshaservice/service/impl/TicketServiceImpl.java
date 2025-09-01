@@ -14,6 +14,7 @@ import com.alibaba.fastjson.JSON;
 import com.google.common.util.concurrent.RateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -27,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -64,6 +66,9 @@ public class TicketServiceImpl implements TicketService {
     
     @Resource
     private TicketCodeGeneratorService ticketCodeGeneratorService;
+    
+    @Resource
+    private RabbitTemplate rabbitTemplate;
 
 
     // Guava令牌桶：每秒放行10个请求
@@ -590,7 +595,114 @@ public class TicketServiceImpl implements TicketService {
         return ApiResponse.success(purchaseRecord);
     }
 
+    @Override
+    public ApiResponse<Map<String, Object>> purchaseTicketV2(PurchaseRequest request) {
+        try {
+            LOGGER.info("开始异步抢购流程，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+            
+            // 参数校验
+            multiValidParam(request);
+            
+            // 生成请求ID
+            String requestId = generateRequestId(request.getUserId(), request.getDate());
+            
+            // 将请求封装后发送到MQ队列
+            Map<String, Object> message = new HashMap<>();
+            message.put("requestId", requestId);
+            message.put("userId", request.getUserId());
+            message.put("date", request.getDate());
+            message.put("verifyHash", request.getVerifyHash());
+            message.put("timestamp", System.currentTimeMillis());
+            
+            // 发送到MQ队列
+            rabbitTemplate.convertAndSend("miaosha.purchase.exchange", "miaosha.purchase", message);
+            
+            LOGGER.info("异步抢购请求已发送到MQ队列，请求ID: {}", requestId);
+            
+            // 返回请求ID给前端
+            Map<String, Object> result = new HashMap<>();
+            result.put("requestId", requestId);
+            result.put("message", "抢购请求已加入队列，请稍后查询结果");
+            
+            return ApiResponse.success(result);
+            
+        } catch (Exception e) {
+            LOGGER.error("异步抢购失败，用户ID: {}, 日期: {}, 错误: {}", 
+                request.getUserId(), request.getDate(), e.getMessage(), e);
+            return ApiResponse.error(e.getMessage());
+        }
+    }
 
+    @Override
+    public ApiResponse<Map<String, Object>> getPurchaseResult(String requestId, Long userId, String date) {
+        try {
+            LOGGER.info("查询异步抢购结果，请求ID: {}, 用户ID: {}, 日期: {}", requestId, userId, date);
+            
+            // 检查是否已购买
+            boolean hasPurchased = hasPurchased(userId, date);
+            
+            if (hasPurchased) {
+                // 查询订单信息
+                TicketOrder order = ticketOrderMapper.selectByUserIdAndDate(userId, date);
+                if (order != null) {
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("status", "SUCCESS");
+                    result.put("requestId", requestId);
+                    result.put("ticketCode", order.getTicketCode());
+                    result.put("orderNo", order.getOrderNo());
+                    result.put("message", "抢购成功");
+                    
+                    LOGGER.info("异步抢购成功，请求ID: {}, 票券编码: {}", requestId, order.getTicketCode());
+                    return ApiResponse.success(result);
+                }
+            }
+            
+            // 检查是否超时（5分钟）
+            long currentTime = System.currentTimeMillis();
+            long requestTime = getRequestTimeFromCache(requestId);
+            if (requestTime > 0 && (currentTime - requestTime) > 5 * 60 * 1000) {
+                Map<String, Object> result = new HashMap<>();
+                result.put("status", "TIMEOUT");
+                result.put("requestId", requestId);
+                result.put("message", "排队超时，请稍后再试");
+                
+                LOGGER.warn("异步抢购超时，请求ID: {}", requestId);
+                return ApiResponse.success(result);
+            }
+            
+            // 还在排队中
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", "QUEUED");
+            result.put("requestId", requestId);
+            result.put("message", "正在排队中，请稍后查询");
+            
+            return ApiResponse.success(result);
+            
+        } catch (Exception e) {
+            LOGGER.error("查询异步抢购结果失败，请求ID: {}, 错误: {}", requestId, e.getMessage(), e);
+            return ApiResponse.error("查询失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 生成请求ID
+     */
+    private String generateRequestId(Long userId, String date) {
+        return "REQ_" + userId + "_" + date + "_" + System.currentTimeMillis();
+    }
+    
+    /**
+     * 从缓存获取请求时间
+     */
+    private long getRequestTimeFromCache(String requestId) {
+        try {
+            String timeStr = stringRedisTemplate.opsForValue().get("request_time:" + requestId);
+            return timeStr != null ? Long.parseLong(timeStr) : 0;
+        } catch (Exception e) {
+            LOGGER.warn("获取请求时间失败，请求ID: {}", requestId);
+            return 0;
+        }
+    }
 
     /**
      * 请求参数校验

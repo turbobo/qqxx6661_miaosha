@@ -169,6 +169,19 @@
                         </div>
                         <span class="font-medium text-gray-700">乐观锁购票</span>
                     </label>
+                    
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio" 
+                               v-model="selectedPurchaseApi" 
+                               value="async" 
+                               class="sr-only">
+                        <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center mr-3 transition-colors"
+                             :class="{'border-primary bg-primary': selectedPurchaseApi === 'async'}">
+                            <div v-if="selectedPurchaseApi === 'async'" 
+                                 class="w-3 h-3 bg-white rounded-full"></div>
+                        </div>
+                        <span class="font-medium text-gray-700">异步抢购</span>
+                    </label>
                 </div>
                 
                 <!-- 快速切换按钮 -->
@@ -181,13 +194,16 @@
                 <!-- 当前接口状态显示 -->
                 <div class="flex items-center space-x-2 px-3 py-2 rounded-lg"
                      :class="{'bg-blue-100 border border-blue-200': selectedPurchaseApi === 'pessimistic', 
-                              'bg-green-100 border border-green-200': selectedPurchaseApi === 'optimistic'}">
+                              'bg-green-100 border border-green-200': selectedPurchaseApi === 'optimistic',
+                              'bg-purple-100 border border-purple-200': selectedPurchaseApi === 'async'}">
                     <i :class="{'fa fa-lock text-blue-600': selectedPurchaseApi === 'pessimistic', 
-                               'fa fa-unlock text-green-600': selectedPurchaseApi === 'optimistic'}"></i>
+                               'fa fa-unlock text-green-600': selectedPurchaseApi === 'optimistic',
+                               'fa fa-clock-o text-purple-600': selectedPurchaseApi === 'async'}"></i>
                     <span class="text-sm font-medium" 
                           :class="{'text-blue-700': selectedPurchaseApi === 'pessimistic', 
-                                   'text-green-700': selectedPurchaseApi === 'optimistic'}">
-                        {{ selectedPurchaseApi === 'pessimistic' ? '悲观锁模式' : '乐观锁模式' }}
+                                   'text-green-700': selectedPurchaseApi === 'optimistic',
+                                   'text-purple-700': selectedPurchaseApi === 'async'}">
+                        {{ selectedPurchaseApi === 'pessimistic' ? '悲观锁模式' : selectedPurchaseApi === 'optimistic' ? '乐观锁模式' : '异步抢购模式' }}
                     </span>
                 </div>
                 
@@ -195,8 +211,8 @@
                     <i class="fa fa-code text-gray-500"></i>
                     <span class="text-sm text-gray-600">
                         API: 
-                        <span class="font-medium" :class="{'text-blue-600': selectedPurchaseApi === 'pessimistic', 'text-green-600': selectedPurchaseApi === 'optimistic'}">
-                            {{ selectedPurchaseApi === 'pessimistic' ? '/v1/purchase' : '/v1/purchase/optimistic' }}
+                        <span class="font-medium" :class="{'text-blue-600': selectedPurchaseApi === 'pessimistic', 'text-green-600': selectedPurchaseApi === 'optimistic', 'text-purple-600': selectedPurchaseApi === 'async'}">
+                            {{ selectedPurchaseApi === 'pessimistic' ? '/v1/purchase' : selectedPurchaseApi === 'optimistic' ? '/v1/purchase/optimistic' : '/v2/purchase/optimistic' }}
                         </span>
                     </span>
                 </div>
@@ -212,6 +228,7 @@
                             <ul class="space-y-1">
                                 <li><span class="font-medium">悲观锁：</span>使用数据库行锁，数据一致性强，适合低并发场景</li>
                                 <li><span class="font-medium">乐观锁：</span>使用版本号机制，性能较高，适合高并发场景，可能出现重试</li>
+                                <li><span class="font-medium">异步抢购：</span>请求加入队列异步处理，适合超高并发场景，需要轮询查询结果</li>
                             </ul>
                         </div>
                     </div>
@@ -230,6 +247,10 @@
                                 </div>
                                 <div class="flex items-center justify-between">
                                     <span>乐观锁接口:</span>
+                                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">正常</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span>异步抢购接口:</span>
                                     <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">正常</span>
                                 </div>
                             </div>
@@ -325,7 +346,7 @@
                         <!-- 接口类型指示器 -->
                         <div v-if="ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate) && !isPurchasing" 
                              class="absolute top-1 right-1 w-2 h-2 rounded-full"
-                             :class="{'bg-blue-300': selectedPurchaseApi === 'pessimistic', 'bg-green-300': selectedPurchaseApi === 'optimistic'}"></div>
+                             :class="{'bg-blue-300': selectedPurchaseApi === 'pessimistic', 'bg-green-300': selectedPurchaseApi === 'optimistic', 'bg-purple-300': selectedPurchaseApi === 'async'}"></div>
                     </button>
                 </div>
             </div>
@@ -373,6 +394,18 @@
             </div>
         </div>
         
+        <!-- 异步抢购轮询状态提示 -->
+        <div v-if="isPolling" class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-8 text-center">
+            <div class="flex items-center justify-center space-x-3">
+                <i class="fa fa-clock-o text-purple-500 text-xl"></i>
+                <div>
+                    <p class="text-purple-800 font-medium">正在排队中...</p>
+                    <p class="text-purple-600 text-sm">您的抢购请求已加入队列，正在等待处理，请稍候</p>
+                    <p class="text-purple-500 text-xs mt-1">请求ID: {{ asyncRequestId }}</p>
+                </div>
+            </div>
+        </div>
+        
         <!-- 确认抢购弹窗 -->
         <div v-if="showConfirmModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
             <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4 transform transition-all duration-300 scale-100">
@@ -387,11 +420,13 @@
                     <div class="mt-3 p-3 bg-gray-50 rounded-lg">
                         <div class="flex items-center justify-center space-x-2">
                             <i :class="{'fa fa-lock text-blue-500': selectedPurchaseApi === 'pessimistic', 
-                                       'fa fa-unlock text-green-500': selectedPurchaseApi === 'optimistic'}"></i>
+                                       'fa fa-unlock text-green-500': selectedPurchaseApi === 'optimistic',
+                                       'fa fa-clock-o text-purple-500': selectedPurchaseApi === 'async'}"></i>
                             <span class="text-sm font-medium" 
                                   :class="{'text-blue-600': selectedPurchaseApi === 'pessimistic', 
-                                           'text-green-600': selectedPurchaseApi === 'optimistic'}">
-                                使用{{ selectedPurchaseApi === 'pessimistic' ? '悲观锁' : '乐观锁' }}接口
+                                           'text-green-600': selectedPurchaseApi === 'optimistic',
+                                           'text-purple-600': selectedPurchaseApi === 'async'}">
+                                使用{{ selectedPurchaseApi === 'pessimistic' ? '悲观锁' : selectedPurchaseApi === 'optimistic' ? '乐观锁' : '异步抢购' }}接口
                             </span>
                         </div>
                     </div>
@@ -477,7 +512,10 @@
                     failMessage: '',
                     purchasedDates: [], // 已购买的日期
                     isPurchasing: false, // 抢购进行中状态
-                    selectedPurchaseApi: 'pessimistic' // 默认选择悲观锁接口
+                    selectedPurchaseApi: 'pessimistic', // 默认选择悲观锁接口
+                    asyncRequestId: '', // 异步抢购请求ID
+                    isPolling: false, // 是否正在轮询
+                    pollingInterval: null // 轮询定时器
                 }
             },
             computed: {
@@ -503,6 +541,10 @@
                 
                 // 获取秒杀活动状态
                 this.loadMiaoshaStatus();
+            },
+            beforeUnmount() {
+                // 组件销毁前清理轮询定时器
+                this.stopPolling();
             },
             methods: {
                 // 注释掉登录状态检查方法
@@ -672,6 +714,8 @@
                         let apiUrl = '';
                         if (this.selectedPurchaseApi === 'optimistic') {
                             apiUrl = 'http://localhost:8081/api/tickets/v1/purchase/optimistic';
+                        } else if (this.selectedPurchaseApi === 'async') {
+                            apiUrl = 'http://localhost:8081/api/tickets/v2/purchase/optimistic';
                         } else {
                             apiUrl = 'http://localhost:8081/api/tickets/v1/purchase';
                         }
@@ -685,19 +729,29 @@
                         });
                         
                         if (response.data.code === 200) {
-                            // 抢购成功
-                            const record = response.data.data;
-                            this.successTicketDate = this.selectedTicket.formattedDate;
-                            this.ticketCode = record.ticketCode;
-                            this.purchasedDates.push(this.selectedTicket.formattedDate);
-                            
-                            // 更新票券数量
-                            this.selectedTicket.remaining--;
-                            
-                            this.LOGGER.info('抢购成功，票券编码: {}, 订单号: {}', record.ticketCode, record.orderNo || 'N/A');
-                            
-                            // 显示成功弹窗
-                            this.showSuccessModal = true;
+                            if (this.selectedPurchaseApi === 'async') {
+                                // 异步抢购，开始轮询查询结果
+                                const result = response.data.data;
+                                this.asyncRequestId = result.requestId;
+                                this.LOGGER.info('异步抢购请求已提交，请求ID: {}, 开始轮询查询结果', this.asyncRequestId);
+                                
+                                // 开始轮询
+                                this.startPolling();
+                            } else {
+                                // 同步抢购成功
+                                const record = response.data.data;
+                                this.successTicketDate = this.selectedTicket.formattedDate;
+                                this.ticketCode = record.ticketCode;
+                                this.purchasedDates.push(this.selectedTicket.formattedDate);
+                                
+                                // 更新票券数量
+                                this.selectedTicket.remaining--;
+                                
+                                this.LOGGER.info('抢购成功，票券编码: {}, 订单号: {}', record.ticketCode, record.orderNo || 'N/A');
+                                
+                                // 显示成功弹窗
+                                this.showSuccessModal = true;
+                            }
                         } else {
                             // 抢购失败
                             this.failMessage = response.data.message || '抢购失败，请重试';
@@ -733,8 +787,96 @@
                 
                 // 切换购票接口
                 togglePurchaseApi() {
-                    this.selectedPurchaseApi = this.selectedPurchaseApi === 'pessimistic' ? 'optimistic' : 'pessimistic';
+                    if (this.selectedPurchaseApi === 'pessimistic') {
+                        this.selectedPurchaseApi = 'optimistic';
+                    } else if (this.selectedPurchaseApi === 'optimistic') {
+                        this.selectedPurchaseApi = 'async';
+                    } else {
+                        this.selectedPurchaseApi = 'pessimistic';
+                    }
                     this.LOGGER.info('切换购票接口: {}', this.selectedPurchaseApi);
+                },
+                
+                // 开始轮询查询异步抢购结果
+                startPolling() {
+                    this.isPolling = true;
+                    this.LOGGER.info('开始轮询查询异步抢购结果，请求ID: {}', this.asyncRequestId);
+                    
+                    // 设置轮询间隔为2秒
+                    this.pollingInterval = setInterval(async () => {
+                        await this.pollPurchaseResult();
+                    }, 2000);
+                    
+                    // 设置超时时间（5分钟）
+                    setTimeout(() => {
+                        if (this.isPolling) {
+                            this.stopPolling();
+                            this.failMessage = '排队超时，请稍后再试';
+                            this.showFailModal = true;
+                            this.LOGGER.warn('异步抢购轮询超时，请求ID: {}', this.asyncRequestId);
+                        }
+                    }, 5 * 60 * 1000);
+                },
+                
+                // 停止轮询
+                stopPolling() {
+                    this.isPolling = false;
+                    if (this.pollingInterval) {
+                        clearInterval(this.pollingInterval);
+                        this.pollingInterval = null;
+                    }
+                    this.LOGGER.info('停止轮询查询异步抢购结果');
+                },
+                
+                // 轮询查询异步抢购结果
+                async pollPurchaseResult() {
+                    try {
+                        const response = await axios.get('http://localhost:8081/api/tickets/v2/purchaseResult', {
+                            params: {
+                                requestId: this.asyncRequestId,
+                                userId: this.currentUserId,
+                                date: this.selectedTicket.date
+                            }
+                        });
+                        
+                        if (response.data.code === 200) {
+                            const result = response.data.data;
+                            const status = result.status;
+                            
+                            this.LOGGER.info('轮询查询结果，请求ID: {}, 状态: {}', this.asyncRequestId, status);
+                            
+                            if (status === 'SUCCESS') {
+                                // 抢购成功
+                                this.stopPolling();
+                                this.successTicketDate = this.selectedTicket.formattedDate;
+                                this.ticketCode = result.ticketCode;
+                                this.purchasedDates.push(this.selectedTicket.formattedDate);
+                                
+                                // 更新票券数量
+                                this.selectedTicket.remaining--;
+                                
+                                this.LOGGER.info('异步抢购成功，票券编码: {}, 订单号: {}', result.ticketCode, result.orderNo || 'N/A');
+                                
+                                // 显示成功弹窗
+                                this.showSuccessModal = true;
+                                
+                            } else if (status === 'FAILED' || status === 'TIMEOUT') {
+                                // 抢购失败或超时
+                                this.stopPolling();
+                                this.failMessage = result.message || '抢购失败，请重试';
+                                this.showFailModal = true;
+                                this.LOGGER.warn('异步抢购失败，请求ID: {}, 错误: {}', this.asyncRequestId, this.failMessage);
+                                
+                            } else if (status === 'QUEUED') {
+                                // 还在排队中，继续轮询
+                                this.LOGGER.info('异步抢购还在排队中，请求ID: {}, 继续轮询', this.asyncRequestId);
+                            }
+                        } else {
+                            this.LOGGER.error('轮询查询失败: {}', response.data.message);
+                        }
+                    } catch (error) {
+                        this.LOGGER.error('轮询查询异常: {}', error.message);
+                    }
                 },
                 
                 // 注释掉退出登录和跳转登录页面方法
