@@ -43,12 +43,12 @@ public class TicketServiceImpl implements TicketService {
     @Resource
     private TicketEntityMapper ticketEntityMapper;
 
-        @Resource
+    @Resource
     private TicketPurchaseRecordMapper ticketPurchaseRecordMapper;
-    
+
     @Resource
     private TicketOrderMapper ticketOrderMapper;
-    
+
     @Resource
     private TicketCacheManager ticketCacheManager;
 
@@ -63,10 +63,10 @@ public class TicketServiceImpl implements TicketService {
 
     @Resource
     private UserService userService;
-    
+
     @Resource
     private TicketCodeGeneratorService ticketCodeGeneratorService;
-    
+
     @Resource
     private RabbitTemplate rabbitTemplate;
 
@@ -181,6 +181,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 根据日期获取库存数量
+     *
      * @param date 日期
      * @return 库存数量
      */
@@ -213,6 +214,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 根据日期查询票券信息
+     *
      * @param date 日期
      * @return 票券信息
      */
@@ -228,7 +230,7 @@ public class TicketServiceImpl implements TicketService {
             // Redis中没有，从数据库查询
             TicketEntity dbTicket = ticketEntityMapper.selectByDate(date);
             if (dbTicket != null) {
-                            Ticket ticketModel = new Ticket(dbTicket.getDate(), dbTicket.getTotalCount());
+                Ticket ticketModel = new Ticket(dbTicket.getDate(), dbTicket.getTotalCount());
                 ticketModel.setRemaining(dbTicket.getRemainingCount());
 
                 // 保存到Redis
@@ -245,6 +247,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 查询所有票券信息
+     *
      * @return 票券列表
      */
     public List<Ticket> getAllTickets() {
@@ -257,13 +260,13 @@ public class TicketServiceImpl implements TicketService {
             }
 
             // Redis中没有，从数据库查询
-                    List<TicketEntity> dbTickets = ticketEntityMapper.selectAllActiveTickets();
-        List<Ticket> result = new ArrayList<>();
-        for (TicketEntity dbTicket : dbTickets) {
-            Ticket ticket = new Ticket(dbTicket.getDate(), dbTicket.getTotalCount());
-            ticket.setRemaining(dbTicket.getRemainingCount());
-            result.add(ticket);
-        }
+            List<TicketEntity> dbTickets = ticketEntityMapper.selectAllActiveTickets();
+            List<Ticket> result = new ArrayList<>();
+            for (TicketEntity dbTicket : dbTickets) {
+                Ticket ticket = new Ticket(dbTicket.getDate(), dbTicket.getTotalCount());
+                ticket.setRemaining(dbTicket.getRemainingCount());
+                result.add(ticket);
+            }
 
             // 保存到Redis
             ticketCacheManager.saveTicketList(result);
@@ -277,7 +280,8 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 更新票券库存
-     * @param date 日期
+     *
+     * @param date              日期
      * @param newRemainingCount 新的剩余数量
      * @return 是否更新成功
      */
@@ -292,7 +296,7 @@ public class TicketServiceImpl implements TicketService {
 
             if (newRemainingCount < 0 || newRemainingCount > dbTicket.getTotalCount()) {
                 LOGGER.warn("库存数量无效，日期: {}, 新数量: {}, 总数量: {}",
-                    date, newRemainingCount, dbTicket.getTotalCount());
+                        date, newRemainingCount, dbTicket.getTotalCount());
                 return false;
             }
 
@@ -319,7 +323,7 @@ public class TicketServiceImpl implements TicketService {
                 }
 
                 LOGGER.info("票券库存更新成功，日期: {}, 旧库存: {}, 新库存: {}",
-                    date, oldRemainingCount, newRemainingCount);
+                        date, oldRemainingCount, newRemainingCount);
                 return true;
             }
             return false;
@@ -331,8 +335,9 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 创建新票券
-     * @param date 日期
-     * @param name 票券名称
+     *
+     * @param date       日期
+     * @param name       票券名称
      * @param totalCount 总数量
      * @return 是否创建成功
      */
@@ -382,6 +387,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 删除票券
+     *
      * @param date 日期
      * @return 是否删除成功
      */
@@ -412,6 +418,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 获取票券统计信息
+     *
      * @return 统计信息Map
      */
     public Map<String, Object> getTicketStatistics() {
@@ -476,9 +483,9 @@ public class TicketServiceImpl implements TicketService {
                 LOGGER.info("数据库中无票券数据，初始化默认数据");
                 initializeTickets(); // 重新调用initializeTickets，它会从数据库获取数据
                 result = Arrays.asList(
-                    ticketCacheManager.getTicketWithFallback(todayStr),
-                    ticketCacheManager.getTicketWithFallback(tomorrowStr),
-                    ticketCacheManager.getTicketWithFallback(dayAfterTomorrowStr)
+                        ticketCacheManager.getTicketWithFallback(todayStr),
+                        ticketCacheManager.getTicketWithFallback(tomorrowStr),
+                        ticketCacheManager.getTicketWithFallback(dayAfterTomorrowStr)
                 );
             }
 
@@ -494,9 +501,9 @@ public class TicketServiceImpl implements TicketService {
             LocalDate today = LocalDate.now();
             String todayStr = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             return Arrays.asList(
-                ticketCacheManager.getTicketWithFallback(todayStr),
-                ticketCacheManager.getTicketWithFallback(today.plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))),
-                ticketCacheManager.getTicketWithFallback(today.plusDays(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
+                    ticketCacheManager.getTicketWithFallback(todayStr),
+                    ticketCacheManager.getTicketWithFallback(today.plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))),
+                    ticketCacheManager.getTicketWithFallback(today.plusDays(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
             );
         }
     }
@@ -518,7 +525,6 @@ public class TicketServiceImpl implements TicketService {
         // 5、生成订单 ----> 同步创建访客预约记录，下发门禁等设备权限，通过rpc，失败则写入重试表；仍然失败，管理员可以手动创建访客预约
         // 6、返回选购成功
         // 7、查询订单
-
 
 
         // 从数据库获取票券信息（使用悲观锁）
@@ -576,6 +582,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 用户请求 → 限流检查 → 参数校验 → 后续步骤（时间校验/库存扣减等）
+     *
      * @param request
      * @return
      */
@@ -599,13 +606,13 @@ public class TicketServiceImpl implements TicketService {
     public ApiResponse<Map<String, Object>> purchaseTicketV2(PurchaseRequest request) {
         try {
             LOGGER.info("开始异步抢购流程，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
-            
+
             // 参数校验
             multiValidParam(request);
-            
+
             // 生成请求ID
             String requestId = generateRequestId(request.getUserId(), request.getDate());
-            
+
             // 将请求封装后发送到MQ队列
             Map<String, Object> message = new HashMap<>();
             message.put("requestId", requestId);
@@ -613,22 +620,22 @@ public class TicketServiceImpl implements TicketService {
             message.put("date", request.getDate());
             message.put("verifyHash", request.getVerifyHash());
             message.put("timestamp", System.currentTimeMillis());
-            
+
             // 发送到MQ队列
             rabbitTemplate.convertAndSend("miaosha.purchase.exchange", "miaosha.purchase", message);
-            
+
             LOGGER.info("异步抢购请求已发送到MQ队列，请求ID: {}", requestId);
-            
+
             // 返回请求ID给前端
             Map<String, Object> result = new HashMap<>();
             result.put("requestId", requestId);
-            result.put("message", "抢购请求已加入队列，请稍后查询结果");
-            
+            result.put("message", "提交成功，正在排队");
+
             return ApiResponse.success(result);
-            
+
         } catch (Exception e) {
-            LOGGER.error("异步抢购失败，用户ID: {}, 日期: {}, 错误: {}", 
-                request.getUserId(), request.getDate(), e.getMessage(), e);
+            LOGGER.error("异步抢购失败，用户ID: {}, 日期: {}, 错误: {}",
+                    request.getUserId(), request.getDate(), e.getMessage(), e);
             return ApiResponse.error(e.getMessage());
         }
     }
@@ -637,10 +644,10 @@ public class TicketServiceImpl implements TicketService {
     public ApiResponse<Map<String, Object>> getPurchaseResult(String requestId, Long userId, String date) {
         try {
             LOGGER.info("查询异步抢购结果，请求ID: {}, 用户ID: {}, 日期: {}", requestId, userId, date);
-            
+
             // 检查是否已购买
             boolean hasPurchased = hasPurchased(userId, date);
-            
+
             if (hasPurchased) {
                 // 查询订单信息
                 TicketOrder order = ticketOrderMapper.selectByUserIdAndDate(userId, date);
@@ -651,12 +658,12 @@ public class TicketServiceImpl implements TicketService {
                     result.put("ticketCode", order.getTicketCode());
                     result.put("orderNo", order.getOrderNo());
                     result.put("message", "抢购成功");
-                    
+
                     LOGGER.info("异步抢购成功，请求ID: {}, 票券编码: {}", requestId, order.getTicketCode());
                     return ApiResponse.success(result);
                 }
             }
-            
+
             // 检查是否超时（5分钟）
             long currentTime = System.currentTimeMillis();
             long requestTime = getRequestTimeFromCache(requestId);
@@ -665,32 +672,32 @@ public class TicketServiceImpl implements TicketService {
                 result.put("status", "TIMEOUT");
                 result.put("requestId", requestId);
                 result.put("message", "排队超时，请稍后再试");
-                
+
                 LOGGER.warn("异步抢购超时，请求ID: {}", requestId);
                 return ApiResponse.success(result);
             }
-            
+
             // 还在排队中
             Map<String, Object> result = new HashMap<>();
             result.put("status", "QUEUED");
             result.put("requestId", requestId);
             result.put("message", "正在排队中，请稍后查询");
-            
+
             return ApiResponse.success(result);
-            
+
         } catch (Exception e) {
             LOGGER.error("查询异步抢购结果失败，请求ID: {}, 错误: {}", requestId, e.getMessage(), e);
             return ApiResponse.error("查询失败: " + e.getMessage());
         }
     }
-    
+
     /**
      * 生成请求ID
      */
     private String generateRequestId(Long userId, String date) {
         return "REQ_" + userId + "_" + date + "_" + System.currentTimeMillis();
     }
-    
+
     /**
      * 从缓存获取请求时间
      */
@@ -706,6 +713,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 请求参数校验
+     *
      * @param request
      */
     private void multiValidParam(PurchaseRequest request) throws Exception {
@@ -772,7 +780,7 @@ public class TicketServiceImpl implements TicketService {
      * 秒杀开始前（倒计时阶段）：限制单用户每分钟最多 10-30 次请求（主要是页面刷新、倒计时同步等非抢购请求）。
      * 秒杀进行中（抢购按钮激活后）：限制单用户每秒最多 1-2 次请求，或每分钟最多 20-50 次请求。
      * 例如：单用户 5 秒内只能发起 1 次抢购请求（通过 Redis 记录user:limit:userId的时间戳，超过则拦截）。
-     *
+     * <p>
      * 用户级限流：秒杀中控制在 1-2 次 / 秒，核心是防恶意请求，保证公平。
      * 接口级限流：低库存场景按 “库存 ×10-20 倍”，高库存场景按 “系统承载的 70%-80%”，核心是匹配系统能 ---- 博物馆 2000张票
      */
@@ -794,8 +802,9 @@ public class TicketServiceImpl implements TicketService {
     /**
      * 检查用户是否已经购买过该日期的票券
      * 先查询购买记录缓存，如果有则返回true，否则查询数据库，如果有则返回true，否则返回false
+     *
      * @param userId 用户ID
-     * @param date 日期
+     * @param date   日期
      * @return
      */
     @Override
@@ -804,33 +813,33 @@ public class TicketServiceImpl implements TicketService {
             // 1. 先从缓存获取是否有该日期的购买记录
             PurchaseRecord cachedRecord = ticketCacheManager.getPurchaseRecord(userId, date);
             if (cachedRecord != null) {
-                LOGGER.debug("从缓存获取到用户购买记录，用户ID: {}, 日期: {}, 票券编码: {}", 
-                    userId, date, cachedRecord.getTicketCode());
+                LOGGER.debug("从缓存获取到用户购买记录，用户ID: {}, 日期: {}, 票券编码: {}",
+                        userId, date, cachedRecord.getTicketCode());
                 return true;
             }
-            
+
             LOGGER.debug("缓存中未找到用户购买记录，尝试从数据库查询，用户ID: {}, 日期: {}", userId, date);
-            
+
             // 2. 缓存中没有，从数据库的ticket_order表查询用户ID+date的订单
             TicketOrder ticketOrder = ticketOrderMapper.selectByUserIdAndDate(userId, date);
             if (ticketOrder != null) {
-                LOGGER.info("从数据库ticket_order表查询到用户购买记录，用户ID: {}, 日期: {}, 订单号: {}", 
-                    userId, date, ticketOrder.getOrderNo());
-                
+                LOGGER.info("从数据库ticket_order表查询到用户购买记录，用户ID: {}, 日期: {}, 订单号: {}",
+                        userId, date, ticketOrder.getOrderNo());
+
                 // 将数据库记录同步到缓存
                 PurchaseRecord record = new PurchaseRecord(
-                    ticketOrder.getUserId(), 
-                    LocalDate.parse(ticketOrder.getTicketDate()), 
-                    ticketOrder.getTicketCode()
+                        ticketOrder.getUserId(),
+                        LocalDate.parse(ticketOrder.getTicketDate()),
+                        ticketOrder.getTicketCode()
                 );
                 ticketCacheManager.addPurchaseRecord(userId, date, record);
-                
+
                 return true;
             }
-            
+
             LOGGER.debug("数据库中未找到用户购买记录，用户ID: {}, 日期: {}", userId, date);
             return false;
-            
+
         } catch (Exception e) {
             LOGGER.error("查询用户购买记录失败，用户ID: {}, 日期: {}, 错误: {}", userId, date, e.getMessage(), e);
             return false;
@@ -946,6 +955,7 @@ public class TicketServiceImpl implements TicketService {
     /**
      * 验证当前时间是否处于抢购时间窗口内
      * 抢购时间：每天上午9:00 - 晚上23:00
+     *
      * @throws RuntimeException 如果当前时间不在抢购时间窗口内
      */
     private void validateCurrentTimeInPurchaseWindow() {
@@ -954,10 +964,10 @@ public class TicketServiceImpl implements TicketService {
         // 检查当前时间是否在抢购时间窗口内
         if (currentTime.isBefore(START_TIME) || currentTime.isAfter(END_TIME)) {
             String errorMessage = String.format(
-                "当前时间不在抢购时间窗口内！抢购时间为每天 %02d:%02d - %02d:%02d，当前时间：%02d:%02d",
-                START_TIME.getHour(), START_TIME.getMinute(),
-                END_TIME.getHour(), END_TIME.getMinute(),
-                currentTime.getHour(), currentTime.getMinute()
+                    "当前时间不在抢购时间窗口内！抢购时间为每天 %02d:%02d - %02d:%02d，当前时间：%02d:%02d",
+                    START_TIME.getHour(), START_TIME.getMinute(),
+                    END_TIME.getHour(), END_TIME.getMinute(),
+                    currentTime.getHour(), currentTime.getMinute()
             );
 
             LOGGER.warn("抢购时间验证失败：{}", errorMessage);
@@ -965,9 +975,9 @@ public class TicketServiceImpl implements TicketService {
         }
 
         LOGGER.info("抢购时间验证通过，当前时间：{}，抢购时间窗口：{} - {}",
-                   currentTime.format(DateTimeFormatter.ofPattern("HH:mm")),
-                   START_TIME.format(DateTimeFormatter.ofPattern("HH:mm")),
-                   END_TIME.format(DateTimeFormatter.ofPattern("HH:mm")));
+                currentTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+                START_TIME.format(DateTimeFormatter.ofPattern("HH:mm")),
+                END_TIME.format(DateTimeFormatter.ofPattern("HH:mm")));
     }
 
     @Override
@@ -1062,7 +1072,7 @@ public class TicketServiceImpl implements TicketService {
             result.put("soldPercentage", soldCount * 100.0 / ticketEntity.getTotalCount());
 
             LOGGER.info("票数合法性检查完成，日期: {}, 总票数: {}, 剩余票数: {}, 已售票数: {}",
-                       date, ticketEntity.getTotalCount(), ticketEntity.getRemainingCount(), soldCount);
+                    date, ticketEntity.getTotalCount(), ticketEntity.getRemainingCount(), soldCount);
 
         } catch (Exception e) {
             LOGGER.error("检查票数合法性失败，日期: {}", date, e);
@@ -1077,6 +1087,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 票券校验，包括票券是否存在、总票数是否合法、剩余票数是否合法、已售票数是否合法
+     *
      * @param date
      */
     public void validateTicketCount(String date) {
@@ -1086,8 +1097,9 @@ public class TicketServiceImpl implements TicketService {
     /**
      * 生成票券编号（改进版，确保唯一性）
      * 使用Redis序列号 + 时间戳 + 用户ID + 随机数，确保唯一性
+     *
      * @param userId 用户ID
-     * @param date 日期
+     * @param date   日期
      * @return 唯一票券编码
      */
     private String generateTicketCode(String userId, String date) {
@@ -1097,17 +1109,17 @@ public class TicketServiceImpl implements TicketService {
             if (ticketCode != null) {
                 return ticketCode;
             }
-            
+
             // 方案2：使用时间戳 + 纳秒（备选）
             return generateTicketCodeWithTimestamp(userId, date);
-            
+
         } catch (Exception e) {
             LOGGER.warn("Redis序列号生成失败，使用备选方案: {}", e.getMessage());
             // 方案3：使用UUID + 时间戳（兜底）
             return generateTicketCodeWithUUID(userId, date);
         }
     }
-    
+
     /**
      * 方案1：使用Redis序列号生成票券编码（推荐）
      * 格式：T + 日期 + 序列号 + 用户ID后4位 + 随机数
@@ -1116,26 +1128,26 @@ public class TicketServiceImpl implements TicketService {
         try {
             String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             String userSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
-            
+
             // 使用Redis INCR生成序列号
             String sequenceKey = "ticket:sequence:" + date;
             Long sequence = stringRedisTemplate.opsForValue().increment(sequenceKey);
-            
+
             // 设置序列号过期时间（7天后过期）
             stringRedisTemplate.expire(sequenceKey, 7, TimeUnit.DAYS);
-            
+
             // 生成随机数
-            String randomStr = String.valueOf((int)(Math.random() * 1000));
-            
+            String randomStr = String.valueOf((int) (Math.random() * 1000));
+
             // 格式：T + 日期 + 序列号(6位) + 用户ID后4位 + 随机数(3位)
             return String.format("T%s%06d%s%03d", dateStr, sequence, userSuffix, Integer.parseInt(randomStr));
-            
+
         } catch (Exception e) {
             LOGGER.error("Redis序列号生成失败: {}", e.getMessage(), e);
             return null;
         }
     }
-    
+
     /**
      * 方案2：使用时间戳 + 纳秒生成票券编码（备选）
      * 格式：T + 日期 + 时间戳 + 用户ID后4位 + 纳秒后3位
@@ -1143,15 +1155,15 @@ public class TicketServiceImpl implements TicketService {
     private String generateTicketCodeWithTimestamp(String userId, String date) {
         String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String userSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
-        
+
         // 获取当前时间戳和纳秒
         long timestamp = System.currentTimeMillis();
         long nanoTime = System.nanoTime();
-        
+
         // 格式：T + 日期 + 时间戳后8位 + 用户ID后4位 + 纳秒后3位
-        return String.format("T%s%08d%s%03d", dateStr, timestamp % 100000000, userSuffix, (int)(nanoTime % 1000));
+        return String.format("T%s%08d%s%03d", dateStr, timestamp % 100000000, userSuffix, (int) (nanoTime % 1000));
     }
-    
+
     /**
      * 方案3：使用UUID + 时间戳生成票券编码（兜底）
      * 格式：T + 日期 + UUID前8位 + 用户ID后4位 + 时间戳后3位
@@ -1159,20 +1171,21 @@ public class TicketServiceImpl implements TicketService {
     private String generateTicketCodeWithUUID(String userId, String date) {
         String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String userSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
-        
+
         // 生成UUID并取前8位
         String uuidPrefix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        
+
         // 获取时间戳后3位
         long timestamp = System.currentTimeMillis();
-        int timestampSuffix = (int)(timestamp % 1000);
-        
+        int timestampSuffix = (int) (timestamp % 1000);
+
         // 格式：T + 日期 + UUID前8位 + 用户ID后4位 + 时间戳后3位
         return String.format("T%s%s%s%03d", dateStr, uuidPrefix, userSuffix, timestampSuffix);
     }
-    
+
     /**
      * 验证票券编码唯一性
+     *
      * @param ticketCode 票券编码
      * @return 是否唯一
      */
@@ -1183,10 +1196,10 @@ public class TicketServiceImpl implements TicketService {
             if (existingOrder != null) {
                 return false;
             }
-            
+
             // 检查缓存中是否已存在
             // 这里可以添加缓存检查逻辑
-            
+
             return true;
         } catch (Exception e) {
             LOGGER.error("验证票券编码唯一性失败: {}", e.getMessage(), e);
@@ -1194,33 +1207,34 @@ public class TicketServiceImpl implements TicketService {
             return false;
         }
     }
-    
+
     /**
      * 生成唯一票券编码（带重试机制）
-     * @param userId 用户ID
-     * @param date 日期
+     *
+     * @param userId     用户ID
+     * @param date       日期
      * @param maxRetries 最大重试次数
      * @return 唯一票券编码
      */
     private String generateUniqueTicketCode(String userId, String date, int maxRetries) {
         for (int i = 0; i < maxRetries; i++) {
             String ticketCode = generateTicketCode(userId, date);
-            
+
             if (isTicketCodeUnique(ticketCode)) {
                 return ticketCode;
             }
-            
+
             LOGGER.warn("票券编码冲突，重试第{}次: {}", i + 1, ticketCode);
-            
+
             // 重试前等待一小段时间，避免连续冲突
             try {
-                Thread.sleep(10 + (int)(Math.random() * 20));
+                Thread.sleep(10 + (int) (Math.random() * 20));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
             }
         }
-        
+
         // 所有重试都失败，使用时间戳 + 纳秒 + 随机数生成
         LOGGER.error("票券编码生成重试{}次后仍冲突，使用兜底方案", maxRetries);
         return generateTicketCodeWithTimestamp(userId, date) + "_" + System.nanoTime();
@@ -1340,7 +1354,7 @@ public class TicketServiceImpl implements TicketService {
                             successCount++;
 
                             LOGGER.info("票券创建成功，日期: {}, 总票数: {}, 剩余票数: {}",
-                                update.getDate(), update.getTotalCount(), update.getRemainingCount());
+                                    update.getDate(), update.getTotalCount(), update.getRemainingCount());
                         } else {
                             updateResult.put("status", "FAILED");
                             updateResult.put("message", "票券创建失败");
@@ -1375,8 +1389,8 @@ public class TicketServiceImpl implements TicketService {
                             successCount++;
 
                             LOGGER.info("票券更新成功，日期: {}, 总票数: {}->{}, 剩余票数: {}->{}",
-                                update.getDate(), oldTotalCount, update.getTotalCount(),
-                                oldRemainingCount, update.getRemainingCount());
+                                    update.getDate(), oldTotalCount, update.getTotalCount(),
+                                    oldRemainingCount, update.getRemainingCount());
                         } else {
                             updateResult.put("status", "FAILED");
                             updateResult.put("message", "票券更新失败");
@@ -1429,6 +1443,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 使用悲观锁扣库存购票（包含事务控制）
+     *
      * @param request 购票请求
      * @return 购票结果
      * @throws Exception 购票异常
@@ -1494,13 +1509,13 @@ public class TicketServiceImpl implements TicketService {
             PurchaseRecord result = new PurchaseRecord(request.getUserId(), LocalDate.parse(request.getDate()), ticketCode);
 
             LOGGER.info("悲观锁购票成功，用户ID: {}, 日期: {}, 票券编码: {}",
-                request.getUserId(), request.getDate(), ticketCode);
+                    request.getUserId(), request.getDate(), ticketCode);
 
             return ApiResponse.success(result);
 
         } catch (Exception e) {
             LOGGER.error("悲观锁购票失败，用户ID: {}, 日期: {}, 错误: {}",
-                request.getUserId(), request.getDate(), e.getMessage(), e);
+                    request.getUserId(), request.getDate(), e.getMessage(), e);
             throw e;
         }
     }
@@ -1511,6 +1526,7 @@ public class TicketServiceImpl implements TicketService {
      * 2. 事务控制
      * 3. 扣减库存
      * 4. 生成ticket_order订单
+     *
      * @param request 购票请求
      * @return 购票结果
      * @throws Exception 购票异常
@@ -1550,7 +1566,7 @@ public class TicketServiceImpl implements TicketService {
             // 6. 扣减库存
             int originalRemaining = ticketEntity.getRemainingCount();
             int originalSold = ticketEntity.getSoldCount();
-            
+
             ticketEntity.setRemainingCount(originalRemaining - 1);
             ticketEntity.setSoldCount(originalSold + 1);
             ticketEntity.setVersion(ticketEntity.getVersion() + 1);
@@ -1561,9 +1577,9 @@ public class TicketServiceImpl implements TicketService {
                 throw new RuntimeException("库存扣减失败");
             }
 
-            LOGGER.info("库存扣减成功，日期: {}, 原剩余: {}, 现剩余: {}, 原已售: {}, 现已售: {}", 
-                purchaseDate, originalRemaining, ticketEntity.getRemainingCount(), 
-                originalSold, ticketEntity.getSoldCount());
+            LOGGER.info("库存扣减成功，日期: {}, 原剩余: {}, 现剩余: {}, 原已售: {}, 现已售: {}",
+                    purchaseDate, originalRemaining, ticketEntity.getRemainingCount(),
+                    originalSold, ticketEntity.getSoldCount());
 
             // 7. 生成唯一票券编码（使用专业服务）
             String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId, purchaseDate);
@@ -1589,12 +1605,12 @@ public class TicketServiceImpl implements TicketService {
                 throw new RuntimeException("订单创建失败");
             }
 
-            LOGGER.info("订单创建成功，订单号: {}, 用户ID: {}, 票券编码: {}", 
-                orderNo, userId, ticketCode);
+            LOGGER.info("订单创建成功，订单号: {}, 用户ID: {}, 票券编码: {}",
+                    orderNo, userId, ticketCode);
 
             // 10. 更新缓存
             ticketCacheManager.deleteTicket(purchaseDate);
-            
+
             // 添加购买记录到缓存
             PurchaseRecord purchaseRecord = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
             ticketCacheManager.addPurchaseRecord(userId, purchaseDate, purchaseRecord);
@@ -1603,13 +1619,13 @@ public class TicketServiceImpl implements TicketService {
             PurchaseRecord result = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
 
             LOGGER.info("悲观锁购票V2成功，用户ID: {}, 日期: {}, 票券编码: {}, 订单号: {}",
-                userId, purchaseDate, ticketCode, orderNo);
+                    userId, purchaseDate, ticketCode, orderNo);
 
             return ApiResponse.success(result);
 
         } catch (Exception e) {
             LOGGER.error("悲观锁购票V2失败，用户ID: {}, 日期: {}, 错误: {}",
-                request.getUserId(), request.getDate(), e.getMessage(), e);
+                    request.getUserId(), request.getDate(), e.getMessage(), e);
             throw e;
         }
     }
@@ -1704,7 +1720,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 乐观锁购票
-     *
+     * <p>
      * 1. 优先选乐观锁的场景
      * 高并发、低冲突：如电商商品库存更新、秒杀业务、用户积分修改（大部分时间无冲突，偶尔冲突可通过重试解决）；
      * 读多写少：如新闻资讯阅读、商品详情查询（读操作无需锁，写操作少，冲突概率低）；
@@ -1763,10 +1779,10 @@ public class TicketServiceImpl implements TicketService {
                         // 乐观锁更新失败，版本冲突
                         retryCount++;
                         if (retryCount < maxRetries) {
-                            LOGGER.warn("乐观锁更新失败，版本冲突，重试第{}次，用户ID: {}, 日期: {}", 
-                                      retryCount, userId, purchaseDate);
+                            LOGGER.warn("乐观锁更新失败，版本冲突，重试第{}次，用户ID: {}, 日期: {}",
+                                    retryCount, userId, purchaseDate);
                             // 短暂等待后重试
-                            Thread.sleep(10 + (int)(Math.random() * 20));
+                            Thread.sleep(10 + (int) (Math.random() * 20));
                         } else {
                             throw new RuntimeException("乐观锁更新失败，重试" + maxRetries + "次后仍失败");
                         }
@@ -1779,9 +1795,9 @@ public class TicketServiceImpl implements TicketService {
                     if (retryCount >= maxRetries) {
                         throw new RuntimeException("乐观锁购票失败，重试" + maxRetries + "次后仍失败: " + e.getMessage(), e);
                     }
-                    LOGGER.warn("乐观锁购票异常，重试第{}次，用户ID: {}, 日期: {}, 错误: {}", 
-                              retryCount, userId, purchaseDate, e.getMessage());
-                    Thread.sleep(10 + (int)(Math.random() * 20));
+                    LOGGER.warn("乐观锁购票异常，重试第{}次，用户ID: {}, 日期: {}, 错误: {}",
+                            retryCount, userId, purchaseDate, e.getMessage());
+                    Thread.sleep(10 + (int) (Math.random() * 20));
                 }
             }
 
@@ -1846,15 +1862,16 @@ public class TicketServiceImpl implements TicketService {
     /**
      * 生成订单编号
      * 格式：TB + 时间戳 + 用户ID后4位 + 随机数
+     *
      * @param userId 用户ID
-     * @param date 购票日期
+     * @param date   购票日期
      * @return 订单编号
      */
     private String generateOrderNo(Long userId, String date) {
         long timestamp = System.currentTimeMillis();
         String userIdSuffix = String.valueOf(userId).substring(Math.max(0, String.valueOf(userId).length() - 4));
         int random = (int) (Math.random() * 1000);
-        
+
         return String.format("TB%d%s%03d", timestamp, userIdSuffix, random);
     }
 
@@ -1863,35 +1880,36 @@ public class TicketServiceImpl implements TicketService {
         try {
             // 获取基础票券信息
             List<Ticket> tickets = getRecentTickets();
-            
+
             // 如果用户未登录，直接返回基础信息
             if (userId == null) {
                 LOGGER.info("用户未登录，返回基础票券信息");
                 return tickets;
             }
-            
+
             // 为每个票券添加用户购买状态
             for (Ticket ticket : tickets) {
                 boolean hasPurchased = checkUserPurchaseStatus(userId, ticket.getDate());
                 ticket.setUserPurchased(hasPurchased);
                 LOGGER.debug("票券日期: {}, 用户ID: {}, 已购买: {}", ticket.getDate(), userId, hasPurchased);
             }
-            
+
             LOGGER.info("获取票券信息成功，用户ID: {}, 票券数量: {}", userId, tickets.size());
             return tickets;
-            
+
         } catch (Exception e) {
             LOGGER.error("获取带用户状态的票券信息失败，用户ID: {}", userId, e);
             // 如果出错，返回基础票券信息
             return getRecentTickets();
         }
     }
-    
+
     /**
      * 检查用户是否已购买指定日期的票券
      * 优先从缓存查询，缓存未命中则从数据库ticket_order表查询
+     *
      * @param userId 用户ID
-     * @param date 日期
+     * @param date   日期
      * @return 是否已购买
      */
     private boolean checkUserPurchaseStatus(Long userId, String date) {
@@ -1899,20 +1917,20 @@ public class TicketServiceImpl implements TicketService {
             if (userId == null) {
                 return false;
             }
-            
+
             // 1. 先从缓存查询用户购买状态
             boolean fromCache = checkUserPurchaseStatusFromCache(userId, date);
             if (fromCache) {
                 LOGGER.debug("从缓存查询到用户购买状态，用户ID: {}, 日期: {}, 已购买: true", userId, date);
                 return true;
             }
-            
+
             // 2. 缓存中没有，查询数据库ticket_order表
             LOGGER.debug("缓存中未找到用户购买记录，尝试从数据库查询，用户ID: {}, 日期: {}", userId, date);
             TicketOrder ticketOrder = ticketOrderMapper.selectByUserIdAndDate(userId, date);
-            
+
             boolean hasPurchased = ticketOrder != null;
-            
+
             // 3. 将查询结果写入缓存
             String cacheKey = CacheKey.USER_HAS_ORDER.getKey() + "_" + date + "_" + userId;
             if (hasPurchased) {
@@ -1922,20 +1940,21 @@ public class TicketServiceImpl implements TicketService {
                 stringRedisTemplate.opsForValue().set(cacheKey, "0", 12, TimeUnit.HOURS);
                 LOGGER.debug("用户未购买，写入缓存，用户ID: {}, 日期: {}, 缓存键: {}", userId, date, cacheKey);
             }
-            
+
             LOGGER.debug("从数据库查询用户购买状态，用户ID: {}, 日期: {}, 已购买: {}", userId, date, hasPurchased);
             return hasPurchased;
-            
+
         } catch (Exception e) {
             LOGGER.error("查询用户购买状态失败，用户ID: {}, 日期: {}", userId, date, e);
             return false;
         }
     }
-    
+
     /**
      * 从缓存查询用户购买状态
+     *
      * @param userId 用户ID
-     * @param date 日期
+     * @param date   日期
      * @return 是否已购买
      */
     private boolean checkUserPurchaseStatusFromCache(Long userId, String date) {
@@ -1943,19 +1962,19 @@ public class TicketServiceImpl implements TicketService {
             if (userId == null) {
                 return false;
             }
-            
+
             // 从Redis缓存查询
             String cacheKey = CacheKey.USER_HAS_ORDER.getKey() + "_" + date + "_" + userId;
             String cacheValue = stringRedisTemplate.opsForValue().get(cacheKey);
-            
+
             if (cacheValue != null) {
                 boolean hasPurchased = "1".equals(cacheValue);
                 LOGGER.debug("从缓存查询用户购买状态，用户ID: {}, 日期: {}, 已购买: {}", userId, date, hasPurchased);
                 return hasPurchased;
             }
-            
+
             return false;
-            
+
         } catch (Exception e) {
             LOGGER.error("从缓存查询用户购买状态失败，用户ID: {}, 日期: {}", userId, date, e);
             return false;
@@ -1964,7 +1983,8 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 验证取消条件
-     * @param order 订单信息
+     *
+     * @param order   订单信息
      * @param request 取消购票请求
      */
     private void validateCancelConditions(TicketOrder order, CancelPurchaseRequest request) {
@@ -1972,22 +1992,22 @@ public class TicketServiceImpl implements TicketService {
         if (!order.getUserId().equals(request.getUserId())) {
             throw new IllegalStateException("只能取消自己的订单");
         }
-        
+
         // 2. 状态验证：只能取消待支付或已支付的订单
         if (order.getStatus() != 1 && order.getStatus() != 2) {
             throw new IllegalStateException("只能取消待支付或已支付的订单");
         }
-        
+
         // 3. 时间验证：只能在购票后24小时内取消
         Date createTime = order.getCreateTime();
         Date now = new Date();
         long timeDiff = now.getTime() - createTime.getTime();
         long hoursDiff = timeDiff / (1000 * 60 * 60);
-        
+
         if (hoursDiff > 24) {
             throw new IllegalStateException("购票超过24小时，无法取消");
         }
-        
+
         // 4. 活动状态验证：秒杀活动暂停时不允许取消
         try {
             if (miaoshaStatusService.isMiaoshaPaused()) {
@@ -1997,73 +2017,75 @@ public class TicketServiceImpl implements TicketService {
             LOGGER.warn("检查秒杀活动状态失败，继续执行: {}", e.getMessage());
         }
     }
-    
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public CancelPurchaseResponse cancelPurchase(CancelPurchaseRequest request) throws Exception {
         try {
-            LOGGER.info("开始处理取消购票请求，用户ID: {}, 订单号: {}, 票券编码: {}", 
-                       request.getUserId(), request.getOrderNo(), request.getTicketCode());
+            LOGGER.info("开始处理取消购票请求，用户ID: {}, 订单号: {}, 票券编码: {}",
+                    request.getUserId(), request.getOrderNo(), request.getTicketCode());
 
             // 1. 参数验证
             validateCancelRequest(request);
-            
+
             // 2. 查询订单信息
             TicketOrder order = getOrderByRequest(request);
             if (order == null) {
                 throw new IllegalArgumentException("订单不存在");
             }
-            
+
             // 3. 验证取消条件
             validateCancelConditions(order, request);
-            
+
             // 4. 执行取消操作
             CancelPurchaseResponse response = executeCancel(order, request);
-            
+
             // 5. 更新缓存
             updateCacheAfterCancel(order);
-            
-            LOGGER.info("取消购票成功，用户ID: {}, 订单号: {}, 票券编码: {}", 
-                       order.getUserId(), order.getOrderNo(), order.getTicketCode());
-            
+
+            LOGGER.info("取消购票成功，用户ID: {}, 订单号: {}, 票券编码: {}",
+                    order.getUserId(), order.getOrderNo(), order.getTicketCode());
+
             return response;
-            
+
         } catch (Exception e) {
-            LOGGER.error("取消购票失败，用户ID: {}, 订单号: {}, 票券编码: {}", 
-                        request.getUserId(), request.getOrderNo(), request.getTicketCode(), e);
+            LOGGER.error("取消购票失败，用户ID: {}, 订单号: {}, 票券编码: {}",
+                    request.getUserId(), request.getOrderNo(), request.getTicketCode(), e);
             throw e;
         }
     }
-    
+
     /**
      * 验证取消购票请求参数
+     *
      * @param request 取消购票请求
      */
     private void validateCancelRequest(CancelPurchaseRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("请求参数不能为空");
         }
-        
+
         if (request.getUserId() == null) {
             throw new IllegalArgumentException("用户ID不能为空");
         }
-        
+
         // 至少需要提供一种查询方式
         if (request.getOrderNo() == null && request.getTicketCode() == null && request.getDate() == null) {
             throw new IllegalArgumentException("至少需要提供订单号、票券编码或日期中的一种");
         }
-        
+
         if (request.getCancelReason() == null || request.getCancelReason().trim().isEmpty()) {
             throw new IllegalArgumentException("取消原因不能为空");
         }
-        
+
         if (request.getVerifyHash() == null || request.getVerifyHash().trim().isEmpty()) {
             throw new IllegalArgumentException("验证哈希不能为空");
         }
     }
-    
+
     /**
      * 根据请求参数查询订单信息
+     *
      * @param request 取消购票请求
      * @return 订单信息
      */
@@ -2072,49 +2094,51 @@ public class TicketServiceImpl implements TicketService {
         if (request.getOrderNo() != null) {
             return ticketOrderMapper.selectByOrderNo(request.getOrderNo());
         }
-        
+
         // 其次通过票券编码查询
         if (request.getTicketCode() != null) {
             return ticketOrderMapper.selectByTicketCode(request.getTicketCode());
         }
-        
+
         // 最后通过用户ID+日期查询
         if (request.getUserId() != null && request.getDate() != null) {
             return ticketOrderMapper.selectByUserIdAndDate(request.getUserId(), request.getDate());
         }
-        
+
         throw new IllegalArgumentException("缺少必要的查询参数");
     }
-    
+
     /**
      * 执行取消操作
-     * @param order 订单信息
+     *
+     * @param order   订单信息
      * @param request 取消购票请求
      * @return 取消购票响应
      */
     private CancelPurchaseResponse executeCancel(TicketOrder order, CancelPurchaseRequest request) {
         // 1. 恢复票券库存
         restoreTicketStock(order);
-        
+
         // 2. 更新订单状态
         updateOrderStatus(order, request.getCancelReason());
-        
+
         // 3. 构建响应
         String cancelTime = new Date().toString();
         Integer refundAmount = order.getAmount() != null ? order.getAmount().intValue() : 0;
-        
+
         return new CancelPurchaseResponse(
-            order.getOrderNo(),
-            order.getTicketCode(),
-            cancelTime,
-            request.getCancelReason(),
-            refundAmount,
-            "已取消"
+                order.getOrderNo(),
+                order.getTicketCode(),
+                cancelTime,
+                request.getCancelReason(),
+                refundAmount,
+                "已取消"
         );
     }
-    
+
     /**
      * 恢复票券库存
+     *
      * @param order 订单信息
      */
     private void restoreTicketStock(TicketOrder order) {
@@ -2123,45 +2147,47 @@ public class TicketServiceImpl implements TicketService {
         if (ticketEntity == null) {
             throw new RuntimeException("票券不存在，无法恢复库存");
         }
-        
+
         // 2. 恢复库存
         ticketEntity.setRemainingCount(ticketEntity.getRemainingCount() + 1);
         ticketEntity.setSoldCount(ticketEntity.getSoldCount() - 1);
         ticketEntity.setVersion(ticketEntity.getVersion() + 1);
         ticketEntity.setUpdateTime(new Date());
-        
+
         // 3. 更新数据库 TODO 乐观锁，version不需要在业务层加1
         int result = ticketEntityMapper.updateByPrimaryKey(ticketEntity);
         if (result <= 0) {
             throw new RuntimeException("库存恢复失败");
         }
-        
-        LOGGER.info("库存恢复成功，日期: {}, 原剩余: {}, 现剩余: {}, 原已售: {}, 现已售: {}", 
-                   order.getTicketDate(), ticketEntity.getRemainingCount() - 1, 
-                   ticketEntity.getRemainingCount(), ticketEntity.getSoldCount() + 1, 
-                   ticketEntity.getSoldCount());
+
+        LOGGER.info("库存恢复成功，日期: {}, 原剩余: {}, 现剩余: {}, 原已售: {}, 现已售: {}",
+                order.getTicketDate(), ticketEntity.getRemainingCount() - 1,
+                ticketEntity.getRemainingCount(), ticketEntity.getSoldCount() + 1,
+                ticketEntity.getSoldCount());
     }
-    
+
     /**
      * 更新订单状态
-     * @param order 订单信息
+     *
+     * @param order        订单信息
      * @param cancelReason 取消原因
      */
     private void updateOrderStatus(TicketOrder order, String cancelReason) {
         order.setStatus(3); // 已取消
         order.setUpdateTime(new Date());
         order.setRemark("用户取消：" + cancelReason);
-        
+
         int result = ticketOrderMapper.updateByPrimaryKey(order);
         if (result <= 0) {
             throw new RuntimeException("订单状态更新失败");
         }
-        
+
         LOGGER.info("订单状态更新成功，订单号: {}, 新状态: 已取消", order.getOrderNo());
     }
-    
+
     /**
      * 取消购票后更新缓存
+     *
      * @param order 订单信息
      */
     private void updateCacheAfterCancel(TicketOrder order) {
@@ -2169,18 +2195,18 @@ public class TicketServiceImpl implements TicketService {
             // 1. 清除用户购买状态缓存
             String cacheKey = CacheKey.USER_HAS_ORDER.getKey() + "_" + order.getTicketDate() + "_" + order.getUserId();
             stringRedisTemplate.delete(cacheKey);
-            
+
             // 2. 清除购买记录缓存
             ticketCacheManager.deletePurchaseRecord(order.getUserId(), order.getTicketDate());
-            
+
             // 3. 清除票券库存缓存
             ticketCacheManager.deleteTicket(order.getTicketDate());
-            
+
             // 4. 清除票券列表缓存
 //            ticketCacheManager.deleteTicketList();
-            
+
             LOGGER.debug("缓存更新完成，订单号: {}, 票券日期: {}", order.getOrderNo(), order.getTicketDate());
-            
+
         } catch (Exception e) {
             LOGGER.warn("缓存更新失败，订单号: {}, 票券日期: {}", order.getOrderNo(), order.getTicketDate(), e);
             // 缓存更新失败不影响主流程

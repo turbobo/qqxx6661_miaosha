@@ -8,7 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    
+
     <script>
         tailwind.config = {
             theme: {
@@ -27,27 +27,31 @@
             }
         }
     </script>
-    
+
     <style type="text/tailwindcss">
         @layer utilities {
             .content-auto {
                 content-visibility: auto;
             }
+
             .card-hover {
                 transition: transform 0.3s ease, box-shadow 0.3s ease;
             }
+
             .card-hover:hover {
                 transform: translateY(-5px);
                 box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.1), 0 10px 10px -5px rgba(59, 130, 246, 0.04);
             }
+
             .pulse {
                 animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
             }
+
             .star-rotate {
                 animation: rotate 8s linear infinite;
             }
         }
-        
+
         @keyframes pulse {
             0%, 100% {
                 opacity: 1;
@@ -56,7 +60,7 @@
                 opacity: 0.7;
             }
         }
-        
+
         @keyframes rotate {
             from {
                 transform: rotate(0deg);
@@ -68,855 +72,910 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
-    <div id="app" class="container mx-auto px-4 py-8">
-        <!-- 顶部导航 -->
-        <header class="bg-white shadow-sm sticky top-0 z-50 mb-8">
-            <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-                <div class="flex items-center space-x-2">
-                    <i class="fa fa-ticket text-primary text-2xl"></i>
-                    <h1 class="text-xl font-bold text-dark">票券抢购系统 V1</h1>
-                </div>
-                
-                <!-- 秒杀活动状态显示 -->
-                <div v-if="miaoshaStatus.paused" class="flex items-center space-x-2 px-4 py-2 bg-yellow-100 border border-yellow-300 rounded-lg">
-                    <i class="fa fa-exclamation-triangle text-yellow-600"></i>
-                    <span class="text-yellow-800 font-medium">秒杀活动正在维护中</span>
-                </div>
-                
-                <div class="flex items-center space-x-4">
-                    <!-- 注释掉用户信息显示和登录相关按钮 -->
-                    <!-- <div v-if="currentUser" class="flex items-center space-x-2 text-gray-600">
-                        <i class="fa fa-user-circle-o text-xl"></i>
-                        <span>{{ currentUser }}</span>
-                    </div>
-                    <div v-if="!currentUser" class="text-gray-500">
-                        <span>未登录</span>
-                    </div>
-                    <button v-if="currentUser" @click="logout" 
-                            class="text-gray-500 hover:text-gray-700 transition-colors">
-                        <i class="fa fa-sign-out mr-1"></i>
-                        退出登录
-                    </button>
-                    <button v-if="!currentUser" @click="goToLogin" 
-                            class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
-                        <i class="fa fa-sign-in mr-1"></i>
-                        登录
-                    </button> -->
-                    
-                    <!-- 显示匿名用户信息 -->
-                    <div class="flex items-center space-x-2 text-gray-600">
-                        <i class="fa fa-user-circle-o text-xl"></i>
-                        <span>匿名用户</span>
-                    </div>
-                </div>
+<div id="app" class="container mx-auto px-4 py-8">
+    <!-- 顶部导航 -->
+    <header class="bg-white shadow-sm sticky top-0 z-50 mb-8">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-ticket text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold text-dark">票券抢购系统 V1</h1>
             </div>
-        </header>
-        
-        <!-- 管理功能导航 -->
-        <div class="bg-white shadow-sm rounded-lg mb-6">
-            <div class="container mx-auto px-4 py-3">
-                <div class="flex flex-wrap gap-3 justify-center">
-                    <a href="admin-ticket-update.html" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm">
-                        <i class="fa fa-edit mr-2"></i>票券管理
-                    </a>
-                    <a href="ticket-validation.html" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm">
-                        <i class="fa fa-check-circle mr-2"></i>票数检查
-                    </a>
-                    <a href="admin-miaosha-control.html" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm">
-                        <i class="fa fa-cogs mr-2"></i>秒杀控制
-                    </a>
-                </div>
+
+            <!-- 秒杀活动状态显示 -->
+            <div v-if="miaoshaStatus.paused"
+                 class="flex items-center space-x-2 px-4 py-2 bg-yellow-100 border border-yellow-300 rounded-lg">
+                <i class="fa fa-exclamation-triangle text-yellow-600"></i>
+                <span class="text-yellow-800 font-medium">秒杀活动正在维护中</span>
             </div>
-        </div>
-        
-        <!-- 页面标题 -->
-        <div class="text-center mb-10">
-            <h2 class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-dark mb-3">每日限量票券抢购</h2>
-            <p class="text-gray-500 max-w-xl mx-auto">每人每天限购一张票券，先到先得。点击下方日期卡片即可参与抢购。</p>
-        </div>
-        
-        <!-- 接口切换控制区域 -->
-        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
-            <h3 class="text-lg font-bold text-dark mb-4 flex items-center">
-                <i class="fa fa-cogs text-primary mr-2"></i>
-                购票接口选择
-            </h3>
-            
-            <div class="flex flex-wrap gap-4 items-center">
-                <div class="flex items-center space-x-4">
-                    <label class="flex items-center cursor-pointer">
-                        <input type="radio" 
-                               v-model="selectedPurchaseApi" 
-                               value="pessimistic" 
-                               class="sr-only">
-                        <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center mr-3 transition-colors"
-                             :class="{'border-primary bg-primary': selectedPurchaseApi === 'pessimistic'}">
-                            <div v-if="selectedPurchaseApi === 'pessimistic'" 
-                                 class="w-3 h-3 bg-white rounded-full"></div>
-                        </div>
-                        <span class="font-medium text-gray-700">悲观锁购票</span>
-                    </label>
-                    
-                    <label class="flex items-center cursor-pointer">
-                        <input type="radio" 
-                               v-model="selectedPurchaseApi" 
-                               value="optimistic" 
-                               class="sr-only">
-                        <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center mr-3 transition-colors"
-                             :class="{'border-primary bg-primary': selectedPurchaseApi === 'optimistic'}">
-                            <div v-if="selectedPurchaseApi === 'optimistic'" 
-                                 class="w-3 h-3 bg-white rounded-full"></div>
-                        </div>
-                        <span class="font-medium text-gray-700">乐观锁购票</span>
-                    </label>
-                    
-                    <label class="flex items-center cursor-pointer">
-                        <input type="radio" 
-                               v-model="selectedPurchaseApi" 
-                               value="async" 
-                               class="sr-only">
-                        <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center mr-3 transition-colors"
-                             :class="{'border-primary bg-primary': selectedPurchaseApi === 'async'}">
-                            <div v-if="selectedPurchaseApi === 'async'" 
-                                 class="w-3 h-3 bg-white rounded-full"></div>
-                        </div>
-                        <span class="font-medium text-gray-700">异步抢购</span>
-                    </label>
+
+            <div class="flex items-center space-x-4">
+                <!-- 注释掉用户信息显示和登录相关按钮 -->
+                <!-- <div v-if="currentUser" class="flex items-center space-x-2 text-gray-600">
+                    <i class="fa fa-user-circle-o text-xl"></i>
+                    <span>{{ currentUser }}</span>
                 </div>
-                
-                <!-- 快速切换按钮 -->
-                <button @click="togglePurchaseApi" 
-                        class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center space-x-2">
-                    <i class="fa fa-exchange"></i>
-                    <span>快速切换</span>
+                <div v-if="!currentUser" class="text-gray-500">
+                    <span>未登录</span>
+                </div>
+                <button v-if="currentUser" @click="logout"
+                        class="text-gray-500 hover:text-gray-700 transition-colors">
+                    <i class="fa fa-sign-out mr-1"></i>
+                    退出登录
                 </button>
-                
-                <!-- 当前接口状态显示 -->
-                <div class="flex items-center space-x-2 px-3 py-2 rounded-lg"
-                     :class="{'bg-blue-100 border border-blue-200': selectedPurchaseApi === 'pessimistic', 
+                <button v-if="!currentUser" @click="goToLogin"
+                        class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                    <i class="fa fa-sign-in mr-1"></i>
+                    登录
+                </button> -->
+
+                <!-- 显示匿名用户信息 -->
+                <div class="flex items-center space-x-2 text-gray-600">
+                    <i class="fa fa-user-circle-o text-xl"></i>
+                    <span>匿名用户</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 管理功能导航 -->
+    <div class="bg-white shadow-sm rounded-lg mb-6">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex flex-wrap gap-3 justify-center">
+                <a href="admin-ticket-update.html"
+                   class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm">
+                    <i class="fa fa-edit mr-2"></i>票券管理
+                </a>
+                <a href="ticket-validation.html"
+                   class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm">
+                    <i class="fa fa-check-circle mr-2"></i>票数检查
+                </a>
+                <a href="admin-miaosha-control.html"
+                   class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm">
+                    <i class="fa fa-cogs mr-2"></i>秒杀控制
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页面标题 -->
+    <div class="text-center mb-10">
+        <h2 class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-dark mb-3">每日限量票券抢购</h2>
+        <p class="text-gray-500 max-w-xl mx-auto">每人每天限购一张票券，先到先得。点击下方日期卡片即可参与抢购。</p>
+    </div>
+
+    <!-- 接口切换控制区域 -->
+    <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+        <h3 class="text-lg font-bold text-dark mb-4 flex items-center">
+            <i class="fa fa-cogs text-primary mr-2"></i>
+            购票接口选择
+        </h3>
+
+        <div class="flex flex-wrap gap-4 items-center">
+            <div class="flex items-center space-x-4">
+                <label class="flex items-center cursor-pointer">
+                    <input type="radio"
+                           v-model="selectedPurchaseApi"
+                           value="pessimistic"
+                           class="sr-only">
+                    <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center mr-3 transition-colors"
+                         :class="{'border-primary bg-primary': selectedPurchaseApi === 'pessimistic'}">
+                        <div v-if="selectedPurchaseApi === 'pessimistic'"
+                             class="w-3 h-3 bg-white rounded-full"></div>
+                    </div>
+                    <span class="font-medium text-gray-700">悲观锁购票</span>
+                </label>
+
+                <label class="flex items-center cursor-pointer">
+                    <input type="radio"
+                           v-model="selectedPurchaseApi"
+                           value="optimistic"
+                           class="sr-only">
+                    <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center mr-3 transition-colors"
+                         :class="{'border-primary bg-primary': selectedPurchaseApi === 'optimistic'}">
+                        <div v-if="selectedPurchaseApi === 'optimistic'"
+                             class="w-3 h-3 bg-white rounded-full"></div>
+                    </div>
+                    <span class="font-medium text-gray-700">乐观锁购票</span>
+                </label>
+
+                <label class="flex items-center cursor-pointer">
+                    <input type="radio"
+                           v-model="selectedPurchaseApi"
+                           value="async"
+                           class="sr-only">
+                    <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center mr-3 transition-colors"
+                         :class="{'border-primary bg-primary': selectedPurchaseApi === 'async'}">
+                        <div v-if="selectedPurchaseApi === 'async'"
+                             class="w-3 h-3 bg-white rounded-full"></div>
+                    </div>
+                    <span class="font-medium text-gray-700">异步抢购</span>
+                </label>
+            </div>
+
+            <!-- 快速切换按钮 -->
+            <button @click="togglePurchaseApi"
+                    class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center space-x-2">
+                <i class="fa fa-exchange"></i>
+                <span>快速切换</span>
+            </button>
+
+            <!-- 当前接口状态显示 -->
+            <div class="flex items-center space-x-2 px-3 py-2 rounded-lg"
+                 :class="{'bg-blue-100 border border-blue-200': selectedPurchaseApi === 'pessimistic',
                               'bg-green-100 border border-green-200': selectedPurchaseApi === 'optimistic',
                               'bg-purple-100 border border-purple-200': selectedPurchaseApi === 'async'}">
-                    <i :class="{'fa fa-lock text-blue-600': selectedPurchaseApi === 'pessimistic', 
+                <i :class="{'fa fa-lock text-blue-600': selectedPurchaseApi === 'pessimistic',
                                'fa fa-unlock text-green-600': selectedPurchaseApi === 'optimistic',
                                'fa fa-clock-o text-purple-600': selectedPurchaseApi === 'async'}"></i>
-                    <span class="text-sm font-medium" 
-                          :class="{'text-blue-700': selectedPurchaseApi === 'pessimistic', 
+                <span class="text-sm font-medium"
+                      :class="{'text-blue-700': selectedPurchaseApi === 'pessimistic',
                                    'text-green-700': selectedPurchaseApi === 'optimistic',
                                    'text-purple-700': selectedPurchaseApi === 'async'}">
-                        {{ selectedPurchaseApi === 'pessimistic' ? '悲观锁模式' : selectedPurchaseApi === 'optimistic' ? '乐观锁模式' : '异步抢购模式' }}
+                        {{ selectedPurchaseApi === 'pessimistic' ? '悲观锁模式' : selectedPurchaseApi === 'optimistic' ? '乐观锁模式' : '异步抢购模式'
+                    }}
                     </span>
-                </div>
-                
-                <div class="flex items-center space-x-2 px-3 py-2 bg-gray-100 rounded-lg">
-                    <i class="fa fa-code text-gray-500"></i>
-                    <span class="text-sm text-gray-600">
+            </div>
+
+            <div class="flex items-center space-x-2 px-3 py-2 bg-gray-100 rounded-lg">
+                <i class="fa fa-code text-gray-500"></i>
+                <span class="text-sm text-gray-600">
                         API: 
-                        <span class="font-medium" :class="{'text-blue-600': selectedPurchaseApi === 'pessimistic', 'text-green-600': selectedPurchaseApi === 'optimistic', 'text-purple-600': selectedPurchaseApi === 'async'}">
-                            {{ selectedPurchaseApi === 'pessimistic' ? '/v1/purchase' : selectedPurchaseApi === 'optimistic' ? '/v1/purchase/optimistic' : '/v2/purchase/optimistic' }}
+                        <span class="font-medium"
+                              :class="{'text-blue-600': selectedPurchaseApi === 'pessimistic', 'text-green-600': selectedPurchaseApi === 'optimistic', 'text-purple-600': selectedPurchaseApi === 'async'}">
+                            {{ selectedPurchaseApi === 'pessimistic' ? '/v1/purchase' : selectedPurchaseApi === 'optimistic' ? '/v1/purchase/optimistic' : '/v2/purchase/optimistic'
+                            }}
                         </span>
                     </span>
-                </div>
             </div>
-            
-            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- 接口说明 -->
-                <div class="p-4 bg-blue-50 rounded-lg">
-                    <div class="flex items-start space-x-3">
-                        <i class="fa fa-lightbulb-o text-blue-500 mt-1"></i>
-                        <div class="text-sm text-blue-700">
-                            <p class="font-medium mb-1">接口说明：</p>
-                            <ul class="space-y-1">
-                                <li><span class="font-medium">悲观锁：</span>使用数据库行锁，数据一致性强，适合低并发场景</li>
-                                <li><span class="font-medium">乐观锁：</span>使用版本号机制，性能较高，适合高并发场景，可能出现重试</li>
-                                <li><span class="font-medium">异步抢购：</span>请求加入队列异步处理，适合超高并发场景，需要轮询查询结果</li>
-                            </ul>
-                        </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- 接口说明 -->
+            <div class="p-4 bg-blue-50 rounded-lg">
+                <div class="flex items-start space-x-3">
+                    <i class="fa fa-lightbulb-o text-blue-500 mt-1"></i>
+                    <div class="text-sm text-blue-700">
+                        <p class="font-medium mb-1">接口说明：</p>
+                        <ul class="space-y-1">
+                            <li><span class="font-medium">悲观锁：</span>使用数据库行锁，数据一致性强，适合低并发场景</li>
+                            <li><span class="font-medium">乐观锁：</span>使用版本号机制，性能较高，适合高并发场景，可能出现重试
+                            </li>
+                            <li><span class="font-medium">异步抢购：</span>请求加入队列异步处理，适合超高并发场景，需要轮询查询结果
+                            </li>
+                        </ul>
                     </div>
                 </div>
-                
-                <!-- 接口测试 -->
-                <div class="p-4 bg-green-50 rounded-lg">
-                    <div class="flex items-start space-x-3">
-                        <i class="fa fa-check-circle text-green-500 mt-1"></i>
-                        <div class="text-sm text-green-700">
-                            <p class="font-medium mb-1">接口状态：</p>
-                            <div class="space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <span>悲观锁接口:</span>
-                                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">正常</span>
-                                </div>
-                                <div class="flex items-center justify-between">
-                                    <span>乐观锁接口:</span>
-                                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">正常</span>
-                                </div>
-                                <div class="flex items-center justify-between">
-                                    <span>异步抢购接口:</span>
-                                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">正常</span>
-                                </div>
+            </div>
+
+            <!-- 接口测试 -->
+            <div class="p-4 bg-green-50 rounded-lg">
+                <div class="flex items-start space-x-3">
+                    <i class="fa fa-check-circle text-green-500 mt-1"></i>
+                    <div class="text-sm text-green-700">
+                        <p class="font-medium mb-1">接口状态：</p>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span>悲观锁接口:</span>
+                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">正常</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span>乐观锁接口:</span>
+                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">正常</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span>异步抢购接口:</span>
+                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">正常</span>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 加载状态 -->
-        <div v-if="loading" class="flex justify-center items-center py-16">
-            <div class="text-center">
-                <i class="fa fa-spinner fa-spin text-3xl text-primary mb-4"></i>
-                <p class="text-gray-500">加载票券信息中...</p>
-            </div>
-        </div>
-        
-        <!-- 错误状态 -->
-        <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-8 text-center">
-            <i class="fa fa-exclamation-circle text-red-500 mr-2"></i>
-            <span class="text-red-500">{{ error }}</span>
-        </div>
-        
-        <!-- 票数卡片容器 - 只展示最近3天 -->
-        <div v-if="!loading && !error" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <!-- 票券卡片 -->
-            <div v-for="(ticket, index) in tickets" :key="index" 
-                 class="bg-white rounded-xl overflow-hidden shadow-md card-hover"
-                 :class="{'border-t-4 border-primary': index === 0, 
-                          'border-t-4 border-secondary': index === 1,
-                          'border-t-4 border-accent': index === 2}">
-                <div class="p-1" 
-                     :class="{'bg-gradient-to-r from-primary to-blue-400': index === 0,
-                              'bg-gradient-to-r from-secondary to-emerald-400': index === 1,
-                              'bg-gradient-to-r from-accent to-amber-400': index === 2}"></div>
-                <div class="p-6">
-                    <div class="flex justify-between items-start mb-5">
-                        <div>
-                            <h3 class="text-lg font-bold text-dark">{{ ticket.formattedDate }}</h3>
-                            <p class="text-gray-500">{{ ticket.weekday }}</p>
-                        </div>
-                        <span :class="{'bg-primary/10 text-primary': index === 0,
-                                       'bg-secondary/10 text-secondary': index === 1,
-                                       'bg-accent/10 text-accent': index === 2}" 
-                              class="text-xs px-2 py-1 rounded-full font-medium">
-                            {{ index === 0 ? '今天' : index === 1 ? '明天' : '后天' }}
-                        </span>
-                    </div>
-                    
-                    <div class="flex items-center justify-center mb-6">
-                        <div class="relative w-24 h-24 flex items-center justify-center">
-                            <div class="star-rotate text-accent">
-                                <i class="fa fa-star text-5xl"></i>
-                            </div>
-                            <div class="absolute text-center">
-                                <span class="text-2xl font-bold text-dark">{{ ticket.remaining }}</span>
-                                <span class="text-gray-500">张</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <div class="flex justify-between text-sm mb-1">
-                            <span class="text-gray-500">剩余票数</span>
-                            <span class="font-medium">{{ ticket.remaining }} / {{ ticket.total }}</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5">
-                            <div :class="{'bg-primary': index === 0, 
-                                          'bg-secondary': index === 1,
-                                          'bg-accent': index === 2,
-                                          'bg-danger': ticket.remaining / ticket.total < 0.2}" 
-                                 class="h-2.5 rounded-full" 
-                                 :style="{ width: (ticket.remaining / ticket.total) * 100 + '%' }"></div>
-                        </div>
-                    </div>
-                    
-                    <button @click="handlePurchase(ticket)" 
-                            :disabled="ticket.remaining <= 0 || purchasedDates.includes(ticket.formattedDate) || isPurchasing"
-                            :class="{'bg-primary hover:bg-primary/90 pulse': index === 0 && ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate) && !isPurchasing,
-                                     'bg-secondary hover:bg-secondary/90': index === 1 && ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate) && !isPurchasing,
-                                     'bg-accent hover:bg-accent/90': index === 2 && ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate) && !isPurchasing,
-                                     'bg-gray-200 text-gray-500 cursor-not-allowed': ticket.remaining <= 0 || purchasedDates.includes(ticket.formattedDate) || isPurchasing}"
-                            class="w-full py-3 text-white rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors relative">
-                        <i v-if="ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate) && !isPurchasing" class="fa fa-shopping-cart"></i>
-                        <i v-if="ticket.remaining <= 0" class="fa fa-times"></i>
-                        <i v-if="purchasedDates.includes(ticket.formattedDate)" class="fa fa-check"></i>
-                        <i v-if="isPurchasing" class="fa fa-spinner fa-spin"></i>
-                        <span v-if="ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate) && !isPurchasing">立即抢购</span>
-                        <span v-if="ticket.remaining <= 0">已售罄</span>
-                        <span v-if="purchasedDates.includes(ticket.formattedDate)">已抢购</span>
-                        <span v-if="isPurchasing">抢购中...</span>
-                        
-                        <!-- 接口类型指示器 -->
-                        <div v-if="ticket.remaining > 0 && !purchasedDates.includes(ticket.formattedDate) && !isPurchasing" 
-                             class="absolute top-1 right-1 w-2 h-2 rounded-full"
-                             :class="{'bg-blue-300': selectedPurchaseApi === 'pessimistic', 'bg-green-300': selectedPurchaseApi === 'optimistic', 'bg-purple-300': selectedPurchaseApi === 'async'}"></div>
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 抢购规则 -->
-        <div class="bg-white rounded-xl shadow-md p-6 mb-10">
-            <h3 class="text-xl font-bold text-dark mb-4 flex items-center">
-                <i class="fa fa-info-circle text-primary mr-2"></i>
-                抢购规则
-            </h3>
-            
-            <ul class="space-y-3 text-gray-600">
-                <li class="flex items-start">
-                    <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
-                    <span>每人每天限购一张票券，重复抢购将失败</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
-                    <span>票券抢购成功后，将为您保留24小时，请及时使用</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
-                    <span>票券一旦售出，不退不换，请确认日期后再抢购</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
-                    <span>每日0点更新票数，售完即止</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="fa fa-shield text-accent mt-1 mr-2"></i>
-                    <span>抢购采用双重验证机制，确保安全性和公平性</span>
-                </li>
-            </ul>
-        </div>
-        
-        <!-- 抢购状态提示 -->
-        <div v-if="isPurchasing" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8 text-center">
-            <div class="flex items-center justify-center space-x-3">
-                <i class="fa fa-spinner fa-spin text-blue-500 text-xl"></i>
-                <div>
-                    <p class="text-blue-800 font-medium">正在抢购中...</p>
-                    <p class="text-blue-600 text-sm">请耐心等待，系统正在处理您的抢购请求</p>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 异步抢购轮询状态提示 -->
-        <div v-if="isPolling" class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-8 text-center">
-            <div class="flex items-center justify-center space-x-3">
-                <i class="fa fa-clock-o text-purple-500 text-xl"></i>
-                <div>
-                    <p class="text-purple-800 font-medium">正在排队中...</p>
-                    <p class="text-purple-600 text-sm">您的抢购请求已加入队列，正在等待处理，请稍候</p>
-                    <p class="text-purple-500 text-xs mt-1">请求ID: {{ asyncRequestId }}</p>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 确认抢购弹窗 -->
-        <div v-if="showConfirmModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-            <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4 transform transition-all duration-300 scale-100">
-                <div class="text-center mb-5">
-                    <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fa fa-ticket text-primary text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-dark">确认抢购</h3>
-                    <p class="text-gray-500 mt-2">
-                        您确定要抢购{{ selectedTicket.formattedDate }}（{{ selectedTicket.weekday }}）的票券吗？每人每天限购一张。
-                    </p>
-                    <div class="mt-3 p-3 bg-gray-50 rounded-lg">
-                        <div class="flex items-center justify-center space-x-2">
-                            <i :class="{'fa fa-lock text-blue-500': selectedPurchaseApi === 'pessimistic', 
-                                       'fa fa-unlock text-green-500': selectedPurchaseApi === 'optimistic',
-                                       'fa fa-clock-o text-purple-500': selectedPurchaseApi === 'async'}"></i>
-                            <span class="text-sm font-medium" 
-                                  :class="{'text-blue-600': selectedPurchaseApi === 'pessimistic', 
-                                           'text-green-600': selectedPurchaseApi === 'optimistic',
-                                           'text-purple-600': selectedPurchaseApi === 'async'}">
-                                使用{{ selectedPurchaseApi === 'pessimistic' ? '悲观锁' : selectedPurchaseApi === 'optimistic' ? '乐观锁' : '异步抢购' }}接口
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="flex space-x-3">
-                    <button @click="showConfirmModal = false" 
-                            class="flex-1 py-3 border border-gray-200 rounded-lg font-medium hover:bg-gray-50 transition-colors">
-                        取消
-                    </button>
-                    <button @click="confirmPurchase()" 
-                            class="flex-1 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors">
-                        确认抢购
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 抢购成功弹窗 -->
-        <div v-if="showSuccessModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-            <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fa fa-check text-green-500 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-green-500">抢购成功！</h3>
-                    <p class="text-gray-500 mt-2 mb-5">
-                        您已成功抢购{{ successTicketDate }}的票券
-                    </p>
-                    
-                    <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-                        <p class="text-sm"><span class="text-gray-500">票券编号：</span> <span class="font-medium">{{ ticketCode }}</span></p>
-                        <p class="text-sm mt-1"><span class="text-gray-500">有效日期：</span> <span class="font-medium">{{ successTicketDate }}</span></p>
-                    </div>
-                    
-                    <button @click="showSuccessModal = false" 
-                            class="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors">
-                        完成
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 抢购失败弹窗 -->
-        <div v-if="showFailModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-            <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fa fa-times text-red-500 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-red-500">抢购失败</h3>
-                    <p class="text-gray-500 mt-2 mb-6">{{ failMessage }}</p>
-                    
-                    <button @click="showFailModal = false" 
-                            class="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors">
-                        确定
-                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        const { createApp } = Vue;
-        
-                createApp({
-            data() {
+    <!-- 加载状态 -->
+    <div v-if="loading" class="flex justify-center items-center py-16">
+        <div class="text-center">
+            <i class="fa fa-spinner fa-spin text-3xl text-primary mb-4"></i>
+            <p class="text-gray-500">加载票券信息中...</p>
+        </div>
+    </div>
+
+    <!-- 错误状态 -->
+    <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-8 text-center">
+        <i class="fa fa-exclamation-circle text-red-500 mr-2"></i>
+        <span class="text-red-500">{{ error }}</span>
+    </div>
+
+    <!-- 票数卡片容器 - 只展示最近3天 -->
+    <div v-if="!loading && !error" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <!-- 票券卡片 -->
+        <div v-for="(ticket, index) in tickets" :key="index"
+             class="bg-white rounded-xl overflow-hidden shadow-md card-hover"
+             :class="{'border-t-4 border-primary': index === 0,
+                          'border-t-4 border-secondary': index === 1,
+                          'border-t-4 border-accent': index === 2}">
+            <div class="p-1"
+                 :class="{'bg-gradient-to-r from-primary to-blue-400': index === 0,
+                              'bg-gradient-to-r from-secondary to-emerald-400': index === 1,
+                              'bg-gradient-to-r from-accent to-amber-400': index === 2}"></div>
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-5">
+                    <div>
+                        <h3 class="text-lg font-bold text-dark">{{ ticket.formattedDate }}</h3>
+                        <p class="text-gray-500">{{ ticket.weekday }}</p>
+                    </div>
+                    <span :class="{'bg-primary/10 text-primary': index === 0,
+                                       'bg-secondary/10 text-secondary': index === 1,
+                                       'bg-accent/10 text-accent': index === 2}"
+                          class="text-xs px-2 py-1 rounded-full font-medium">
+                            {{ index === 0 ? '今天' : index === 1 ? '明天' : '后天' }}
+                        </span>
+                </div>
+
+                <div class="flex items-center justify-center mb-6">
+                    <div class="relative w-24 h-24 flex items-center justify-center">
+                        <div class="star-rotate text-accent">
+                            <i class="fa fa-star text-5xl"></i>
+                        </div>
+                        <div class="absolute text-center">
+                            <span class="text-2xl font-bold text-dark">{{ ticket.remaining }}</span>
+                            <span class="text-gray-500">张</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-500">剩余票数</span>
+                        <span class="font-medium">{{ ticket.remaining }} / {{ ticket.total }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div :class="{'bg-primary': index === 0,
+                                          'bg-secondary': index === 1,
+                                          'bg-accent': index === 2,
+                                          'bg-danger': ticket.remaining / ticket.total < 0.2}"
+                             class="h-2.5 rounded-full"
+                             :style="{ width: (ticket.remaining / ticket.total) * 100 + '%' }"></div>
+                    </div>
+                </div>
+
+                <button @click="handlePurchase(ticket)"
+                        :disabled="isButtonDisabled(ticket)"
+                        :class="getButtonClass(ticket, index)">
+                    <i v-if="getButtonIcon(ticket)" :class="getButtonIcon(ticket)"></i>
+                    <span>{{ getButtonText(ticket) }}</span>
+                </button>
+                <div v-if="purchaseStatus === 'polling'"
+                     class="mt-2 text-purple-600 text-sm flex items-center justify-center">
+                    <i class="fa fa-spinner fa-spin mr-2"></i>
+                    <span>🔥 请求已提交，正在全力抢购中，请稍候... (第{{pollingCount}}次查询)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 抢购规则 -->
+    <div class="bg-white rounded-xl shadow-md p-6 mb-10">
+        <h3 class="text-xl font-bold text-dark mb-4 flex items-center">
+            <i class="fa fa-info-circle text-primary mr-2"></i>
+            抢购规则
+        </h3>
+
+        <ul class="space-y-3 text-gray-600">
+            <li class="flex items-start">
+                <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
+                <span>每人每天限购一张票券，重复抢购将失败</span>
+            </li>
+            <li class="flex items-start">
+                <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
+                <span>票券抢购成功后，将为您保留24小时，请及时使用</span>
+            </li>
+            <li class="flex items-start">
+                <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
+                <span>票券一旦售出，不退不换，请确认日期后再抢购</span>
+            </li>
+            <li class="flex items-start">
+                <i class="fa fa-check-circle text-secondary mt-1 mr-2"></i>
+                <span>每日0点更新票数，售完即止</span>
+            </li>
+            <li class="flex items-start">
+                <i class="fa fa-shield text-accent mt-1 mr-2"></i>
+                <span>抢购采用双重验证机制，确保安全性和公平性</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- 抢购状态提示 -->
+    <div v-if="isPurchasing" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8 text-center">
+        <div class="flex items-center justify-center space-x-3">
+            <i class="fa fa-spinner fa-spin text-blue-500 text-xl"></i>
+            <div>
+                <p class="text-blue-800 font-medium">正在抢购中...</p>
+                <p class="text-blue-600 text-sm">请耐心等待，系统正在处理您的抢购请求</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 异步抢购轮询状态提示 -->
+    <div v-if="isPolling" class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-8 text-center">
+        <div class="flex items-center justify-center space-x-3">
+            <i class="fa fa-clock-o text-purple-500 text-xl"></i>
+            <div>
+                <p class="text-purple-800 font-medium">正在排队中...</p>
+                <p class="text-purple-600 text-sm">您的抢购请求已加入队列，正在等待处理，请稍候</p>
+                <p class="text-purple-500 text-xs mt-1">请求ID: {{ asyncRequestId }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认抢购弹窗 -->
+    <div v-if="showConfirmModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4 transform transition-all duration-300 scale-100">
+            <div class="text-center mb-5">
+                <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa fa-ticket text-primary text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-dark">确认抢购</h3>
+                <p class="text-gray-500 mt-2">
+                    您确定要抢购{{ selectedTicket.formattedDate }}（{{ selectedTicket.weekday }}）的票券吗？每人每天限购一张。
+                </p>
+                <div class="mt-3 p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center justify-center space-x-2">
+                        <i :class="{'fa fa-lock text-blue-500': selectedPurchaseApi === 'pessimistic',
+                                       'fa fa-unlock text-green-500': selectedPurchaseApi === 'optimistic',
+                                       'fa fa-clock-o text-purple-500': selectedPurchaseApi === 'async'}"></i>
+                        <span class="text-sm font-medium"
+                              :class="{'text-blue-600': selectedPurchaseApi === 'pessimistic',
+                                           'text-green-600': selectedPurchaseApi === 'optimistic',
+                                           'text-purple-600': selectedPurchaseApi === 'async'}">
+                                使用{{ selectedPurchaseApi === 'pessimistic' ? '悲观锁' : selectedPurchaseApi === 'optimistic' ? '乐观锁' : '异步抢购'
+                            }}接口
+                            </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex space-x-3">
+                <button @click="showConfirmModal = false"
+                        class="flex-1 py-3 border border-gray-200 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+                    取消
+                </button>
+                <button @click="confirmPurchase()"
+                        class="flex-1 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                    确认抢购
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 抢购成功弹窗 -->
+    <div v-if="showSuccessModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa fa-check text-green-500 text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-green-500">抢购成功！</h3>
+                <p class="text-gray-500 mt-2 mb-5">
+                    您已成功抢购{{ successTicketDate }}的票券
+                </p>
+
+                <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+                    <p class="text-sm"><span class="text-gray-500">票券编号：</span> <span
+                            class="font-medium">{{ ticketCode }}</span></p>
+                    <p class="text-sm mt-1"><span class="text-gray-500">有效日期：</span> <span
+                            class="font-medium">{{ successTicketDate }}</span></p>
+                </div>
+
+                <button @click="showSuccessModal = false"
+                        class="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                    完成
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 抢购失败弹窗 -->
+    <div v-if="showFailModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa fa-times text-red-500 text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-red-500">抢购失败</h3>
+                <p class="text-gray-500 mt-2 mb-6">{{ failMessage }}</p>
+
+                <button @click="showFailModal = false"
+                        class="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                    确定
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const {createApp} = Vue;
+
+    createApp({
+        data() {
+            return {
+                // 秒杀活动状态
+                miaoshaStatus: {},
+
+                tickets: [],
+                loading: true,
+                error: '',
+                currentUser: '', // 当前登录用户昵称
+                currentUserId: -1, // 当前用户ID，默认-1表示匿名用户
+                selectedTicket: null,
+                showConfirmModal: false,
+                showSuccessModal: false,
+                showFailModal: false,
+                successTicketDate: '',
+                ticketCode: '',
+                failMessage: '',
+                purchasedDates: [], // 已购买的日期
+                isPurchasing: false, // 抢购进行中状态
+                selectedPurchaseApi: 'pessimistic', // 默认选择悲观锁接口
+                asyncRequestId: '', // 异步抢购请求ID
+                isPolling: false, // 是否正在轮询
+                pollingInterval: null, // 轮询定时器
+                purchaseStatus: 'idle', // idle, submitting, polling, success, fail
+                pollingCount: 0,
+                pollingTimer: null,
+                pollingTimeoutTimer: null,
+                maxPollingTime: 30000,
+            }
+        },
+        computed: {
+            // 日志记录器
+            LOGGER() {
                 return {
-                    // 秒杀活动状态
-                    miaoshaStatus: {},
-                    
-                    tickets: [],
-                    loading: true,
-                    error: '',
-                    currentUser: '', // 当前登录用户昵称
-                    currentUserId: -1, // 当前用户ID，默认-1表示匿名用户
-                    selectedTicket: null,
-                    showConfirmModal: false,
-                    showSuccessModal: false,
-                    showFailModal: false,
-                    successTicketDate: '',
-                    ticketCode: '',
-                    failMessage: '',
-                    purchasedDates: [], // 已购买的日期
-                    isPurchasing: false, // 抢购进行中状态
-                    selectedPurchaseApi: 'pessimistic', // 默认选择悲观锁接口
-                    asyncRequestId: '', // 异步抢购请求ID
-                    isPolling: false, // 是否正在轮询
-                    pollingInterval: null // 轮询定时器
+                    info: (message, ...args) => console.log(`[INFO] ${message}`, ...args),
+                    warn: (message, ...args) => console.warn(`[WARN] ${message}`, ...args),
+                    error: (message, ...args) => console.error(`[ERROR] ${message}`, ...args),
+                    debug: (message, ...args) => console.debug(`[DEBUG] ${message}`, ...args)
+                };
+            }
+        },
+        mounted() {
+            // 注释掉登录状态检查，直接加载票券数据
+            // 先检查登录状态，然后加载票券数据
+            // this.checkLoginStatus().then(() => {
+            //     this.loadTickets();
+            // });
+
+            // 直接加载票券数据，不检查登录状态
+            this.loadTickets();
+
+            // 获取秒杀活动状态
+            this.loadMiaoshaStatus();
+        },
+        beforeUnmount() {
+            // 组件销毁前清理轮询定时器
+            this.stopPolling();
+        },
+        methods: {
+            // Add sleep helper at the top of methods
+            async sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            },
+
+            // 注释掉登录状态检查方法
+            // 检查登录状态
+            // async checkLoginStatus() {
+            //     const token = localStorage.getItem('token');
+            //     if (!token) {
+            //         // 没有token，设置用户为未登录状态
+            //         this.currentUser = '';
+            //         this.currentUserId = '';
+            //         return Promise.resolve();
+            //     }
+            //
+            //     try {
+            //         // 验证token并获取用户信息
+            //         const response = await axios.get('http://localhost:8081/api/auth/me', {
+            //             headers: {
+            //                 'Authorization': 'Bearer ' + token
+            //             }
+            //         });
+            //
+            //         if (response.data.code === 200) {
+            //             const user = response.data.data;
+            //             this.currentUser = user.nickname || user.username;
+            //             this.currentUserId = user.id;
+            //
+            //             // 设置全局axios默认header
+            //             axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+            //         } else {
+            //             // token无效，清除并设置为未登录
+            //             localStorage.removeItem('token');
+            //             localStorage.removeItem('user');
+            //             this.currentUser = '';
+            //             this.currentUserId = '';
+            //         }
+            //     } catch (err) {
+            //         console.error('验证登录状态失败:', err);
+            //         // 网络错误或token无效，设置为未登录
+            //         localStorage.removeItem('token');
+            //         localStorage.removeItem('user');
+            //         this.currentUser = '';
+            //         this.currentUserId = '';
+            //     }
+            //
+            //     return Promise.resolve();
+            // },
+
+            // 获取秒杀活动状态
+            async loadMiaoshaStatus() {
+                try {
+                    const response = await axios.get('http://localhost:8081/api/tickets/miaosha/status');
+                    if (response.data.code === 200) {
+                        this.miaoshaStatus = response.data.data;
+                    }
+                } catch (error) {
+                    console.error('获取秒杀状态失败:', error);
                 }
             },
-            computed: {
-                // 日志记录器
-                LOGGER() {
-                    return {
-                        info: (message, ...args) => console.log(`[INFO] ${message}`, ...args),
-                        warn: (message, ...args) => console.warn(`[WARN] ${message}`, ...args),
-                        error: (message, ...args) => console.error(`[ERROR] ${message}`, ...args),
-                        debug: (message, ...args) => console.debug(`[DEBUG] ${message}`, ...args)
-                    };
+
+            // 从后端加载票券数据
+            async loadTickets() {
+                try {
+                    this.loading = true;
+                    // 注释掉认证相关代码，直接调用API
+                    // 使用全局设置的axios默认header，无需手动添加token
+                    // 调用新的接口，获取包含用户购买状态的票券信息
+                    const response = await axios.get('http://localhost:8081/api/tickets/listWithUserStatus', {
+                        params: {
+                            userId: this.currentUserId || null
+                        }
+                    });
+
+                    if (response.data.code === 200) {
+                        this.tickets = response.data.data;
+                        this.error = '';
+
+                        // 更新已购买日期列表
+                        this.updatePurchasedDates();
+                        console.log('Tickets loaded:', this.tickets);
+                    } else {
+                        this.error = response.data.message || '加载票券失败';
+                    }
+                } catch (err) {
+                    // 注释掉401错误处理，简化错误处理逻辑
+                    // if (err.response && err.response.status === 401) {
+                    //     // 未授权，需要登录
+                    //     this.error = '请先登录后再查看票券信息';
+                    //     console.error('票券列表访问失败:', err);
+                    // } else {
+                    //     this.error = '网络错误，无法加载票券信息';
+                    //     console.error(err);
+                    // }
+
+                    this.error = '网络错误，无法加载票券信息';
+                    console.error(err);
+                } finally {
+                    console.log('Setting loading to false');
+                    this.loading = false;
+                    this.$forceUpdate(); // Force Vue to re-render if reactivity issue
                 }
             },
-            mounted() {
-                // 注释掉登录状态检查，直接加载票券数据
-                // 先检查登录状态，然后加载票券数据
-                // this.checkLoginStatus().then(() => {
-                //     this.loadTickets();
-                // });
-                
-                // 直接加载票券数据，不检查登录状态
-                this.loadTickets();
-                
-                // 获取秒杀活动状态
-                this.loadMiaoshaStatus();
+
+            // 更新已购买日期列表
+            updatePurchasedDates() {
+                this.purchasedDates = [];
+                for (const ticket of this.tickets) {
+                    if (ticket.userPurchased) {
+                        this.purchasedDates.push(ticket.formattedDate);
+                    }
+                }
+                this.LOGGER.info('已购买日期列表更新: {}', this.purchasedDates);
             },
-            beforeUnmount() {
-                // 组件销毁前清理轮询定时器
-                this.stopPolling();
+
+            // 处理抢购点击事件
+            handlePurchase(ticket) {
+                // 检查秒杀活动状态
+                if (this.miaoshaStatus.paused) {
+                    this.failMessage = '秒杀活动正在维护中，请稍后再试';
+                    this.showFailModal = true;
+                    return;
+                }
+
+                // 注释掉登录检查，允许未登录用户抢购
+                // 检查是否已登录
+                // if (!this.currentUser) {
+                //     this.failMessage = '请先登录后再抢购票券';
+                //     this.showFailModal = true;
+                //     return;
+                // }
+
+                this.selectedTicket = ticket;
+                this.showConfirmModal = true;
             },
-            methods: {
-                // 注释掉登录状态检查方法
-                // 检查登录状态
-                // async checkLoginStatus() {
-                //     const token = localStorage.getItem('token');
-                //     if (!token) {
-                //         // 没有token，设置用户为未登录状态
-                //         this.currentUser = '';
-                //         this.currentUserId = '';
-                //         return Promise.resolve();
-                //     }
-                //     
-                //     try {
-                //         // 验证token并获取用户信息
-                //         const response = await axios.get('http://localhost:8081/api/auth/me', {
-                //             headers: {
-                //                 'Authorization': 'Bearer ' + token
-                //             }
-                //         });
-                //         
-                //         if (response.data.code === 200) {
-                //             const user = response.data.data;
-                //             this.currentUser = user.nickname || user.username;
-                //             this.currentUserId = user.id;
-                //             
-                //             // 设置全局axios默认header
-                //             axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
-                //         } else {
-                //             // token无效，清除并设置为未登录
-                //             localStorage.removeItem('token');
-                //             localStorage.removeItem('user');
-                //             this.currentUser = '';
-                //             this.currentUserId = '';
-                //         }
-                //     } catch (err) {
-                //         console.error('验证登录状态失败:', err);
-                //         // 网络错误或token无效，设置为未登录
-                //         localStorage.removeItem('token');
-                //         localStorage.removeItem('user');
-                //         this.currentUser = '';
-                //         this.currentUserId = '';
-                //     }
-                //     
-                //     return Promise.resolve();
-                // },
-                
-                // 获取秒杀活动状态
-                async loadMiaoshaStatus() {
-                    try {
-                        const response = await axios.get('http://localhost:8081/api/tickets/miaosha/status');
-                        if (response.data.code === 200) {
-                            this.miaoshaStatus = response.data.data;
+
+            // 确认抢购
+            async confirmPurchase() {
+                if (!this.selectedTicket) return;
+
+                try {
+                    // 隐藏确认弹窗
+                    this.showConfirmModal = false;
+
+                    // 设置抢购进行中状态
+                    this.isPurchasing = true;
+
+                    // 第一步：获取验证值verifyHash
+                    this.LOGGER.info('开始获取验证值，用户ID: {}, 日期: {}', this.currentUserId, this.selectedTicket.date);
+
+                    const verifyResponse = await axios.get('http://localhost:8081/api/tickets/getVerifyHash', {
+                        params: {
+                            userId: this.currentUserId,
+                            date: this.selectedTicket.date
                         }
-                    } catch (error) {
-                        console.error('获取秒杀状态失败:', error);
-                    }
-                },
-                
-                // 从后端加载票券数据
-                async loadTickets() {
-                    try {
-                        this.loading = true;
-                        // 注释掉认证相关代码，直接调用API
-                        // 使用全局设置的axios默认header，无需手动添加token
-                        // 调用新的接口，获取包含用户购买状态的票券信息
-                        const response = await axios.get('http://localhost:8081/api/tickets/listWithUserStatus', {
-                            params: {
-                                userId: this.currentUserId || null
-                            }
-                        });
-                        
-                        if (response.data.code === 200) {
-                            this.tickets = response.data.data;
-                            this.error = '';
-                            
-                            // 更新已购买日期列表
-                            this.updatePurchasedDates();
-                        } else {
-                            this.error = response.data.message || '加载票券失败';
-                        }
-                    } catch (err) {
-                        // 注释掉401错误处理，简化错误处理逻辑
-                        // if (err.response && err.response.status === 401) {
-                        //     // 未授权，需要登录
-                        //     this.error = '请先登录后再查看票券信息';
-                        //     console.error('票券列表访问失败:', err);
-                        // } else {
-                        //     this.error = '网络错误，无法加载票券信息';
-                        //     console.error(err);
-                        // }
-                        
-                        this.error = '网络错误，无法加载票券信息';
-                        console.error(err);
-                    } finally {
-                        this.loading = false;
-                    }
-                },
-                
-                // 更新已购买日期列表
-                updatePurchasedDates() {
-                    this.purchasedDates = [];
-                    for (const ticket of this.tickets) {
-                        if (ticket.userPurchased) {
-                            this.purchasedDates.push(ticket.formattedDate);
-                        }
-                    }
-                    this.LOGGER.info('已购买日期列表更新: {}', this.purchasedDates);
-                },
-                
-                // 处理抢购点击事件
-                handlePurchase(ticket) {
-                    // 检查秒杀活动状态
-                    if (this.miaoshaStatus.paused) {
-                        this.failMessage = '秒杀活动正在维护中，请稍后再试';
+                    });
+
+                    if (verifyResponse.data.code !== 200) {
+                        this.failMessage = verifyResponse.data.message || '获取验证值失败';
                         this.showFailModal = true;
                         return;
                     }
-                    
-                    // 注释掉登录检查，允许未登录用户抢购
-                    // 检查是否已登录
-                    // if (!this.currentUser) {
-                    //     this.failMessage = '请先登录后再抢购票券';
-                    //     this.showFailModal = true;
-                    //     return;
-                    // }
-                    
-                    this.selectedTicket = ticket;
-                    this.showConfirmModal = true;
-                },
-                
-                // 确认抢购
-                async confirmPurchase() {
-                    if (!this.selectedTicket) return;
-                    
-                    try {
-                        // 隐藏确认弹窗
-                        this.showConfirmModal = false;
-                        
-                        // 设置抢购进行中状态
-                        this.isPurchasing = true;
-                        
-                        // 第一步：获取验证值verifyHash
-                        this.LOGGER.info('开始获取验证值，用户ID: {}, 日期: {}', this.currentUserId, this.selectedTicket.date);
-                        
-                        const verifyResponse = await axios.get('http://localhost:8081/api/tickets/getVerifyHash', {
-                            params: {
-                                userId: this.currentUserId,
-                                date: this.selectedTicket.date
-                            }
-                        });
-                        
-                        if (verifyResponse.data.code !== 200) {
-                            this.failMessage = verifyResponse.data.message || '获取验证值失败';
-                            this.showFailModal = true;
-                            return;
-                        }
-                        
-                        const verifyHash = verifyResponse.data.data;
-                        this.LOGGER.info('获取验证值成功: {}', verifyHash);
-                        
-                        // 第二步：携带verifyHash发送抢购请求
-                        this.LOGGER.info('开始发送抢购请求，用户ID: {}, 日期: {}, 验证值: {}, 接口类型: {}', 
-                            this.currentUserId, this.selectedTicket.date, verifyHash, this.selectedPurchaseApi);
-                        
-                        // 根据选择的接口类型动态选择API地址
-                        let apiUrl = '';
-                        if (this.selectedPurchaseApi === 'optimistic') {
-                            apiUrl = 'http://localhost:8081/api/tickets/v1/purchase/optimistic';
-                        } else if (this.selectedPurchaseApi === 'async') {
-                            apiUrl = 'http://localhost:8081/api/tickets/v2/purchase/optimistic';
-                        } else {
-                            apiUrl = 'http://localhost:8081/api/tickets/v1/purchase';
-                        }
-                        
-                        this.LOGGER.info('使用接口: {}', apiUrl);
-                        
-                        const response = await axios.post(apiUrl, {
-                            userId: this.currentUserId,
-                            date: this.selectedTicket.date,
-                            verifyHash: verifyHash
-                        });
-                        
-                                                 if (response.data.code === 200) {
-                             if (this.selectedPurchaseApi === 'async') {
-                                 // 异步抢购，检查requestId
-                                 const result = response.data.data;
-                                 this.asyncRequestId = result.requestId;
-                                 
-                                 if (!this.asyncRequestId) {
-                                     // requestId为空，直接结束并提示失败
-                                     this.failMessage = '抢购失败，请重试';
-                                     this.showFailModal = true;
-                                     this.LOGGER.warn('异步抢购失败，requestId为空');
-                                 } else {
-                                     // requestId不为空，开始轮询
-                                     this.LOGGER.info('异步抢购请求已提交，请求ID: {}, 开始轮询查询结果', this.asyncRequestId);
-                                     this.startPolling();
-                                 }
-                             } else {
-                                // 同步抢购成功
-                                const record = response.data.data;
-                                this.successTicketDate = this.selectedTicket.formattedDate;
-                                this.ticketCode = record.ticketCode;
-                                this.purchasedDates.push(this.selectedTicket.formattedDate);
-                                
-                                // 更新票券数量
-                                this.selectedTicket.remaining--;
-                                
-                                this.LOGGER.info('抢购成功，票券编码: {}, 订单号: {}', record.ticketCode, record.orderNo || 'N/A');
-                                
-                                // 显示成功弹窗
-                                this.showSuccessModal = true;
-                            }
-                        } else {
-                            // 抢购失败
-                            this.failMessage = response.data.message || '抢购失败，请重试';
-                            this.showFailModal = true;
-                            this.LOGGER.warn('抢购失败，错误信息: {}', this.failMessage);
-                        }
-                    } catch (err) {
-                        this.LOGGER.error('抢购流程异常: {}', err.message, err);
-                        
-                        if (err.response) {
-                            // 服务器返回错误
-                            if (err.response.status === 400) {
-                                this.failMessage = err.response.data.message || '请求参数错误';
-                            } else if (err.response.status === 500) {
-                                this.failMessage = '服务器内部错误，请稍后重试';
-                            } else {
-                                this.failMessage = `请求失败 (${err.response.status}): ${err.response.data.message || '未知错误'}`;
-                            }
-                        } else if (err.request) {
-                            // 网络错误
-                            this.failMessage = '网络连接失败，请检查网络后重试';
-                        } else {
-                            // 其他错误
-                            this.failMessage = '抢购失败，请重试';
-                        }
-                        
-                        this.showFailModal = true;
-                    } finally {
-                        // 只有非异步抢购时才重置抢购状态
-                        // 异步抢购的状态由轮询机制管理
-                        if (this.selectedPurchaseApi !== 'async') {
-                            this.isPurchasing = false;
-                        }
-                    }
-                },
-                
-                // 切换购票接口
-                togglePurchaseApi() {
-                    if (this.selectedPurchaseApi === 'pessimistic') {
-                        this.selectedPurchaseApi = 'optimistic';
-                    } else if (this.selectedPurchaseApi === 'optimistic') {
-                        this.selectedPurchaseApi = 'async';
+
+                    const verifyHash = verifyResponse.data.data;
+                    this.LOGGER.info('获取验证值成功: {}', verifyHash);
+
+                    // 第二步：携带verifyHash发送抢购请求
+                    this.LOGGER.info('开始发送抢购请求，用户ID: {}, 日期: {}, 验证值: {}, 接口类型: {}',
+                        this.currentUserId, this.selectedTicket.date, verifyHash, this.selectedPurchaseApi);
+
+                    // 根据选择的接口类型动态选择API地址
+                    let apiUrl = '';
+                    if (this.selectedPurchaseApi === 'optimistic') {
+                        apiUrl = 'http://localhost:8081/api/tickets/v1/purchase/optimistic';
+                    } else if (this.selectedPurchaseApi === 'async') {
+                        apiUrl = 'http://localhost:8081/api/tickets/v2/purchase/optimistic';
                     } else {
-                        this.selectedPurchaseApi = 'pessimistic';
+                        apiUrl = 'http://localhost:8081/api/tickets/v1/purchase';
                     }
-                    this.LOGGER.info('切换购票接口: {}', this.selectedPurchaseApi);
-                },
-                
-                // 开始轮询查询异步抢购结果
-                startPolling() {
-                    this.isPolling = true;
-                    this.LOGGER.info('开始轮询查询异步抢购结果，请求ID: {}', this.asyncRequestId);
-                    
-                    // 显示"抢购中"加载提示
-                    this.isPurchasing = true;
-                    
-                    // 设置轮询间隔为1秒
-                    this.pollingInterval = setInterval(async () => {
-                        await this.pollPurchaseResult();
-                    }, 1000);
-                    
-                    // 设置超时时间（3分钟）
-                    setTimeout(() => {
-                        if (this.isPolling) {
-                            this.stopPolling();
-                            this.failMessage = '抢购超时，请稍后重试';
-                            this.showFailModal = true;
-                            this.LOGGER.warn('异步抢购轮询超时，请求ID: {}', this.asyncRequestId);
-                        }
-                    }, 3 * 60 * 1000);
-                },
-                
-                // 停止轮询
-                stopPolling() {
-                    this.isPolling = false;
-                    this.isPurchasing = false; // 关闭"抢购中"加载状态
-                    if (this.pollingInterval) {
-                        clearInterval(this.pollingInterval);
-                        this.pollingInterval = null;
-                    }
-                    this.LOGGER.info('停止轮询查询异步抢购结果');
-                },
-                
-                // 轮询查询异步抢购结果
-                async pollPurchaseResult() {
-                    try {
-                        const response = await axios.get('http://localhost:8081/api/tickets/v2/purchaseResult', {
-                            params: {
-                                requestId: this.asyncRequestId,
-                                userId: this.currentUserId,
-                                date: this.selectedTicket.date
-                            }
-                        });
-                        
-                        if (response.data.code === 200) {
+
+                    this.LOGGER.info('使用接口: {}', apiUrl);
+
+                    const response = await axios.post(apiUrl, {
+                        userId: this.currentUserId,
+                        date: this.selectedTicket.date,
+                        verifyHash: verifyHash
+                    });
+
+                    if (response.data.code === 200) {
+                        if (this.selectedPurchaseApi === 'async') {
+                            this.purchaseStatus = 'submitting';
                             const result = response.data.data;
-                            const status = result.status;
-                            
-                            this.LOGGER.info('轮询查询结果，请求ID: {}, 状态: {}', this.asyncRequestId, status);
-                            
-                            if (status === 'SUCCESS') {
-                                // 抢购成功
-                                this.stopPolling();
-                                this.successTicketDate = this.selectedTicket.formattedDate;
-                                this.ticketCode = result.ticketCode;
-                                this.purchasedDates.push(this.selectedTicket.formattedDate);
-                                
-                                // 更新票券数量
-                                this.selectedTicket.remaining--;
-                                
-                                this.LOGGER.info('异步抢购成功，票券编码: {}, 订单号: {}', result.ticketCode, result.orderNo || 'N/A');
-                                
-                                // 显示成功弹窗
-                                this.showSuccessModal = true;
-                                
-                            } else if (status === 'FAILED' || status === 'TIMEOUT') {
-                                // 抢购失败或超时
-                                this.stopPolling();
-                                this.failMessage = result.message || '抢购失败，请重试';
+                            this.asyncRequestId = result.requestId;
+
+                            if (!this.asyncRequestId) {
+                                this.purchaseStatus = 'fail';
+                                this.failMessage = '抢购失败，请重试';
                                 this.showFailModal = true;
-                                this.LOGGER.warn('异步抢购失败，请求ID: {}, 错误: {}', this.asyncRequestId, this.failMessage);
-                                
-                            } else if (status === 'QUEUED') {
-                                // 还在排队中，继续轮询
-                                this.LOGGER.info('异步抢购还在排队中，请求ID: {}, 继续轮询', this.asyncRequestId);
+                                this.LOGGER.warn('异步抢购失败，requestId为空');
+                            } else {
+                                this.purchaseStatus = 'polling';
+                                this.LOGGER.info('异步抢购请求已提交，请求ID: {}, 开始轮询查询结果', this.asyncRequestId);
+                                this.startPolling();
                             }
                         } else {
-                            this.LOGGER.error('轮询查询失败: {}', response.data.message);
+                            // 同步抢购成功
+                            const record = response.data.data;
+                            this.successTicketDate = this.selectedTicket.formattedDate;
+                            this.ticketCode = record.ticketCode;
+                            this.purchasedDates.push(this.selectedTicket.formattedDate);
+
+                            // 更新票券数量
+                            this.selectedTicket.remaining--;
+
+                            this.LOGGER.info('抢购成功，票券编码: {}, 订单号: {}', record.ticketCode, record.orderNo || 'N/A');
+
+                            // 显示成功弹窗
+                            this.showSuccessModal = true;
                         }
-                    } catch (error) {
-                        this.LOGGER.error('轮询查询异常: {}', error.message);
+                    } else {
+                        // 抢购失败
+                        this.failMessage = response.data.message || '抢购失败，请重试';
+                        this.showFailModal = true;
+                        this.LOGGER.warn('抢购失败，错误信息: {}', this.failMessage);
                     }
-                },
-                
-                // 注释掉退出登录和跳转登录页面方法
-                // 退出登录
-                // async logout() {
-                //     try {
-                //         // 调用后端退出接口
-                //         await axios.post('http://localhost:8081/api/auth/logout');
-                //     } catch (err) {
-                //         console.error('退出登录失败:', err);
-                //     } finally {
-                //         // 无论是否成功，都清除本地数据
-                //         localStorage.removeItem('token');
-                //         localStorage.removeItem('user');
-                //         delete axios.defaults.headers.common['Authorization'];
-                //         // 重新加载当前页面，显示未登录状态
-                //         window.location.reload();
-                //     }
-                // },
-                
-                // 跳转到登录页面
-                // goToLogin() {
-                //     window.location.href = 'login.html';
-                // }
+                } catch (err) {
+                    this.LOGGER.error('抢购流程异常: {}', err.message, err);
+
+                    if (err.response) {
+                        // 服务器返回错误
+                        if (err.response.status === 400) {
+                            this.failMessage = err.response.data.message || '请求参数错误';
+                        } else if (err.response.status === 500) {
+                            this.failMessage = '服务器内部错误，请稍后重试';
+                        } else {
+                            this.failMessage = `请求失败 (${err.response.status}): ${err.response.data.message || '未知错误'}`;
+                        }
+                    } else if (err.request) {
+                        // 网络错误
+                        this.failMessage = '网络连接失败，请检查网络后重试';
+                    } else {
+                        // 其他错误
+                        this.failMessage = '抢购失败，请重试';
+                    }
+
+                    this.showFailModal = true;
+                } finally {
+                    // 只有非异步抢购时才重置抢购状态
+                    // 异步抢购的状态由轮询机制管理
+                    if (this.selectedPurchaseApi !== 'async') {
+                        this.isPurchasing = false;
+                    }
+                }
+            },
+
+            // 切换购票接口
+            togglePurchaseApi() {
+                if (this.selectedPurchaseApi === 'pessimistic') {
+                    this.selectedPurchaseApi = 'optimistic';
+                } else if (this.selectedPurchaseApi === 'optimistic') {
+                    this.selectedPurchaseApi = 'async';
+                } else {
+                    this.selectedPurchaseApi = 'pessimistic';
+                }
+                this.LOGGER.info('切换购票接口: {}', this.selectedPurchaseApi);
+            },
+
+            // 开始轮询查询异步抢购结果
+            async startPolling() {
+                this.stopPolling(); // Clear any existing, though not needed now
+                this.pollingCount = 0;
+                const startTime = Date.now();
+
+                while (true) {
+                    const status = await this.pollPurchaseResult();
+                    if (status === 'SUCCESS' || status === 'FAILED' || status === 'TIMEOUT') {
+                        break;
+                    }
+                    
+                    // Check timeout
+                    if (Date.now() - startTime > this.maxPollingTime) {
+                        this.handlePollingTimeout();
+                        break;
+                    }
+                    
+                    await this.sleep(1000);
+                }
+            },
+
+            // 停止轮询
+            stopPolling() {
+                if (this.pollingTimer) clearInterval(this.pollingTimer);
+                if (this.pollingTimeoutTimer) clearTimeout(this.pollingTimeoutTimer);
+                this.pollingTimer = null;
+                this.pollingTimeoutTimer = null;
+                this.pollingCount = 0;
+            },
+
+            // 轮询查询异步抢购结果
+            async pollPurchaseResult() {
+                this.pollingCount++;
+                try {
+                    const response = await axios.get('http://localhost:8081/api/tickets/v2/purchaseResult', {
+                        params: {
+                            requestId: this.asyncRequestId,
+                            userId: this.currentUserId,
+                            date: this.selectedTicket.date
+                        }
+                    });
+                    
+                    if (response.data.code === 200) {
+                        const result = response.data.data;
+                        const status = result.status;
+                        
+                        this.LOGGER.info('轮询查询结果，请求ID: {}, 状态: {}', this.asyncRequestId, status);
+                        
+                        if (status === 'SUCCESS') {
+                            this.purchaseStatus = 'success';
+                            this.successTicketDate = this.selectedTicket.formattedDate;
+                            this.ticketCode = result.ticketCode;
+                            this.purchasedDates.push(this.selectedTicket.formattedDate);
+                            this.selectedTicket.remaining--;
+                            this.LOGGER.info('异步抢购成功，票券编码: {}, 订单号: {}', result.ticketCode, result.orderNo || 'N/A');
+                            this.showSuccessModal = true;
+                        } else if (status === 'FAILED' || status === 'TIMEOUT') {
+                            this.purchaseStatus = 'fail';
+                            this.failMessage = result.message || '抢购失败，请重试';
+                            this.showFailModal = true;
+                            this.LOGGER.warn('异步抢购失败，请求ID: {}, 错误: {}', this.asyncRequestId, this.failMessage);
+                        } else if (status === 'QUEUED') {
+                            this.LOGGER.info('异步抢购还在排队中，请求ID: {}, 继续轮询', this.asyncRequestId);
+                        }
+                        
+                        return status;
+                    } else {
+                        this.LOGGER.error('轮询查询失败: {}', response.data.message);
+                        return 'FAILED';
+                    }
+                } catch (error) {
+                    this.LOGGER.error('轮询查询异常: {}', error.message);
+                    return 'FAILED';
+                }
+            },
+
+            // 处理轮询超时
+            handlePollingTimeout() {
+                if (this.purchaseStatus === 'polling') {
+                    this.stopPolling();
+                    this.purchaseStatus = 'fail';
+                    this.failMessage = '抢购处理超时，请前往「我的订单」查看确认，或稍后重试';
+                    this.showFailModal = true;
+                }
+            },
+
+            // 注释掉退出登录和跳转登录页面方法
+            // 退出登录
+            // async logout() {
+            //     try {
+            //         // 调用后端退出接口
+            //         await axios.post('http://localhost:8081/api/auth/logout');
+            //     } catch (err) {
+            //         console.error('退出登录失败:', err);
+            //     } finally {
+            //         // 无论是否成功，都清除本地数据
+            //         localStorage.removeItem('token');
+            //         localStorage.removeItem('user');
+            //         delete axios.defaults.headers.common['Authorization'];
+            //         // 重新加载当前页面，显示未登录状态
+            //         window.location.reload();
+            //     }
+            // },
+
+            // 跳转到登录页面
+            // goToLogin() {
+            //     window.location.href = 'login.html';
+            // }
+
+            isButtonDisabled(ticket) {
+                return ticket.remaining <= 0 || this.purchasedDates.includes(ticket.formattedDate) || this.purchaseStatus === 'submitting' || this.purchaseStatus === 'polling';
+            },
+
+            getButtonText(ticket) {
+                if (this.purchaseStatus === 'submitting') return '提交中...';
+                if (this.purchaseStatus === 'polling') return '排队中...';
+                if (ticket.remaining <= 0) return '已售罄';
+                if (this.purchasedDates.includes(ticket.formattedDate)) return '已抢购';
+                return '立即抢购';
+            },
+
+            getButtonClass(ticket, index) {
+                let baseClass = 'w-full py-3 text-white rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors relative';
+
+                if (this.purchaseStatus === 'submitting' || this.purchaseStatus === 'polling') {
+                    return `${baseClass} bg-gray-400 cursor-not-allowed animate-pulse`;
+                }
+
+                if (ticket.remaining <= 0 || this.purchasedDates.includes(ticket.formattedDate)) {
+                    return `${baseClass} bg-gray-200 text-gray-500 cursor-not-allowed`;
+                }
+
+                let colorClass = '';
+                if (index === 0) colorClass = 'bg-primary hover:bg-primary/90 pulse';
+                else if (index === 1) colorClass = 'bg-secondary hover:bg-secondary/90';
+                else if (index === 2) colorClass = 'bg-accent hover:bg-accent/90';
+
+                return `${baseClass} ${colorClass}`;
+            },
+
+            getButtonIcon(ticket) {
+                if (this.purchaseStatus === 'submitting' || this.purchaseStatus === 'polling') return 'fa fa-spinner fa-spin';
+                if (ticket.remaining <= 0) return 'fa fa-times';
+                if (this.purchasedDates.includes(ticket.formattedDate)) return 'fa fa-check';
+                if (ticket.remaining > 0 && !this.purchasedDates.includes(ticket.formattedDate)) return 'fa fa-shopping-cart';
+                return '';
             }
-        }).mount('#app');
-    </script>
+        }
+    }).mount('#app');
+</script>
 </body>
 </html>

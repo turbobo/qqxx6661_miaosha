@@ -325,7 +325,7 @@ public class TicketController {
             @RequestParam String date) {
         long startTime = System.currentTimeMillis();
         try {
-            Thread.sleep(5000);
+//            Thread.sleep(5000);
             LOGGER.info("查询异步抢购结果，请求ID: {}, 用户ID: {}, 日期: {}", requestId, userId, date);
             
             ApiResponse<Map<String, Object>> response = ticketService.getPurchaseResult(requestId, userId, date);
