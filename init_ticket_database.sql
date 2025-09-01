@@ -80,4 +80,40 @@ WHERE t.status = 1;
 -- 显示创建结果
 SELECT 'Database initialization completed successfully!' as message;
 SELECT COUNT(*) as ticket_count FROM `ticket`;
-SELECT COUNT(*) as record_count FROM `ticket_purchase_record`; 
+SELECT COUNT(*) as record_count FROM `ticket_purchase_record`;
+
+
+
+-- m4a_miaosha.ticket_order definition
+
+CREATE TABLE `ticket_order` (
+                                `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+                                `order_no` varchar(64) NOT NULL COMMENT '订单编号',
+                                `user_id` bigint(20) NOT NULL COMMENT '用户ID',
+                                `ticket_id` int(11) NOT NULL COMMENT '票券ID',
+                                `ticket_code` varchar(128) NOT NULL COMMENT '票券编码',
+                                `ticket_date` varchar(20) NOT NULL COMMENT '购票日期',
+                                `status` int(11) NOT NULL DEFAULT '1' COMMENT '订单状态：1-待支付，2-已支付，3-已取消，4-已过期',
+                                `amount` bigint(20) NOT NULL COMMENT '订单金额（分）',
+                                `pay_time` datetime DEFAULT NULL COMMENT '支付时间',
+                                `create_time` datetime NOT NULL COMMENT '创建时间',
+                                `update_time` datetime NOT NULL COMMENT '更新时间',
+                                `remark` varchar(255) DEFAULT NULL COMMENT '备注',
+                                PRIMARY KEY (`id`),
+                                UNIQUE KEY `uk_order_no` (`order_no`),
+                                KEY `idx_user_id` (`user_id`),
+                                KEY `idx_ticket_id` (`ticket_id`),
+                                KEY `idx_ticket_code` (`ticket_code`),
+                                KEY `idx_status` (`status`),
+                                KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COMMENT='票券订单表';
+
+
+
+-- m4a_miaosha.`user` definition
+
+CREATE TABLE `user` (
+                        `id` bigint(20) NOT NULL AUTO_INCREMENT,
+                        `user_name` varchar(255) NOT NULL DEFAULT '',
+                        PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
