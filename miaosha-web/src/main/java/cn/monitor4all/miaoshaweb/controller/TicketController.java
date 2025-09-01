@@ -49,6 +49,7 @@ public class TicketController {
     // 获取最近3天的票券信息
     @GetMapping("/list")
     public ApiResponse<List<Ticket>> getRecentTickets() {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("开始获取最近3天的票券信息");
             
@@ -67,12 +68,16 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("获取票券列表失败: {}", e.getMessage(), e);
             return ApiResponse.error("获取票券列表失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("获取最近3天票券信息接口响应时间: {}ms", endTime - startTime);
         }
     }
 
     // 获取最近3天的票券信息（包含用户购买状态）
     @GetMapping("/listWithUserStatus")
     public ApiResponse<List<Ticket>> getRecentTicketsWithUserStatus(@RequestParam(required = false) Long userId) {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("开始获取最近3天的票券信息（包含用户购买状态），用户ID: {}", userId);
 
@@ -92,6 +97,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("获取票券列表（包含用户购买状态）失败: {}", e.getMessage(), e);
             return ApiResponse.error("获取票券列表失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("获取最近3天票券信息（包含用户购买状态）接口响应时间: {}ms", endTime - startTime);
         }
     }
     
@@ -102,6 +110,7 @@ public class TicketController {
      */
     @GetMapping("/validateTime")
     public ApiResponse<Map<String, Object>> validatePurchaseTime(@RequestParam String date) {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("开始验证抢购时间，日期: {}", date);
             
@@ -112,6 +121,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("验证抢购时间失败，日期: {}", date, e);
             return ApiResponse.error("验证抢购时间失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("验证抢购时间接口响应时间: {}ms", endTime - startTime);
         }
     }
     
@@ -122,6 +134,7 @@ public class TicketController {
      */
     @GetMapping("/validateTicketCount")
     public ApiResponse<Map<String, Object>> validateTicketCount(@RequestParam String date) {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("开始检查票数合法性，日期: {}", date);
             
@@ -132,6 +145,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("检查票数合法性失败，日期: {}", date, e);
             return ApiResponse.error("检查票数合法性失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("检查票数合法性接口响应时间: {}ms", endTime - startTime);
         }
     }
 
@@ -147,6 +163,7 @@ public class TicketController {
     @ResponseBody
     public ApiResponse<String> getVerifyHash(@RequestParam(value = "date") String date,
                                             @RequestParam(value = "userId") Long userId) {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("开始获取验证hash，用户ID: {}, 日期: {}", userId, date);
             
@@ -181,6 +198,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("获取验证hash系统错误，用户ID: {}, 日期: {}", userId, date, e);
             return ApiResponse.error("系统错误，获取验证hash失败，请重试");
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("获取验证hash接口响应时间: {}ms", endTime - startTime);
         }
     }
 
@@ -195,13 +215,14 @@ public class TicketController {
      *   快速失败   快速失败    快速失败   缓存更新   监控记录
      *
      *   限流 → 合法性校验 → 参数校验 → 防重放 → 库存预扣 → 核心业务 → 结果返回
-     *   核心原则：“轻量拦截在前，重操作在后”，用最低的成本（限流、缓存校验）拦截尽可能多的无效请求，让真正有效的请求进入核心业务流程，从而在高并发场景下保证系统的稳定性和安全性。
+     *   核心原则："轻量拦截在前，重操作在后"，用最低的成本（限流、缓存校验）拦截尽可能多的无效请求，让真正有效的请求进入核心业务流程，从而在高并发场景下保证系统的稳定性和安全性。
      * @param request
      * @param httpRequest
      * @return
      */
     @PostMapping("/v1/purchase")
     public ApiResponse<PurchaseRecord> purchaseTicket(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("V1开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
 
@@ -222,6 +243,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("票券购买系统错误: {}", e.getMessage(), e);
             return ApiResponse.error("系统错误，购买失败，请重试");
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("V1票券购买接口响应时间: {}ms", endTime - startTime);
         }
     }
 
@@ -232,7 +256,8 @@ public class TicketController {
      * @return
      */
     @PostMapping("/v1/purchase/optimistic")
-    public ApiResponse<PurchaseRecord> purchaseTicketV2(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
+    public ApiResponse<PurchaseRecord> purchaseTicketV1(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("V1乐观锁开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
 
@@ -253,12 +278,16 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("票券购买系统错误: {}", e.getMessage(), e);
             return ApiResponse.error("系统错误，购买失败，请重试");
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("V1乐观锁票券购买接口响应时间: {}ms", endTime - startTime);
         }
     }
     
     // 测试接口：手动更新票券数据
     @PostMapping("/admin/updateDailyTickets")
     public ApiResponse<String> updateDailyTickets() {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("手动执行每日票券更新任务");
             // 调用服务层的方法来更新票券
@@ -267,12 +296,16 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("票券更新任务执行失败: {}", e.getMessage(), e);
             return ApiResponse.error("票券更新任务执行失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("手动更新票券数据接口响应时间: {}ms", endTime - startTime);
         }
     }
     
     // 测试接口：获取票券统计信息
     @GetMapping("/stats")
     public ApiResponse<Object> getTicketStats() {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("获取票券统计信息");
             List<Ticket> tickets = ticketService.getRecentTickets();
@@ -294,6 +327,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("获取票券统计信息失败: {}", e.getMessage(), e);
             return ApiResponse.error("获取票券统计信息失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("获取票券统计信息接口响应时间: {}ms", endTime - startTime);
         }
     }
 
@@ -305,6 +341,7 @@ public class TicketController {
      */
     @PostMapping("/admin/updateTicketsWithPessimistic")
     public ApiResponse<Map<String, Object>> updateTicketsWithPessimistic(@RequestBody UpdateTicketsRequest request) {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("管理员请求修改3天票数，请求参数: {}", request);
             
@@ -327,6 +364,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("管理员修改3天票数失败: {}", e.getMessage(), e);
             return ApiResponse.error("修改失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("管理员修改3天票数接口响应时间: {}ms", endTime - startTime);
         }
     }
     
@@ -336,6 +376,7 @@ public class TicketController {
      */
     @PostMapping("/admin/pauseMiaosha")
     public ApiResponse<Map<String, Object>> pauseMiaosha() {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("管理员请求暂停秒杀活动");
             
@@ -356,6 +397,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("暂停秒杀活动异常: {}", e.getMessage(), e);
             return ApiResponse.error("暂停秒杀活动异常: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("暂停秒杀活动接口响应时间: {}ms", endTime - startTime);
         }
     }
     
@@ -365,6 +409,7 @@ public class TicketController {
      */
     @PostMapping("/admin/resumeMiaosha")
     public ApiResponse<Map<String, Object>> resumeMiaosha() {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("管理员请求恢复秒杀活动");
             
@@ -385,6 +430,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("恢复秒杀活动异常: {}", e.getMessage(), e);
             return ApiResponse.error("恢复秒杀活动异常: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("恢复秒杀活动接口响应时间: {}ms", endTime - startTime);
         }
     }
     
@@ -394,6 +442,7 @@ public class TicketController {
      */
     @GetMapping("/miaosha/status")
     public ApiResponse<Object> getMiaoshaStatus() {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("获取秒杀活动状态");
             
@@ -413,6 +462,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("获取秒杀活动状态失败: {}", e.getMessage(), e);
             return ApiResponse.error("获取秒杀活动状态失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("获取秒杀活动状态接口响应时间: {}ms", endTime - startTime);
         }
     }
     
@@ -423,6 +475,7 @@ public class TicketController {
      */
     @PostMapping("/admin/updateTicketsWithOptimistic")
     public ApiResponse<Map<String, Object>> updateTicketsWithOptimistic(@RequestBody UpdateTicketsRequest request) {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("管理员请求使用乐观锁无感知修改票券库存，请求参数: {}", request);
             
@@ -445,6 +498,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("乐观锁无感知修改票券库存失败: {}", e.getMessage(), e);
             return ApiResponse.error("修改失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("乐观锁无感知修改票券库存接口响应时间: {}ms", endTime - startTime);
         }
     }
     
@@ -454,6 +510,7 @@ public class TicketController {
      */
     @GetMapping("/admin/optimisticRetryStats")
     public ApiResponse<Object> getOptimisticRetryStats() {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("获取乐观锁修改重试统计信息");
             
@@ -464,6 +521,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("获取乐观锁修改重试统计信息失败: {}", e.getMessage(), e);
             return ApiResponse.error("获取重试统计信息失败: " + e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("获取乐观锁修改重试统计信息接口响应时间: {}ms", endTime - startTime);
         }
     }
 
@@ -480,6 +540,7 @@ public class TicketController {
      */
     @PostMapping("/v1/cancel")
     public ApiResponse<CancelPurchaseResponse> cancelPurchase(@RequestBody CancelPurchaseRequest request, HttpServletRequest httpRequest) {
+        long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("开始处理票券取消请求，用户ID: {}, 订单号: {}, 票券编码: {}", 
                        request.getUserId(), request.getOrderNo(), request.getTicketCode());
@@ -501,6 +562,9 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("票券取消系统错误: {}", e.getMessage(), e);
             return ApiResponse.error("系统错误，取消失败，请重试");
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("票券取消接口响应时间: {}ms", endTime - startTime);
         }
     }
 }
