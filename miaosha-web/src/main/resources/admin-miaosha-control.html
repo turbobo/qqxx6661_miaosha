@@ -377,7 +377,7 @@
             methods: {
                 async refreshMiaoshaStatus() {
                     try {
-                        const response = await axios.get('/api/tickets/miaosha/status');
+                        const response = await axios.get('http://localhost:8081/api/tickets/miaosha/status');
                         if (response.data.success) {
                             this.miaoshaStatus = response.data.data;
                         }
@@ -388,7 +388,7 @@
                 
                 async pauseMiaosha() {
                     try {
-                        const response = await axios.post('/api/tickets/admin/pauseMiaosha');
+                        const response = await axios.post('http://localhost:8081/api/tickets/admin/pauseMiaosha');
                         if (response.data.success) {
                             this.showMessage('秒杀活动已暂停', 'success');
                             this.refreshMiaoshaStatus();
@@ -402,7 +402,7 @@
                 
                 async resumeMiaosha() {
                     try {
-                        const response = await axios.post('/api/tickets/admin/resumeMiaosha');
+                        const response = await axios.post('http://localhost:8081/api/tickets/admin/resumeMiaosha');
                         if (response.data.success) {
                             this.showMessage('秒杀活动已恢复', 'success');
                             this.refreshMiaoshaStatus();
@@ -463,7 +463,7 @@
                             ticketUpdates: this.pessimisticForm.tickets
                         };
                         
-                        const response = await axios.post('/api/tickets/admin/updateTicketsWithPessimistic', request);
+                        const response = await axios.post('http://localhost:8081/api/tickets/admin/updateTicketsWithPessimistic', request);
                         if (response.data.success) {
                             this.updateResult = response.data.data;
                             this.showMessage('悲观锁修改成功', 'success');
@@ -524,7 +524,7 @@
                             ticketUpdates: this.optimisticForm.tickets
                         };
                         
-                        const response = await axios.post('/api/tickets/admin/updateTicketsWithOptimistic', request);
+                        const response = await axios.post('http://localhost:8081/api/tickets/admin/updateTicketsWithOptimistic', request);
                         if (response.data.success) {
                             this.updateResult = response.data.data;
                             this.showMessage('乐观锁修改成功', 'success');
@@ -539,7 +539,7 @@
                 
                 async loadRetryStats() {
                     try {
-                        const response = await axios.get('/api/tickets/admin/optimisticRetryStats');
+                        const response = await axios.get('http://localhost:8081/api/tickets/admin/optimisticRetryStats');
                         if (response.data.success) {
                             this.retryStats = response.data.data;
                         }

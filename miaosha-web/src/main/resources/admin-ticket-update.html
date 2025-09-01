@@ -232,7 +232,7 @@
                     try {
                         this.showMessage('正在更新票券...', 'info');
                         
-                        const response = await axios.post('/api/tickets/admin/updateTicketsWithPessimistic', {
+                        const response = await axios.post('http://localhost:8081/api/tickets/admin/updateTicketsWithPessimistic', {
                             adminId: this.adminId,
                             ticketUpdates: this.tickets
                         });
@@ -251,7 +251,7 @@
                 },
                 async refreshCurrentTickets() {
                     try {
-                        const response = await axios.get('/api/tickets/list');
+                        const response = await axios.get('http://localhost:8081/api/tickets/list');
                         if (response.data.success) {
                             this.currentTickets = response.data.data;
                         }
