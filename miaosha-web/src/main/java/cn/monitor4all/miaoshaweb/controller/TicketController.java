@@ -219,7 +219,7 @@ public class TicketController {
      *   核心原则："轻量拦截在前，重操作在后"，用最低的成本（限流、缓存校验）拦截尽可能多的无效请求，让真正有效的请求进入核心业务流程，从而在高并发场景下保证系统的稳定性和安全性。
      * @param request
      * @param httpRequest
-     * @return
+     * @return  V1票券购买接口响应时间: 15ms
      */
     @PostMapping("/v1/purchase")
     public ApiResponse<PurchaseRecord> purchaseTicket(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
@@ -254,7 +254,7 @@ public class TicketController {
      * 同步购买 乐观锁
      * @param request
      * @param httpRequest
-     * @return
+     * @return V1乐观锁票券购买接口响应时间: 21ms
      */
     @PostMapping("/v1/purchase/optimistic")
     public ApiResponse<PurchaseRecord> purchaseTicketV1(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
@@ -285,7 +285,13 @@ public class TicketController {
         }
     }
 
-    // 异步处理 + 乐观锁
+    /**
+     * 异步处理 + 乐观锁
+     *
+     * @param request
+     * @param httpRequest
+     * @return V2异步抢购接口响应时间: 4ms
+     */
     @PostMapping("/v2/purchase/optimistic")
     public ApiResponse<Map<String, Object>> purchaseTicketV2(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
         long startTime = System.currentTimeMillis();
