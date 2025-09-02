@@ -607,11 +607,20 @@ public class TicketServiceImpl implements TicketService {
         // 获取请求参数
         Long userId = request.getUserId();
         String purchaseDate = request.getDate();
-        PurchaseRecord purchaseRecord = doPurchaseTicketWithOptimisticLock(request);
+
+        // TODO  //订单锁 新锁定同一时间内相同订单只有一个线程在创建或者更新
+        final String lockKey = String.format("{}##{}", request.getUserId(), request.getDate());
+        RedisLock redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 1000);
+        if (null != redisLock && redisLock.lock()) {
+            PurchaseRecord purchaseRecord = doPurchaseTicketWithOptimisticLock(request);
+
+            LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
+            return ApiResponse.success(purchaseRecord);
+        } else {
+            throw new BusinessException("获取订单创建锁超时");
+        }
 
 
-        LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
-        return ApiResponse.success(purchaseRecord);
     }
 
     @Override
@@ -781,7 +790,7 @@ public class TicketServiceImpl implements TicketService {
             LOGGER.warn("检查秒杀活动状态失败，继续执行: {}", e.getMessage());
         }
 
-        // 检查是否已经购买（从数据库查询）
+//        // 检查是否已经购买（从数据库查询）
 //        if (hasPurchased(request.getUserId(), request.getDate())) {
 //            throw new IllegalStateException("您已购买过当天的票券，每人每天限购一张");
 //        }
@@ -1759,6 +1768,11 @@ public class TicketServiceImpl implements TicketService {
     public PurchaseRecord doPurchaseTicketWithOptimisticLock(PurchaseRequest request) throws Exception {
         try {
             LOGGER.info("开始乐观锁购票购票，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+
+            // 检查是否已经购买（从数据库查询）
+            if (hasPurchased(request.getUserId(), request.getDate())) {
+                throw new IllegalStateException("您已购买过当天的票券，每人每天限购一张");
+            }
 
             Long userId = request.getUserId();
             String purchaseDate = request.getDate();
