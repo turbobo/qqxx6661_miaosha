@@ -236,8 +236,8 @@
                             adminId: this.adminId,
                             ticketUpdates: this.tickets
                         });
-                        
-                        if (response.data.success) {
+                        console.log('更新结果:', response.data);
+                        if (response.data.message == 'success') {
                             this.updateResult = response.data.data;
                             this.showMessage('票券更新成功！', 'success');
                             this.refreshCurrentTickets();
