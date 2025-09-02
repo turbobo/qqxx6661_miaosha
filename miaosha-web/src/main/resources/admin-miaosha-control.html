@@ -387,8 +387,11 @@
                 async refreshMiaoshaStatus() {
                     try {
                         const response = await axios.get('http://localhost:8081/api/tickets/miaosha/status');
-                        if (response.data.success) {
+                        console.log("refreshMiaoshaStatus response:", response.data);
+
+                        if (response.data.message == 'success') {
                             this.miaoshaStatus = response.data.data;
+                            console.log("refreshMiaoshaStatus miaoshaStatus:", this.miaoshaStatus);
                         }
                     } catch (error) {
                         console.error('获取秒杀状态失败:', error);
@@ -398,11 +401,16 @@
                 async pauseMiaosha() {
                     try {
                         const response = await axios.post('http://localhost:8081/api/tickets/admin/pauseMiaosha');
-                        if (response.data.success) {
+                        console.log("pauseMiaosha response:", response.data);
+                        
+                        if (response.data.data.status === 'SUCCESS') {
                             this.showMessage('秒杀活动已暂停', 'success');
+                            // 乐观更新：立即更新状态，让按钮立即响应
+                            // this.miaoshaStatus.paused = true;
+                            // this.miaoshaStatus.status = 'PAUSED';
                             this.refreshMiaoshaStatus();
                         } else {
-                            this.showMessage(response.data.message, 'error');
+                            this.showMessage(response.data.message || '暂停失败', 'error');
                         }
                     } catch (error) {
                         this.showMessage('暂停秒杀活动失败: ' + error.message, 'error');
@@ -412,11 +420,16 @@
                 async resumeMiaosha() {
                     try {
                         const response = await axios.post('http://localhost:8081/api/tickets/admin/resumeMiaosha');
-                        if (response.data.success) {
+                        console.log("resumeMiaosha response:", response.data);
+
+                        if (response.data.data.status === 'SUCCESS') {
                             this.showMessage('秒杀活动已恢复', 'success');
+                            // 乐观更新：立即更新状态，让按钮立即响应
+                            // this.miaoshaStatus.paused = false;
+                            // this.miaoshaStatus.status = 'RUNNING';
                             this.refreshMiaoshaStatus();
                         } else {
-                            this.showMessage(response.data.message, 'error');
+                            this.showMessage(response.data.message || '恢复失败', 'error');
                         }
                     } catch (error) {
                         this.showMessage('恢复秒杀活动失败: ' + error.message, 'error');

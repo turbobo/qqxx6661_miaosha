@@ -9,6 +9,8 @@ import cn.monitor4all.miaoshadao.model.CancelPurchaseRequest;
 import cn.monitor4all.miaoshadao.model.CancelPurchaseResponse;
 import cn.monitor4all.miaoshadao.dao.TicketOrder;
 import cn.monitor4all.miaoshaservice.service.MiaoshaStatusService;
+import cn.monitor4all.miaoshadao.model.MiaoshaOperationResponse;
+import cn.monitor4all.miaoshadao.model.MiaoshaStatusResponse;
 import cn.monitor4all.miaoshaservice.service.TicketOptimisticUpdateService;
 import cn.monitor4all.miaoshaservice.service.TicketService;
 import cn.monitor4all.miaoshaservice.service.UserService;
@@ -442,7 +444,7 @@ public class TicketController {
      * @return 暂停结果
      */
     @PostMapping("/admin/pauseMiaosha")
-    public ApiResponse<Map<String, Object>> pauseMiaosha() {
+    public ApiResponse<MiaoshaOperationResponse> pauseMiaosha() {
         long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("管理员请求暂停秒杀活动");
@@ -450,10 +452,7 @@ public class TicketController {
             boolean success = miaoshaStatusService.pauseMiaosha();
             
             if (success) {
-                Map<String, Object> result = new HashMap<>();
-                result.put("status", "SUCCESS");
-                result.put("message", "秒杀活动已暂停");
-                result.put("timestamp", System.currentTimeMillis());
+                MiaoshaOperationResponse result = new MiaoshaOperationResponse("SUCCESS", "秒杀活动已暂停");
                 
                 LOGGER.info("秒杀活动暂停成功");
                 return ApiResponse.success(result);
@@ -475,7 +474,7 @@ public class TicketController {
      * @return 恢复结果
      */
     @PostMapping("/admin/resumeMiaosha")
-    public ApiResponse<Map<String, Object>> resumeMiaosha() {
+    public ApiResponse<MiaoshaOperationResponse> resumeMiaosha() {
         long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("管理员请求恢复秒杀活动");
@@ -483,10 +482,7 @@ public class TicketController {
             boolean success = miaoshaStatusService.resumeMiaosha();
             
             if (success) {
-                Map<String, Object> result = new HashMap<>();
-                result.put("status", "SUCCESS");
-                result.put("message", "秒杀活动已恢复");
-                result.put("timestamp", System.currentTimeMillis());
+                MiaoshaOperationResponse result = new MiaoshaOperationResponse("SUCCESS", "秒杀活动已恢复");
                 
                 LOGGER.info("秒杀活动恢复成功");
                 return ApiResponse.success(result);
@@ -508,21 +504,21 @@ public class TicketController {
      * @return 秒杀活动状态
      */
     @GetMapping("/miaosha/status")
-    public ApiResponse<Object> getMiaoshaStatus() {
+    public ApiResponse<MiaoshaStatusResponse> getMiaoshaStatus() {
         long startTime = System.currentTimeMillis();
         try {
             LOGGER.info("获取秒杀活动状态");
             
             MiaoshaStatusService.MiaoshaStatus status = miaoshaStatusService.getMiaoshaStatusDetail();
             
-            Map<String, Object> result = new HashMap<>();
-            result.put("paused", status.isPaused());
-            result.put("status", status.getStatus());
-            result.put("pauseTime", status.getPauseTime());
-            result.put("resumeTime", status.getResumeTime());
-            result.put("operator", status.getOperator());
-            result.put("reason", status.getReason());
-            result.put("timestamp", System.currentTimeMillis());
+            MiaoshaStatusResponse result = new MiaoshaStatusResponse();
+            result.setPaused(status.isPaused());
+            result.setStatus(status.getStatus());
+            result.setPauseTime(status.getPauseTime());
+            result.setResumeTime(status.getResumeTime());
+            result.setOperator(status.getOperator());
+            result.setReason(status.getReason());
+            result.setTimestamp(System.currentTimeMillis());
             
             return ApiResponse.success(result);
             
