@@ -11,7 +11,13 @@
 <body class="bg-gray-100">
     <div id="app" class="container mx-auto px-4 py-8">
         <div class="max-w-6xl mx-auto">
-            <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">秒杀活动管理控制台</h1>
+            <div class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold text-center text-gray-800">秒杀活动管理控制台</h1>
+                <button onclick="window.location.href='index.html'" 
+                        class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+                    返回首页
+                </button>
+            </div>
             
             <!-- 状态显示 -->
             <div v-if="message" :class="messageClass" class="mb-6 p-4 rounded-lg">
@@ -340,7 +346,10 @@
                 return {
                     message: '',
                     messageClass: '',
-                    miaoshaStatus: {},
+                    miaoshaStatus: {
+                        paused: false,
+                        status: 'RUNNING'
+                    },
                     showPessimisticForm: false,
                     showOptimisticForm: false,
                     pessimisticForm: {
