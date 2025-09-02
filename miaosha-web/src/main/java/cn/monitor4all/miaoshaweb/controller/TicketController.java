@@ -8,12 +8,9 @@ import cn.monitor4all.miaoshadao.model.UpdateTicketsRequest;
 import cn.monitor4all.miaoshadao.model.CancelPurchaseRequest;
 import cn.monitor4all.miaoshadao.model.CancelPurchaseResponse;
 import cn.monitor4all.miaoshadao.dao.TicketOrder;
-import cn.monitor4all.miaoshaservice.service.MiaoshaStatusService;
+import cn.monitor4all.miaoshaservice.service.*;
 import cn.monitor4all.miaoshadao.model.MiaoshaOperationResponse;
 import cn.monitor4all.miaoshadao.model.MiaoshaStatusResponse;
-import cn.monitor4all.miaoshaservice.service.TicketOptimisticUpdateService;
-import cn.monitor4all.miaoshaservice.service.TicketService;
-import cn.monitor4all.miaoshaservice.service.UserService;
 import com.google.common.util.concurrent.RateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,11 +18,14 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
-
+/**
+ * 票券控制器
+ * 提供票券查询、购买、统计等相关接口
+ */
 @RestController
 @RequestMapping("/api/tickets")
 @CrossOrigin // 允许所有来源访问，解决403 Forbidden错误
@@ -44,6 +44,9 @@ public class TicketController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private ResponseTimeStatisticsService responseTimeStatisticsService;
 
 
     // Guava令牌桶：每秒放行10个请求
@@ -209,6 +212,7 @@ public class TicketController {
 
 
     /**
+     * 一天票数设置1000
      *   用户请求 → 前置校验 → 限流检查 → 异步处理 → 返回结果
      *     ↓           ↓         ↓         ↓         ↓
      *   参数验证   验证码校验   用户限流   库存更新   成功/失败
@@ -222,10 +226,15 @@ public class TicketController {
      * @param request
      * @param httpRequest
      * @return  V1票券购买接口响应时间: 15ms
+     *
+     * 1000 吞吐量：950.5
+     * 2000 吞吐量：589.275  响应时间：3-7ms  3579ms-5052ms
+     * 总请求数: 2000, 平均响应时间: 1989.40 ms ms  吞吐量：484.9660523763337
      */
     @PostMapping("/v1/purchase")
     public ApiResponse<PurchaseRecord> purchaseTicket(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
         long startTime = System.currentTimeMillis();
+        long responseTime = 0;
         try {
             LOGGER.info("V1开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
 
@@ -245,10 +254,13 @@ public class TicketController {
             return ApiResponse.error(e.getMessage());
         } catch (Exception e) {
             LOGGER.error("票券购买系统错误: {}", e.getMessage(), e);
-            return ApiResponse.error("系统错误，购买失败，请重试");
+            return ApiResponse.error(e.getMessage());
         } finally {
             long endTime = System.currentTimeMillis();
-            LOGGER.info("V1票券购买接口响应时间: {}ms", endTime - startTime);
+            responseTime = endTime - startTime;
+            LOGGER.info("V1票券购买接口响应时间: {}ms", responseTime);
+            // 收集响应时间统计数据
+            responseTimeStatisticsService.addResponseTime(responseTime);
         }
     }
 
@@ -257,21 +269,26 @@ public class TicketController {
      * @param request
      * @param httpRequest
      * @return V1乐观锁票券购买接口响应时间: 21ms
+     * 2000 吞吐量：546.2988254575253  响应时间：3-7ms
+     * 总请求数: 2000, 平均响应时间: 644.14 ms  吞吐量：844.9514152936206
+     * 总请求数: 2000, 平均响应时间: 505.67 ms
+     * 吞吐量：838.2229673093042
      */
     @PostMapping("/v1/purchase/optimistic")
-    public ApiResponse<PurchaseRecord> purchaseTicketV1(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
+    public ApiResponse<PurchaseRecord> purchaseTicketWithOptimistic(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
         long startTime = System.currentTimeMillis();
+        long responseTime = 0;
         try {
-            LOGGER.info("V1乐观锁开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
-
-            // 调用服务层购买票券
+            LOGGER.info("V1开始处理票券购买请求(乐观锁)，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+            
+            // 调用服务层购买票券(乐观锁)
             ApiResponse<PurchaseRecord> response = ticketService.purchaseTicketV1WithOptimisticLock(request);
-
-            LOGGER.info("票券购买成功，用户ID: {}, 日期: {}, 票券编号: {}",
+            
+            LOGGER.info("票券购买成功(乐观锁)，用户ID: {}, 日期: {}, 票券编号: {}",
                     request.getUserId(), request.getDate(), response.getData().getTicketCode());
-
+            
             return response;
-
+            
         } catch (IllegalArgumentException e) {
             LOGGER.warn("票券购买参数错误: {}", e.getMessage());
             return ApiResponse.error(e.getMessage());
@@ -280,43 +297,54 @@ public class TicketController {
             return ApiResponse.error(e.getMessage());
         } catch (Exception e) {
             LOGGER.error("票券购买系统错误: {}", e.getMessage(), e);
-            return ApiResponse.error("系统错误，购买失败，请重试");
+            return ApiResponse.error(e.getMessage());
         } finally {
             long endTime = System.currentTimeMillis();
-            LOGGER.info("V1乐观锁票券购买接口响应时间: {}ms", endTime - startTime);
+            responseTime = endTime - startTime;
+            LOGGER.info("V1乐观锁票券购买接口响应时间: {}ms", responseTime);
+            // 收集响应时间统计数据
+            responseTimeStatisticsService.addResponseTime(responseTime);
         }
     }
-
+    
     /**
-     * 异步处理 + 乐观锁
-     *
-     * @param request
-     * @param httpRequest
-     * @return V2异步抢购接口响应时间: 4ms
+     * V2异步抢购接口
+     * @param request 抢购请求
+     * @param httpRequest HTTP请求对象
+     * @return 异步抢购结果
+     * V2异步抢购接口响应时间: 10ms
+     * 2000 吞吐量：1989.025 响应时间：3-7ms
      */
     @PostMapping("/v2/purchase/optimistic")
-    public ApiResponse<Map<String, Object>> purchaseTicketV2(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
+    public ApiResponse<Map<String, Object>> purchaseTicketAsync(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
         long startTime = System.currentTimeMillis();
+        long responseTime = 0;
         try {
-            LOGGER.info("V2异步抢购开始处理票券购买请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
-
-            // 调用服务层异步抢购
-            ApiResponse<Map<String, Object>> response = ticketService.purchaseTicketV2(request);
-
-            return response;
-
+            LOGGER.info("V2开始处理异步抢购请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+            
+            // 调用服务层异步购买票券
+            ApiResponse<Map<String, Object>> result = ticketService.purchaseTicketV2(request);
+            
+            LOGGER.info("V2异步抢购请求处理完成，用户ID: {}, 日期: {}",
+                    request.getUserId(), request.getDate());
+            
+            return result;
+            
         } catch (IllegalArgumentException e) {
-            LOGGER.warn("票券购买参数错误: {}", e.getMessage());
+            LOGGER.warn("异步抢购参数错误: {}", e.getMessage());
             return ApiResponse.error(e.getMessage());
         } catch (IllegalStateException e) {
-            LOGGER.warn("票券购买业务错误: {}", e.getMessage());
+            LOGGER.warn("异步抢购业务错误: {}", e.getMessage());
             return ApiResponse.error(e.getMessage());
         } catch (Exception e) {
-            LOGGER.error("票券购买系统错误: {}", e.getMessage(), e);
-            return ApiResponse.error("系统错误，购买失败，请重试");
+            LOGGER.error("异步抢购系统错误: {}", e.getMessage(), e);
+            return ApiResponse.error("系统错误，请稍后重试");
         } finally {
             long endTime = System.currentTimeMillis();
-            LOGGER.info("V2异步抢购接口响应时间: {}ms", endTime - startTime);
+            responseTime = endTime - startTime;
+            LOGGER.info("V2异步抢购接口响应时间: {}ms", responseTime);
+            // 收集响应时间统计数据
+            responseTimeStatisticsService.addResponseTime(responseTime);
         }
     }
     
@@ -333,17 +361,15 @@ public class TicketController {
             @RequestParam Long userId,
             @RequestParam String date) {
         long startTime = System.currentTimeMillis();
+        long responseTime = 0;
         try {
-//            Thread.sleep(5000);
             LOGGER.info("查询异步抢购结果，请求ID: {}, 用户ID: {}, 日期: {}", requestId, userId, date);
             
-            ApiResponse<Map<String, Object>> response = ticketService.getPurchaseResult(requestId, userId, date);
+            ApiResponse<Map<String, Object>> result = ticketService.getPurchaseResult(requestId, userId, date);
             
-            LOGGER.info("查询异步抢购结果完成，请求ID: {}, 状态: {}", requestId, 
-                response.getData() != null ? response.getData().get("status") : "null");
+            LOGGER.info("异步抢购结果查询完成，请求ID: {}, 结果: {}", requestId, result.getData().get("status"));
             
-            return response;
-            
+            return result;
         } catch (Exception e) {
             LOGGER.error("查询异步抢购结果失败: {}", e.getMessage(), e);
             return ApiResponse.error("查询抢购结果失败: " + e.getMessage());
@@ -371,7 +397,10 @@ public class TicketController {
         }
     }
     
-    // 测试接口：获取票券统计信息
+    /**
+     * 获取票券统计信息
+     * @return 票券统计信息
+     */
     @GetMapping("/stats")
     public ApiResponse<Object> getTicketStats() {
         long startTime = System.currentTimeMillis();
@@ -639,5 +668,37 @@ public class TicketController {
     @GetMapping("/v1/order/detail")
     public ApiResponse<TicketOrder> getOrderDetail(@RequestParam Long orderId) {
         return ticketService.getOrderById(orderId);
+    }
+
+    /**
+     * 获取响应时间统计信息
+     * @return 统计信息
+     */
+    @GetMapping("/statistics/responseTime")
+    public ApiResponse<String> getResponseTimeStatistics() {
+        try {
+            String statistics = responseTimeStatisticsService.getStatistics();
+            LOGGER.info("获取响应时间统计信息: {}", statistics);
+            return ApiResponse.success(statistics);
+        } catch (Exception e) {
+            LOGGER.error("获取响应时间统计信息失败: {}", e.getMessage(), e);
+            return ApiResponse.error("获取统计信息失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 清空响应时间统计信息
+     * @return 操作结果
+     */
+    @GetMapping("/statistics/responseTime/clear")
+    public ApiResponse<String> clearResponseTimeStatistics() {
+        try {
+            responseTimeStatisticsService.clearStatistics();
+            LOGGER.info("清空响应时间统计信息成功");
+            return ApiResponse.success("统计信息已清空");
+        } catch (Exception e) {
+            LOGGER.error("清空响应时间统计信息失败: {}", e.getMessage(), e);
+            return ApiResponse.error("清空统计信息失败: " + e.getMessage());
+        }
     }
 }

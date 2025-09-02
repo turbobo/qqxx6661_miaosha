@@ -531,7 +531,7 @@ public class TicketServiceImpl implements TicketService {
 
 
         // TODO  //订单锁 新锁定同一时间内相同订单只有一个线程在创建或者更新
-        final String lockKey = String.format("{}##{}", request.getUserId(), request.getDate());
+        final String lockKey = CacheKey.LOCK_USER_TICKET_DATE.getKey() + request.getUserId() + request.getDate();
         RedisLock redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 1000);
         if (null != redisLock && redisLock.lock()) {
             // 从数据库获取票券信息（使用悲观锁）
