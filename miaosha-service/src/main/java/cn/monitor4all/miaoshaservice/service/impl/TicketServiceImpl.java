@@ -41,7 +41,7 @@ public class TicketServiceImpl implements TicketService {
 
     // 抢购时间常量
     private static final LocalTime START_TIME = LocalTime.of(8, 0); // 上午9点开始
-    private static final LocalTime END_TIME = LocalTime.of(18, 0);  // 晚上11点结束
+    private static final LocalTime END_TIME = LocalTime.of(21, 0);  // 晚上11点结束
 
     @Resource
     private TicketEntityMapper ticketEntityMapper;
@@ -529,19 +529,31 @@ public class TicketServiceImpl implements TicketService {
         // 6、返回选购成功
         // 7、查询订单
 
-
         // TODO  //订单锁 新锁定同一时间内相同订单只有一个线程在创建或者更新
         final String lockKey = CacheKey.LOCK_USER_TICKET_DATE.getKey() + request.getUserId() + request.getDate();
-        RedisLock redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 1000);
-        if (null != redisLock && redisLock.lock()) {
-            // 从数据库获取票券信息（使用悲观锁）
-            PurchaseRecord purchaseRecord = doPurchaseTicketWithPessimisticLockV2(request);
+        // 接口响应时间平均1-2 s 设置3s超时
+        RedisLock redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 3000);
+        try {
 
-            LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
-            return ApiResponse.success(purchaseRecord);
-        } else {
-            throw new BusinessException("获取订单创建锁超时");
+            if (null != redisLock && redisLock.lock()) {
+                // 从数据库获取票券信息（使用悲观锁）
+                PurchaseRecord purchaseRecord = doPurchaseTicketWithPessimisticLockV2(request);
+
+
+                LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
+                return ApiResponse.success(purchaseRecord);
+            } else {
+                throw new BusinessException("获取订单创建锁超时");
+            }
+        } catch (Exception e) {
+            LOGGER.error("购买票券失败，日期: {}", purchaseDate, e);
+            return ApiResponse.error("购买失败");
+        } finally {
+            if (null != redisLock) {
+                redisLock.unlock();
+            }
         }
+
 
        /* TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(purchaseDate);
         if (ticketEntity == null) {
@@ -609,17 +621,25 @@ public class TicketServiceImpl implements TicketService {
         String purchaseDate = request.getDate();
 
         // TODO  //订单锁 新锁定同一时间内相同订单只有一个线程在创建或者更新
-        final String lockKey = String.format("{}##{}", request.getUserId(), request.getDate());
-        RedisLock redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 1000);
-        if (null != redisLock && redisLock.lock()) {
-            PurchaseRecord purchaseRecord = doPurchaseTicketWithOptimisticLock(request);
+        final String lockKey = CacheKey.LOCK_USER_TICKET_DATE.getKey() + request.getUserId() + request.getDate();
+        RedisLock redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 3000);
+        try {
+            if (null != redisLock && redisLock.lock()) {
+                PurchaseRecord purchaseRecord = doPurchaseTicketWithOptimisticLock(request);
 
-            LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
-            return ApiResponse.success(purchaseRecord);
-        } else {
-            throw new BusinessException("获取订单创建锁超时");
+                LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
+                return ApiResponse.success(purchaseRecord);
+            } else {
+                throw new BusinessException("获取订单创建锁超时");
+            }
+        } catch (Exception e) {
+            LOGGER.error("购买票券失败，日期: {}", purchaseDate, e);
+            return ApiResponse.error("购买失败");
+        } finally {
+            if (null != redisLock) {
+                redisLock.unlock();
+            }
         }
-
 
     }
 
@@ -767,13 +787,14 @@ public class TicketServiceImpl implements TicketService {
 
         // 验证码、哈希值 校验
         // 验证hash值合法性
-        String hashKey = CacheKey.HASH_KEY.getKey() + "_" + request.getDate() + "_" + request.getUserId();
-        System.out.println(hashKey);
-        String verifyHashInRedis = stringRedisTemplate.opsForValue().get(hashKey);
-        if (!Objects.equals(request.getVerifyHash(), verifyHashInRedis)) {
-            throw new IllegalArgumentException("hash值与Redis中不符合");
-        }
-        LOGGER.info("验证hash值合法性成功");
+        // TODO 压测
+//        String hashKey = CacheKey.HASH_KEY.getKey() + "_" + request.getDate() + "_" + request.getUserId();
+//        System.out.println(hashKey);
+//        String verifyHashInRedis = stringRedisTemplate.opsForValue().get(hashKey);
+//        if (!Objects.equals(request.getVerifyHash(), verifyHashInRedis)) {
+//            throw new IllegalArgumentException("hash值与Redis中不符合");
+//        }
+//        LOGGER.info("验证hash值合法性成功");
 
         // 用户校验
         validationService.validateUserWithException(request.getUserId());

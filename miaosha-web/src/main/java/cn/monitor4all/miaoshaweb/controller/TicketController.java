@@ -230,6 +230,7 @@ public class TicketController {
      * 1000 吞吐量：950.5
      * 2000 吞吐量：589.275  响应时间：3-7ms  3579ms-5052ms
      * 总请求数: 2000, 平均响应时间: 1989.40 ms ms  吞吐量：484.9660523763337
+     * 2592.15  ms  325.7328990228013
      */
     @PostMapping("/v1/purchase")
     public ApiResponse<PurchaseRecord> purchaseTicket(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
@@ -272,7 +273,11 @@ public class TicketController {
      * 2000 吞吐量：546.2988254575253  响应时间：3-7ms
      * 总请求数: 2000, 平均响应时间: 644.14 ms  吞吐量：844.9514152936206
      * 总请求数: 2000, 平均响应时间: 505.67 ms
-     * 吞吐量：838.2229673093042
+     *
+     * 2000 不同用户：
+     * 总请求数: 1999, 平均响应时间: 732.04 ms  吞吐量：755.8578987150416
+     * 1677.20   579.5421616922631
+     *
      */
     @PostMapping("/v1/purchase/optimistic")
     public ApiResponse<PurchaseRecord> purchaseTicketWithOptimistic(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
@@ -314,6 +319,9 @@ public class TicketController {
      * @return 异步抢购结果
      * V2异步抢购接口响应时间: 10ms
      * 2000 吞吐量：1989.025 响应时间：3-7ms
+     *
+     *  2000 不同用户：
+     * 总请求数: 1999, 平均响应时间: 509.93 ms  吞吐量：1386.001386001386
      */
     @PostMapping("/v2/purchase/optimistic")
     public ApiResponse<Map<String, Object>> purchaseTicketAsync(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
