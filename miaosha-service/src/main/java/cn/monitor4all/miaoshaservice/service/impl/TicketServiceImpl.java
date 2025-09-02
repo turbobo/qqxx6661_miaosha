@@ -10,6 +10,9 @@ import cn.monitor4all.miaoshadao.mapper.TicketOrderMapper;
 import cn.monitor4all.miaoshadao.model.*;
 import cn.monitor4all.miaoshadao.utils.CacheKey;
 import cn.monitor4all.miaoshaservice.service.*;
+import cn.monitor4all.miaoshaservice.utils.redis.CacheExpiredTime;
+import cn.monitor4all.miaoshaservice.utils.redis.RedisCache;
+import cn.monitor4all.miaoshaservice.utils.redis.RedisLock;
 import com.alibaba.fastjson.JSON;
 import com.google.common.util.concurrent.RateLimiter;
 import org.slf4j.Logger;
@@ -527,8 +530,19 @@ public class TicketServiceImpl implements TicketService {
         // 7、查询订单
 
 
-        // 从数据库获取票券信息（使用悲观锁）
-        PurchaseRecord purchaseRecord = doPurchaseTicketWithPessimisticLockV2(request);
+        // TODO  //订单锁 新锁定同一时间内相同订单只有一个线程在创建或者更新
+        final String lockKey = String.format("{}##{}", request.getUserId(), request.getDate());
+        RedisLock redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 1000);
+        if (null != redisLock && redisLock.lock()) {
+            // 从数据库获取票券信息（使用悲观锁）
+            PurchaseRecord purchaseRecord = doPurchaseTicketWithPessimisticLockV2(request);
+
+            LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
+            return ApiResponse.success(purchaseRecord);
+        } else {
+            throw new BusinessException("获取订单创建锁超时");
+        }
+
        /* TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(purchaseDate);
         if (ticketEntity == null) {
             throw new IllegalStateException("该日期的票券不存在");
@@ -576,8 +590,6 @@ public class TicketServiceImpl implements TicketService {
         PurchaseRecord record = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
         ticketCacheManager.addPurchaseRecord(userId, purchaseDate, record);*/
 
-        LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
-        return ApiResponse.success(purchaseRecord);
     }
 
     /**
@@ -720,7 +732,7 @@ public class TicketServiceImpl implements TicketService {
         // *********入参为空校验********
         validNullParam(request);
 
-        // *********合法性校验：抢购时间内、用户登录、token、是否重复抢购、黑名单等********
+        // *********合法性校验：抢购时间内、用户登录、token、黑名单等********
         validLegalParam(request);
 
         // 限流检查
@@ -770,9 +782,9 @@ public class TicketServiceImpl implements TicketService {
         }
 
         // 检查是否已经购买（从数据库查询）
-        if (hasPurchased(request.getUserId(), request.getDate())) {
-            throw new IllegalStateException("您已购买过当天的票券，每人每天限购一张");
-        }
+//        if (hasPurchased(request.getUserId(), request.getDate())) {
+//            throw new IllegalStateException("您已购买过当天的票券，每人每天限购一张");
+//        }
     }
 
     /**
@@ -1547,20 +1559,20 @@ public class TicketServiceImpl implements TicketService {
             // 2. 验证抢购时间
             validatePurchaseTime(purchaseDate);
 
-            // 3. 检查用户是否已购买
-            if (hasPurchased(userId, purchaseDate)) {
-                return ApiResponse.error("用户已购买该日期的票券");
-            }
-
-            // 4. 使用悲观锁查询票券记录（FOR UPDATE）
+            // 3. 使用悲观锁查询票券记录（FOR UPDATE）
             TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(purchaseDate);
             if (ticketEntity == null) {
                 return ApiResponse.error("票券不存在");
             }
 
-            // 5. 检查库存
+            // 4. 检查库存
             if (ticketEntity.getRemainingCount() <= 0) {
                 return ApiResponse.error("票券已售罄");
+            }
+
+            // 5. 在悲观锁保护下检查用户是否已购买（关键修改：将检查移到悲观锁内）
+            if (hasPurchased(userId, purchaseDate)) {
+                return ApiResponse.error("用户已购买该日期的票券");
             }
 
             // 6. 扣减库存
@@ -1624,6 +1636,13 @@ public class TicketServiceImpl implements TicketService {
             return ApiResponse.success(result);
 
         } catch (Exception e) {
+            // 检查是否是数据库唯一约束冲突（用户重复购买）
+            if (e.getMessage() != null && e.getMessage().contains("Duplicate entry")) {
+                LOGGER.warn("用户重复购买，用户ID: {}, 日期: {}, 错误: {}", 
+                        request.getUserId(), request.getDate(), e.getMessage());
+                return ApiResponse.error("用户已购买该日期的票券");
+            }
+            
             LOGGER.error("悲观锁购票V2失败，用户ID: {}, 日期: {}, 错误: {}",
                     request.getUserId(), request.getDate(), e.getMessage(), e);
             throw e;
@@ -1633,11 +1652,17 @@ public class TicketServiceImpl implements TicketService {
     // 悲观锁购票,仅处理购票，不做校验
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public PurchaseRecord doPurchaseTicketWithPessimisticLockV2(PurchaseRequest request) throws Exception {
+
         try {
             LOGGER.info("开始悲观锁购票V2，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
 
             Long userId = request.getUserId();
             String purchaseDate = request.getDate();
+
+            // 3. 检查用户是否已购买
+            if (hasPurchased(userId, purchaseDate)) {
+                throw new BusinessException("您已购买过当天的票券，每人每天限购一张");
+            }
 
             // 4. 使用悲观锁查询票券记录（FOR UPDATE）
             TicketEntity ticketEntity = ticketEntityMapper.selectByDateForUpdate(purchaseDate);
