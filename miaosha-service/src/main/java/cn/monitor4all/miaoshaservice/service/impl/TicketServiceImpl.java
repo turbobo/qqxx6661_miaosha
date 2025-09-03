@@ -1841,11 +1841,20 @@ public class TicketServiceImpl implements TicketService {
                         // 乐观锁更新失败，版本冲突
                         retryCount++;
                         if (retryCount < maxRetries) {
-                            // TODO 重试表
+                            // TODO 重试表 针对因为乐观锁错误导致订单同步问题，抛出异常重试
+                            // 总重试时间不超过业务超时时间：例如秒杀接口超时为 5 秒，总重试时间（含处理时间）需≤3 秒，预留网络等其他耗时空间。
+                            // 最大间隔上限（如不超过 500ms），避免总耗时过长。
                             LOGGER.warn("乐观锁更新失败，版本冲突，重试第{}次，用户ID: {}, 日期: {}",
                                     retryCount, userId, purchaseDate);
                             // 短暂等待后重试
-                            Thread.sleep(10 + (int) (Math.random() * 20));
+                            // 修改重试时间间隔：第一次50ms，第二次100ms，第三次300ms，控制在500ms内
+                            long sleepTime = 50;
+                            if (retryCount == 2) {
+                                sleepTime = 100;
+                            } else if (retryCount == 3) {
+                                sleepTime = 300;
+                            }
+                            Thread.sleep(sleepTime);
                         } else {
                             // 业务提示：抢购失败，请重试
                             LOGGER.warn("乐观锁更新失败，重试" + maxRetries + "次后仍失败");
@@ -1863,7 +1872,14 @@ public class TicketServiceImpl implements TicketService {
                     }
                     LOGGER.warn("乐观锁购票异常，重试第{}次，用户ID: {}, 日期: {}, 错误: {}",
                             retryCount, userId, purchaseDate, e.getMessage());
-                    Thread.sleep(10 + (int) (Math.random() * 20));
+                    // 修改重试时间间隔：第一次50ms，第二次100ms，第三次300ms，控制在500ms内
+                    long sleepTime = 50;
+                    if (retryCount == 2) {
+                        sleepTime = 100;
+                    } else if (retryCount == 3) {
+                        sleepTime = 300;
+                    }
+                    Thread.sleep(sleepTime);
                 }
             }
 
@@ -1878,7 +1894,7 @@ public class TicketServiceImpl implements TicketService {
                     purchaseDate, originalRemaining, ticketEntity.getRemainingCount(),
                     originalSold, ticketEntity.getSoldCount());
 
-            // TODO 异步生成订单，消息+重试表
+            // TODO 异步生成订单 + 调用访客接口生成预约记录，消息+重试表
             // 7. 生成唯一票券编码（使用专业服务）
             String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId, purchaseDate);
 

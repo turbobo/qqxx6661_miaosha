@@ -289,8 +289,8 @@ public class TicketController {
             // 调用服务层购买票券(乐观锁)
             ApiResponse<PurchaseRecord> response = ticketService.purchaseTicketV1WithOptimisticLock(request);
             
-            LOGGER.info("票券购买成功(乐观锁)，用户ID: {}, 日期: {}, 票券编号: {}",
-                    request.getUserId(), request.getDate(), response.getData().getTicketCode());
+            LOGGER.info("票券购买成功(乐观锁)，用户ID: {}, 日期: {}",
+                    request.getUserId(), request.getDate());
             
             return response;
             
