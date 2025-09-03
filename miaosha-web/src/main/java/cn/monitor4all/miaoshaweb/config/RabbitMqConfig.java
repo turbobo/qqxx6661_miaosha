@@ -1,6 +1,8 @@
 package cn.monitor4all.miaoshaweb.config;
 
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -29,6 +31,11 @@ public class RabbitMqConfig {
     @Bean
     public Queue purchaseDelayedQueue() {
         return new Queue("purchase.delayed.queue");
+    }
+    
+    @Bean
+    public RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
+        return new RabbitAdmin(connectionFactory);
     }
 
 }
