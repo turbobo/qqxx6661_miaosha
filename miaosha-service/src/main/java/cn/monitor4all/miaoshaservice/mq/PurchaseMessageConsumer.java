@@ -31,13 +31,12 @@ public class PurchaseMessageConsumer {
      * 消费异步抢购消息
      * @param message 消息内容
      */
-    @RabbitListener(queues = RabbitMqPurchaseConfig.MIAOSHA_PURCHASE_QUEUE)
+    @RabbitListener(queues = RabbitMqPurchaseConfig.MIAOSHA_PURCHASE_QUEUE, concurrency = "10-20")
     public void handlePurchaseMessage(Map<String, Object> message) {
         try {
-            LOGGER.info("收到异步抢购消息: {}", JSON.toJSONString(message));
-            
             // 提取消息内容
             String requestId = (String) message.get("requestId");
+            LOGGER.info("收到异步抢购消息，请求ID: {}, 线程: {}", requestId, Thread.currentThread().getName());
             Long userId = Long.valueOf(message.get("userId").toString());
             String date = (String) message.get("date");
             String verifyHash = (String) message.get("verifyHash");

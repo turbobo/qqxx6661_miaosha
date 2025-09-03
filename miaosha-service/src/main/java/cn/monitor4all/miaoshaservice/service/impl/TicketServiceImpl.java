@@ -34,6 +34,9 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import static cn.monitor4all.miaoshaservice.config.RabbitMqPurchaseConfig.MIAOSHA_PURCHASE_EXCHANGE;
+import static cn.monitor4all.miaoshaservice.config.RabbitMqPurchaseConfig.MIAOSHA_PURCHASE_ROUTING_KEY;
+
 @Service
 public class TicketServiceImpl implements TicketService {
 
@@ -688,7 +691,6 @@ public class TicketServiceImpl implements TicketService {
 
             // 检查是否已购买
             boolean hasPurchased = hasPurchased(userId, date);
-
             if (hasPurchased) {
                 // 查询订单信息
                 TicketOrder order = ticketOrderMapper.selectByUserIdAndDate(userId, date);
@@ -705,14 +707,14 @@ public class TicketServiceImpl implements TicketService {
                 }
             }
 
-            // 检查是否超时（5分钟）
+            // 检查是否超时（5分钟），没有则认为 抢购超时
             long currentTime = System.currentTimeMillis();
             long requestTime = getRequestTimeFromCache(requestId);
             if (requestTime > 0 && (currentTime - requestTime) > 5 * 60 * 1000) {
                 Map<String, Object> result = new HashMap<>();
                 result.put("status", "TIMEOUT");
                 result.put("requestId", requestId);
-                result.put("message", "排队超时，请稍后再试");
+                result.put("message", "抢购超时，请稍后再试");
 
                 LOGGER.warn("异步抢购超时，请求ID: {}", requestId);
                 return ApiResponse.success(result);
@@ -833,7 +835,7 @@ public class TicketServiceImpl implements TicketService {
             throw new RuntimeException("购买失败，超过频率限制");
         }
 
-        // 接口限流 每秒放行5000个请求
+        // 接口限流 每秒放行1000个请求
         // 单机使用 非阻塞式获取令牌，分布式使用redis+lua脚本限流
         if (!rateLimiter.tryAcquire(1000, TimeUnit.MILLISECONDS)) {
             LOGGER.warn("你被限流了，真不幸，直接返回失败");
@@ -1839,12 +1841,15 @@ public class TicketServiceImpl implements TicketService {
                         // 乐观锁更新失败，版本冲突
                         retryCount++;
                         if (retryCount < maxRetries) {
+                            // TODO 重试表
                             LOGGER.warn("乐观锁更新失败，版本冲突，重试第{}次，用户ID: {}, 日期: {}",
                                     retryCount, userId, purchaseDate);
                             // 短暂等待后重试
                             Thread.sleep(10 + (int) (Math.random() * 20));
                         } else {
-                            throw new RuntimeException("乐观锁更新失败，重试" + maxRetries + "次后仍失败");
+                            // 业务提示：抢购失败，请重试
+                            LOGGER.warn("乐观锁更新失败，重试" + maxRetries + "次后仍失败");
+                            throw new RuntimeException("抢购失败，请重试");
                         }
                     }
                 } catch (Exception e) {
@@ -1853,7 +1858,8 @@ public class TicketServiceImpl implements TicketService {
                     }
                     retryCount++;
                     if (retryCount >= maxRetries) {
-                        throw new RuntimeException("乐观锁购票失败，重试" + maxRetries + "次后仍失败: " + e.getMessage(), e);
+                        LOGGER.warn("乐观锁购票失败，重试" + maxRetries + "次后仍失败: " + e.getMessage(), e);
+                        throw new RuntimeException("抢购失败，请重试");
                     }
                     LOGGER.warn("乐观锁购票异常，重试第{}次，用户ID: {}, 日期: {}, 错误: {}",
                             retryCount, userId, purchaseDate, e.getMessage());
@@ -1872,6 +1878,7 @@ public class TicketServiceImpl implements TicketService {
                     purchaseDate, originalRemaining, ticketEntity.getRemainingCount(),
                     originalSold, ticketEntity.getSoldCount());
 
+            // TODO 异步生成订单，消息+重试表
             // 7. 生成唯一票券编码（使用专业服务）
             String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId, purchaseDate);
 
