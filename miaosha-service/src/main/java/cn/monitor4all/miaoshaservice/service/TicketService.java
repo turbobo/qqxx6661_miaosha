@@ -37,7 +37,7 @@ public interface TicketService {
 
     ApiResponse<PurchaseRecord> purchaseTicketV1WithOptimisticLock(PurchaseRequest request) throws Exception;
 
-    PurchaseRecord asyncPurchaseTicketWithOptimisticLock(PurchaseRequest request) throws Exception;
+    void asyncPurchaseTicketWithOptimisticLock(PurchaseRequest request) throws Exception;
 
 
     ApiResponse<Map<String, Object>> purchaseTicketV2(PurchaseRequest request);

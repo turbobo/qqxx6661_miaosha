@@ -17,9 +17,14 @@ public class RabbitMqPurchaseConfig {
     // 抢购队列名称
     public static final String MIAOSHA_PURCHASE_QUEUE = "miaosha.purchase.queue";
     
-    // 路由键
-    public static final String MIAOSHA_PURCHASE_ROUTING_KEY = "miaosha.purchase";
+    // 订单创建队列名称
+    public static final String MIAOSHA_ORDER_CREATION_QUEUE = "miaosha.order.creation.queue";
     
+    // 路由键
+    public static final String MIAOSHA_PURCHASE_ROUTING_KEY = "miaosha.purchase.key";
+
+    public static final String MIAOSHA_ORDER_CREATION_ROUTING_KEY = "miaosha.order.creation.key";
+
     /**
      * 抢购交换机
      */
@@ -39,6 +44,16 @@ public class RabbitMqPurchaseConfig {
     }
     
     /**
+     * 订单创建队列
+     */
+    @Bean
+    public Queue miaoshaOrderCreationQueue() {
+        return QueueBuilder.durable(MIAOSHA_ORDER_CREATION_QUEUE)
+                .withArgument("x-message-ttl", 0) // 立即处理
+                .build();
+    }
+    
+    /**
      * 抢购队列绑定
      */
     @Bean
@@ -46,5 +61,15 @@ public class RabbitMqPurchaseConfig {
         return BindingBuilder.bind(miaoshaPurchaseQueue())
                 .to(miaoshaPurchaseExchange())
                 .with(MIAOSHA_PURCHASE_ROUTING_KEY);
+    }
+    
+    /**
+     * 订单创建队列绑定
+     */
+    @Bean
+    public Binding miaoshaOrderCreationBinding() {
+        return BindingBuilder.bind(miaoshaOrderCreationQueue())
+                .to(miaoshaPurchaseExchange())
+                .with(MIAOSHA_ORDER_CREATION_ROUTING_KEY);
     }
 }
