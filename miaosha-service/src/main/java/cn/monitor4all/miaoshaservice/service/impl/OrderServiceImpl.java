@@ -198,8 +198,8 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public void createOrderByMq(Integer sid, Long userId) throws Exception {
 
-        // 模拟多个用户同时抢购，导致消息队列排队等候10秒
-        Thread.sleep(10000);
+//        // 模拟多个用户同时抢购，导致消息队列排队等候10秒
+//        Thread.sleep(10000);
 
         Stock stock;
         //校验库存（不要学我在trycatch中做逻辑处理，这样是不优雅的。这里这样处理是为了兼容之前的秒杀系统文章）
@@ -233,15 +233,41 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     @Override
     public void createOrderByMq(String orderId, Integer sid, Long userId) throws Exception {
+//        //创建订单
+//        LOGGER.info("写入订单至数据库");
+//        Stock stock = checkStock(sid);
+//        createOrderWithUserInfoInDB(orderId, stock, userId);
+//
+//        // 修改订单记录状态
+//        updateOrderRecordStatus(orderId);
+//
+//        LOGGER.info("写入订单至缓存供查询"); // TODO 抢购时就加入缓存，还是下单时加入？
+//        createOrderWithUserInfoInCache(stock, userId);
+//        LOGGER.info("下单完成");
+
+        Stock stock;
+        //校验库存（不要学我在trycatch中做逻辑处理，这样是不优雅的。这里这样处理是为了兼容之前的秒杀系统文章）
+        try {
+            stock = checkStock(sid);
+        } catch (Exception e) {
+            LOGGER.info("库存不足！");
+            return;
+        }
+        //乐观锁更新库存
+        boolean updateStock = saleStockOptimistic(stock);
+        if (!updateStock) {
+            LOGGER.warn("扣减库存失败，库存已经为0");
+            return;
+        }
+
+        LOGGER.info("扣减库存成功，剩余库存：[{}]", stock.getCount() - stock.getSale() - 1);
+        stockService.delStockCountCache(sid);
+        LOGGER.info("删除库存缓存");
+
         //创建订单
         LOGGER.info("写入订单至数据库");
-        Stock stock = checkStock(sid);
-        createOrderWithUserInfoInDB(orderId, stock, userId);
-
-        // 修改订单记录状态
-        updateOrderRecordStatus(orderId);
-
-        LOGGER.info("写入订单至缓存供查询"); // TODO 抢购时就加入缓存，还是下单时加入？
+        createOrderWithUserInfoInDB(stock, userId);
+        LOGGER.info("写入订单至缓存供查询");
         createOrderWithUserInfoInCache(stock, userId);
         LOGGER.info("下单完成");
     }

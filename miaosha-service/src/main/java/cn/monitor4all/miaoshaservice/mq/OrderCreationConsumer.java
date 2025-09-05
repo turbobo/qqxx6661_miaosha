@@ -5,9 +5,11 @@ import cn.monitor4all.miaoshadao.dao.TicketOrder;
 import cn.monitor4all.miaoshadao.mapper.TicketEntityMapper;
 import cn.monitor4all.miaoshadao.mapper.TicketOrderMapper;
 import cn.monitor4all.miaoshadao.model.PurchaseRecord;
+import java.io.IOException;
 import cn.monitor4all.miaoshaservice.config.RabbitMqPurchaseConfig;
 import cn.monitor4all.miaoshaservice.service.TicketCacheManager;
 import cn.monitor4all.miaoshaservice.service.TicketCodeGeneratorService;
+import com.rabbitmq.client.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -17,6 +19,7 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.Date;
 import java.util.Map;
@@ -50,9 +53,10 @@ public class OrderCreationConsumer {
      * @param message 消息内容
      * @param deliveryTag 消息标签，用于手动确认
      */
-    @RabbitListener(queues = RabbitMqPurchaseConfig.MIAOSHA_ORDER_CREATION_QUEUE, concurrency = "1")
+    @RabbitListener(queues = RabbitMqPurchaseConfig.MIAOSHA_ORDER_CREATION_QUEUE, concurrency = "5")
     public void handleOrderCreationMessage(Map<String, Object> message,
-                                           @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {
+                                           @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag,
+                                           Channel channel) {
 
         try {
             LOGGER.info("收到订单创建消息: {}", message);
@@ -99,13 +103,19 @@ public class OrderCreationConsumer {
             PurchaseRecord purchaseRecord = new PurchaseRecord(userId, LocalDate.parse(purchaseDate), ticketCode);
             ticketCacheManager.addPurchaseRecord(userId, purchaseDate, purchaseRecord);
             
+            // 手动确认消息
+            channel.basicAck(deliveryTag, false);
             LOGGER.info("订单创建任务处理完成，用户ID: {}, 日期: {}, 订单号: {}", 
                     userId, purchaseDate, orderNo);
             
         } catch (Exception e) {
             LOGGER.error("处理订单创建消息失败: {}", e.getMessage(), e);
-            // 根据业务需求决定是否需要重试
-            // 这里简化处理，记录错误日志
+            try {
+                // 消息重新入队以便重试
+                channel.basicNack(deliveryTag, false, true);
+            } catch (IOException ioException) {
+                LOGGER.error("确认消息失败失败，错误: {}", ioException.getMessage(), ioException);
+            }
         }
     }
     

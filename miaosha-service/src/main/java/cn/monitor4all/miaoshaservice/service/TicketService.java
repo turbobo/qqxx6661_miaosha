@@ -42,6 +42,9 @@ public interface TicketService {
 
     ApiResponse<Map<String, Object>> purchaseTicketV2(PurchaseRequest request);
 
+
+    ApiResponse<Map<String, Object>> purchaseTicketV3(PurchaseRequest request) throws Exception;
+
     /**
      * 检查用户是否已购买指定日期的票券
      * @param userId 用户ID

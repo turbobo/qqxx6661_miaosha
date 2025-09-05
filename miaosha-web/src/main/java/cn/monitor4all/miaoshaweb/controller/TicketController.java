@@ -355,6 +355,39 @@ public class TicketController {
             responseTimeStatisticsService.addResponseTime(responseTime);
         }
     }
+
+    @PostMapping("/v12/purchase/optimistic")
+    public ApiResponse<Map<String, Object>> purchaseTicketAsyncV3(@RequestBody PurchaseRequest request, HttpServletRequest httpRequest) {
+        long startTime = System.currentTimeMillis();
+        long responseTime = 0;
+        try {
+            LOGGER.info("V3开始处理异步抢购请求，用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+
+            // 调用服务层异步购买票券
+            ApiResponse<Map<String, Object>> result = ticketService.purchaseTicketV3(request);
+
+            LOGGER.info("V3异步抢购请求处理完成，用户ID: {}, 日期: {}",
+                    request.getUserId(), request.getDate());
+
+            return result;
+
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("V3异步抢购参数错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
+        } catch (IllegalStateException e) {
+            LOGGER.warn("V3异步抢购业务错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
+        } catch (Exception e) {
+            LOGGER.error("V3异步抢购系统错误: {}", e.getMessage(), e);
+            return ApiResponse.error("系统错误，请稍后重试");
+        } finally {
+            long endTime = System.currentTimeMillis();
+            responseTime = endTime - startTime;
+            LOGGER.info("V3异步抢购接口响应时间: {}ms", responseTime);
+            // 收集响应时间统计数据
+            responseTimeStatisticsService.addResponseTime(responseTime);
+        }
+    }
     
     /**
      * 查询异步抢购结果
