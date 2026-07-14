@@ -9,6 +9,7 @@ import cn.monitor4all.miaoshadao.mapper.TicketPurchaseRecordMapper;
 import cn.monitor4all.miaoshadao.mapper.TicketOrderMapper;
 import cn.monitor4all.miaoshadao.model.*;
 import cn.monitor4all.miaoshadao.utils.CacheKey;
+import cn.monitor4all.miaoshaservice.config.CacheConfig;
 import cn.monitor4all.miaoshaservice.config.RabbitMqPurchaseConfig;
 import cn.monitor4all.miaoshaservice.service.*;
 import cn.monitor4all.miaoshaservice.utils.redis.CacheExpiredTime;
@@ -43,6 +44,10 @@ public class TicketServiceImpl implements TicketService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TicketServiceImpl.class);
 
+    private static final String FINAL_PURCHASE_RESULT_KEY_PREFIX = "miaosha:final:purchase:result:";
+    private static final String FINAL_PURCHASE_REQUEST_TIME_KEY_PREFIX = "request_time:";
+    private static final long FINAL_PURCHASE_RESULT_EXPIRE_HOURS = 24L;
+
     // 抢购时间常量
     private static final LocalTime START_TIME = LocalTime.of(8, 0); // 上午9点开始
     private static final LocalTime END_TIME = LocalTime.of(21, 0);  // 晚上11点结束
@@ -76,6 +81,12 @@ public class TicketServiceImpl implements TicketService {
 
     @Resource
     private RabbitTemplate rabbitTemplate;
+
+    @Resource
+    private CacheConfig cacheConfig;
+
+    @Resource
+    private CacheDeleteMessageService cacheDeleteMessageService;
 
 
     // Guava令牌桶：每秒放行10个请求
@@ -719,6 +730,133 @@ public class TicketServiceImpl implements TicketService {
     }
 
     /**
+     * 最终版移动端异步预约接口。
+     * 前端提交后立即返回requestId，MQ消费者异步完成扣库存、建订单、写结果状态。
+     */
+    @Override
+    public ApiResponse<Map<String, Object>> purchaseTicketFinal(PurchaseRequest request) {
+        try {
+            LOGGER.info("最终版异步预约开始，用户ID: {}, 日期: {}, 场次: {}",
+                    request.getUserId(), request.getDate(), request.getSessionId());
+
+            multiValidParam(request);
+            validateFinalRequestFields(request);
+            validateFinalVerifyHash(request);
+
+            String requestId = generateRequestId(request.getUserId(), request.getDate());
+
+            if (hasPurchased(request.getUserId(), request.getDate())) {
+                Map<String, Object> duplicateResult = buildFinalPurchaseResult(
+                        requestId,
+                        "DUPLICATE",
+                        "您已预约过当天票券，每人每天限约一次",
+                        request
+                );
+                writeFinalPurchaseResult(requestId, duplicateResult);
+                return ApiResponse.success(duplicateResult);
+            }
+
+            Map<String, Object> queuedResult = buildFinalPurchaseResult(
+                    requestId,
+                    "QUEUED",
+                    "提交成功，正在排队处理中",
+                    request
+            );
+            writeFinalPurchaseResult(requestId, queuedResult);
+            stringRedisTemplate.opsForValue().set(
+                    FINAL_PURCHASE_REQUEST_TIME_KEY_PREFIX + requestId,
+                    String.valueOf(System.currentTimeMillis()),
+                    FINAL_PURCHASE_RESULT_EXPIRE_HOURS,
+                    TimeUnit.HOURS
+            );
+
+            Map<String, Object> message = new HashMap<>();
+            message.put("requestId", requestId);
+            message.put("userId", request.getUserId());
+            message.put("date", request.getDate());
+            message.put("verifyHash", request.getVerifyHash());
+            message.put("sessionId", request.getSessionId());
+            message.put("sessionName", request.getSessionName());
+            message.put("visitorName", request.getVisitorName());
+            message.put("visitorPhone", request.getVisitorPhone());
+            message.put("timestamp", System.currentTimeMillis());
+
+            rabbitTemplate.convertAndSend(
+                    RabbitMqPurchaseConfig.MIAOSHA_PURCHASE_EXCHANGE,
+                    RabbitMqPurchaseConfig.MIAOSHA_FINAL_PURCHASE_ROUTING_KEY,
+                    message
+            );
+
+            Map<String, Object> result = new HashMap<>(queuedResult);
+            result.put("pollInterval", 1400);
+            LOGGER.info("最终版异步预约已入队，请求ID: {}", requestId);
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            LOGGER.error("最终版异步预约提交失败，用户ID: {}, 日期: {}, 错误: {}",
+                    request == null ? null : request.getUserId(),
+                    request == null ? null : request.getDate(),
+                    e.getMessage(), e);
+            return ApiResponse.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 最终版异步预约MQ消费逻辑。
+     */
+    @Override
+    public void processFinalPurchaseMessage(Map<String, Object> message) {
+        String requestId = String.valueOf(message.get("requestId"));
+        PurchaseRequest request = buildFinalPurchaseRequest(message);
+        RedisLock redisLock = null;
+        try {
+            writeFinalPurchaseResult(requestId, buildFinalPurchaseResult(
+                    requestId,
+                    "PROCESSING",
+                    "请求已进入处理队列，正在扣减库存并生成订单",
+                    request
+            ));
+
+            String lockKey = CacheKey.LOCK_USER_TICKET_DATE.getKey()
+                    + "_final_" + request.getUserId() + "_" + request.getDate();
+            redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 3000);
+            if (redisLock == null || !redisLock.lock()) {
+                throw new BusinessException("系统繁忙，请稍后重试");
+            }
+
+            PurchaseRecord purchaseRecord = doPurchaseTicketWithOptimisticLock(request);
+            TicketOrder order = ticketOrderMapper.selectByUserIdAndDate(request.getUserId(), request.getDate());
+            updateFinalOrderRemark(order, request);
+
+            Map<String, Object> successResult = buildFinalPurchaseResult(
+                    requestId,
+                    "SUCCESS",
+                    "预约成功",
+                    request
+            );
+            successResult.put("ticketCode", order != null ? order.getTicketCode() : purchaseRecord.getTicketCode());
+            successResult.put("orderNo", order != null ? order.getOrderNo() : "");
+            writeFinalPurchaseResult(requestId, successResult);
+            LOGGER.info("最终版异步预约成功，请求ID: {}, 用户ID: {}, 日期: {}",
+                    requestId, request.getUserId(), request.getDate());
+        } catch (Exception e) {
+            String status = resolveFinalFailureStatus(e);
+            Map<String, Object> failedResult = buildFinalPurchaseResult(
+                    requestId,
+                    status,
+                    e.getMessage() == null ? "预约失败，请稍后重试" : e.getMessage(),
+                    request
+            );
+            writeFinalPurchaseResult(requestId, failedResult);
+            LOGGER.warn("最终版异步预约失败，请求ID: {}, 状态: {}, 原因: {}",
+                    requestId, status, e.getMessage(), e);
+        } finally {
+            if (redisLock != null) {
+                redisLock.unlock();
+            }
+        }
+    }
+
+    /**
      * 向消息队列orderQueue发送消息
      * @param message
      */
@@ -731,6 +869,13 @@ public class TicketServiceImpl implements TicketService {
     public ApiResponse<Map<String, Object>> getPurchaseResult(String requestId, Long userId, String date) {
         try {
             LOGGER.info("查询异步抢购结果，请求ID: {}, 用户ID: {}, 日期: {}", requestId, userId, date);
+
+            Map<String, Object> cachedFinalResult = getFinalPurchaseResult(requestId);
+            if (cachedFinalResult != null && !cachedFinalResult.isEmpty()) {
+                LOGGER.info("命中最终版异步预约结果缓存，请求ID: {}, 状态: {}",
+                        requestId, cachedFinalResult.get("status"));
+                return ApiResponse.success(cachedFinalResult);
+            }
 
             // 检查是否已购买
             boolean hasPurchased = hasPurchased(userId, date);
@@ -775,6 +920,140 @@ public class TicketServiceImpl implements TicketService {
             LOGGER.error("查询异步抢购结果失败，请求ID: {}, 错误: {}", requestId, e.getMessage(), e);
             return ApiResponse.error("查询失败: " + e.getMessage());
         }
+    }
+
+    private Map<String, Object> getFinalPurchaseResult(String requestId) {
+        if (StringUtils.isEmpty(requestId)) {
+            return null;
+        }
+        String resultJson = stringRedisTemplate.opsForValue().get(FINAL_PURCHASE_RESULT_KEY_PREFIX + requestId);
+        if (StringUtils.isEmpty(resultJson)) {
+            return null;
+        }
+        JSONObject resultObject = JSON.parseObject(resultJson);
+        return new HashMap<>(resultObject);
+    }
+
+    private void writeFinalPurchaseResult(String requestId, Map<String, Object> result) {
+        if (StringUtils.isEmpty(requestId) || result == null) {
+            return;
+        }
+        stringRedisTemplate.opsForValue().set(
+                FINAL_PURCHASE_RESULT_KEY_PREFIX + requestId,
+                JSON.toJSONString(result),
+                FINAL_PURCHASE_RESULT_EXPIRE_HOURS,
+                TimeUnit.HOURS
+        );
+    }
+
+    private Map<String, Object> buildFinalPurchaseResult(String requestId, String status,
+                                                         String message, PurchaseRequest request) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("requestId", requestId);
+        result.put("status", status);
+        result.put("message", message);
+        result.put("updateTime", System.currentTimeMillis());
+        if (request != null) {
+            result.put("userId", request.getUserId());
+            result.put("date", request.getDate());
+            result.put("sessionId", request.getSessionId());
+            result.put("sessionName", request.getSessionName());
+            result.put("visitorName", request.getVisitorName());
+            result.put("visitorPhone", request.getVisitorPhone());
+        }
+        return result;
+    }
+
+    private PurchaseRequest buildFinalPurchaseRequest(Map<String, Object> message) {
+        PurchaseRequest request = new PurchaseRequest();
+        request.setUserId(toLong(message.get("userId")));
+        request.setDate(toStringValue(message.get("date")));
+        request.setVerifyHash(toStringValue(message.get("verifyHash")));
+        request.setSessionId(toStringValue(message.get("sessionId")));
+        request.setSessionName(toStringValue(message.get("sessionName")));
+        request.setVisitorName(toStringValue(message.get("visitorName")));
+        request.setVisitorPhone(toStringValue(message.get("visitorPhone")));
+        return request;
+    }
+
+    private void validateFinalRequestFields(PurchaseRequest request) {
+        if (StringUtils.isEmpty(request.getSessionId()) || StringUtils.isEmpty(request.getSessionName())) {
+            throw new IllegalArgumentException("请选择预约场次");
+        }
+        if (StringUtils.isEmpty(request.getVisitorName()) || request.getVisitorName().trim().isEmpty()) {
+            throw new IllegalArgumentException("请填写参观人姓名");
+        }
+        if (StringUtils.isEmpty(request.getVisitorPhone()) || request.getVisitorPhone().trim().isEmpty()) {
+            throw new IllegalArgumentException("请填写参观人手机号");
+        }
+        if (!request.getVisitorPhone().trim().matches("^1\\d{10}$")) {
+            throw new IllegalArgumentException("参观人手机号格式不正确");
+        }
+
+        request.setSessionId(request.getSessionId().trim());
+        request.setSessionName(request.getSessionName().trim());
+        request.setVisitorName(request.getVisitorName().trim());
+        request.setVisitorPhone(request.getVisitorPhone().trim());
+    }
+
+    private void validateFinalVerifyHash(PurchaseRequest request) {
+        String hashKey = CacheKey.HASH_KEY.getKey() + "_" + request.getDate() + "_" + request.getUserId();
+        String verifyHashInRedis = stringRedisTemplate.opsForValue().get(hashKey);
+        if (!Objects.equals(request.getVerifyHash(), verifyHashInRedis)) {
+            throw new IllegalArgumentException("抢票凭证已失效，请重新获取");
+        }
+        stringRedisTemplate.delete(hashKey);
+    }
+
+    private void updateFinalOrderRemark(TicketOrder order, PurchaseRequest request) {
+        if (order == null || request == null) {
+            return;
+        }
+        try {
+            Map<String, Object> remark = new HashMap<>();
+            remark.put("source", "museum-ticket-final-v3");
+            remark.put("sessionId", request.getSessionId());
+            remark.put("sessionName", request.getSessionName());
+            remark.put("visitorName", request.getVisitorName());
+            remark.put("visitorPhone", request.getVisitorPhone());
+            order.setRemark(JSON.toJSONString(remark));
+            order.setUpdateTime(new Date());
+            int updateResult = ticketOrderMapper.updateByPrimaryKey(order);
+            if (updateResult <= 0) {
+                LOGGER.warn("最终版异步预约订单备注未更新，订单号: {}", order.getOrderNo());
+            }
+        } catch (Exception e) {
+            LOGGER.warn("最终版异步预约订单备注更新失败，不影响预约主流程，订单号: {}, 错误: {}",
+                    order.getOrderNo(), e.getMessage(), e);
+        }
+    }
+
+    private String resolveFinalFailureStatus(Exception exception) {
+        String message = exception.getMessage();
+        if (message == null) {
+            return "FAILED";
+        }
+        if (message.contains("已购买") || message.contains("已预约")) {
+            return "DUPLICATE";
+        }
+        if (message.contains("售罄") || message.contains("库存")) {
+            return "SOLD_OUT";
+        }
+        return "FAILED";
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        return Long.valueOf(String.valueOf(value));
+    }
+
+    private String toStringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     /**
@@ -1179,6 +1458,24 @@ public class TicketServiceImpl implements TicketService {
      */
     public void validateTicketCount(String date) {
         validationService.validateTicketCountWithException(date);
+    }
+
+    /**
+     * 兼容历史测试反射调用的票券编码生成方法。
+     * 格式：T + yyyyMMdd + userId + 6位序列号。
+     */
+    private String generateTicketCode(Long userId, String date) {
+        String dateStr = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String sequenceKey = "ticket:sequence:" + dateStr;
+        try {
+            Long sequence = stringRedisTemplate.opsForValue().increment(sequenceKey);
+            stringRedisTemplate.expire(sequenceKey, 7, TimeUnit.DAYS);
+            return String.format("T%s%s%06d", dateStr, userId, sequence);
+        } catch (Exception e) {
+            LOGGER.warn("Redis序列号生成失败，使用本地序列兜底: {}", e.getMessage());
+            long fallbackSequence = Math.abs(System.nanoTime() % 1000000);
+            return String.format("T%s%s%06d", dateStr, userId, fallbackSequence);
+        }
     }
 
     /**
@@ -2553,6 +2850,60 @@ public class TicketServiceImpl implements TicketService {
         }
 
         LOGGER.info("订单状态更新成功，订单号: {}, 新状态: 已取消", order.getOrderNo());
+    }
+
+    /**
+     * 下单成功后更新票券缓存。
+     * 先立即删除一次，再按配置执行延迟删除；延迟删除失败时通过消息队列补偿。
+     */
+    private void updateCacheAfterPurchase(String date) {
+        try {
+            ticketCacheManager.deleteTicket(date);
+        } catch (Exception e) {
+            LOGGER.warn("下单后首次删除票券缓存失败，日期: {}, 错误: {}", date, e.getMessage(), e);
+        }
+
+        boolean delayedDeleteEnabled;
+        try {
+            delayedDeleteEnabled = cacheConfig.isDelayedDeleteEnabled();
+        } catch (Exception e) {
+            LOGGER.warn("读取延迟双删开关失败，跳过延迟删除，日期: {}, 错误: {}", date, e.getMessage(), e);
+            return;
+        }
+
+        if (!delayedDeleteEnabled) {
+            return;
+        }
+
+        long delayedDeleteDelay;
+        try {
+            delayedDeleteDelay = cacheConfig.getDelayedDeleteDelay();
+        } catch (Exception e) {
+            LOGGER.warn("读取延迟双删时间失败，改用消息队列补偿删除，日期: {}, 错误: {}", date, e.getMessage(), e);
+            sendCacheDeleteMessageIfConnected(date, "调度失败后的消息队列删除");
+            return;
+        }
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                TimeUnit.MILLISECONDS.sleep(delayedDeleteDelay);
+                ticketCacheManager.deleteTicket(date);
+                sendCacheDeleteMessageIfConnected(date, "延迟删除成功后的最终确认");
+            } catch (Exception e) {
+                LOGGER.warn("延迟删除票券缓存失败，日期: {}, 错误: {}", date, e.getMessage(), e);
+                sendCacheDeleteMessageIfConnected(date, "延迟删除失败后的补偿删除");
+            }
+        });
+    }
+
+    private void sendCacheDeleteMessageIfConnected(String date, String reason) {
+        try {
+            if (cacheDeleteMessageService != null && cacheDeleteMessageService.isConnected()) {
+                cacheDeleteMessageService.sendCacheDeleteMessage(date, reason);
+            }
+        } catch (Exception e) {
+            LOGGER.warn("发送缓存删除补偿消息失败，日期: {}, 原因: {}, 错误: {}", date, reason, e.getMessage(), e);
+        }
     }
 
     /**

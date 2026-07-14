@@ -388,6 +388,39 @@ public class TicketController {
             responseTimeStatisticsService.addResponseTime(responseTime);
         }
     }
+
+    /**
+     * 最终版移动端异步预约接口。
+     * 覆盖当前页面的场次、参观人、verifyHash、防重复、异步排队和轮询结果能力。
+     */
+    @PostMapping("/v3/purchase")
+    public ApiResponse<Map<String, Object>> purchaseTicketFinal(@RequestBody PurchaseRequest request,
+                                                                HttpServletRequest httpRequest) {
+        long startTime = System.currentTimeMillis();
+        try {
+            LOGGER.info("最终版异步预约请求，用户ID: {}, 日期: {}, 场次: {}",
+                    request.getUserId(), request.getDate(), request.getSessionId());
+
+            ApiResponse<Map<String, Object>> result = ticketService.purchaseTicketFinal(request);
+
+            LOGGER.info("最终版异步预约请求处理完成，用户ID: {}, 日期: {}",
+                    request.getUserId(), request.getDate());
+            return result;
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("最终版异步预约参数错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
+        } catch (IllegalStateException e) {
+            LOGGER.warn("最终版异步预约业务错误: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
+        } catch (Exception e) {
+            LOGGER.error("最终版异步预约系统错误: {}", e.getMessage(), e);
+            return ApiResponse.error("系统错误，请稍后重试");
+        } finally {
+            long endTime = System.currentTimeMillis();
+            LOGGER.info("最终版异步预约接口响应时间: {}ms", endTime - startTime);
+            responseTimeStatisticsService.addResponseTime(endTime - startTime);
+        }
+    }
     
     /**
      * 查询异步抢购结果

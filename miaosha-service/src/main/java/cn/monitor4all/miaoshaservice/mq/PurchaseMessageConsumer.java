@@ -85,4 +85,32 @@ public class PurchaseMessageConsumer {
             }
         }
     }
+
+    /**
+     * 消费最终版移动端异步预约消息。
+     * 失败结果由服务层写入Redis，供前端轮询展示。
+     */
+    @RabbitListener(queues = RabbitMqPurchaseConfig.MIAOSHA_FINAL_PURCHASE_QUEUE, concurrency = "20")
+    public void handleFinalPurchaseMessage(Map<String, Object> message,
+                                           @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag,
+                                           Channel channel) {
+        int count = messageCounter.incrementAndGet();
+        try {
+            LOGGER.info("收到最终版异步预约消息，请求: {}, 线程: {}, 消息计数: {}",
+                    JSON.toJSONString(message), Thread.currentThread().getName(), count);
+
+            ticketService.processFinalPurchaseMessage(message);
+
+            channel.basicAck(deliveryTag, false);
+            LOGGER.info("最终版异步预约消息处理完成，消息计数: {}", count);
+        } catch (Exception e) {
+            LOGGER.error("最终版异步预约消息处理失败，消息计数: {}, 错误: {}", count, e.getMessage(), e);
+            try {
+                channel.basicNack(deliveryTag, false, false);
+            } catch (IOException ioException) {
+                LOGGER.error("最终版异步预约消息确认失败，消息计数: {}, 错误: {}",
+                        count, ioException.getMessage(), ioException);
+            }
+        }
+    }
 }

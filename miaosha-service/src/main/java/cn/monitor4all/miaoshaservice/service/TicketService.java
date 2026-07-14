@@ -46,6 +46,22 @@ public interface TicketService {
     ApiResponse<Map<String, Object>> purchaseTicketV3(PurchaseRequest request) throws Exception;
 
     /**
+     * 最终版移动端异步预约接口。
+     * 提交后只返回requestId，真正扣库存和建单在MQ消费者中完成。
+     *
+     * @param request 预约请求
+     * @return requestId和排队状态
+     */
+    ApiResponse<Map<String, Object>> purchaseTicketFinal(PurchaseRequest request);
+
+    /**
+     * 处理最终版异步预约消息，并将成功/失败结果写入Redis供前端轮询。
+     *
+     * @param message MQ消息
+     */
+    void processFinalPurchaseMessage(Map<String, Object> message);
+
+    /**
      * 检查用户是否已购买指定日期的票券
      * @param userId 用户ID
      * @param date 日期

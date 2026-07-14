@@ -25,6 +25,12 @@ public class RabbitMqPurchaseConfig {
 
     public static final String MIAOSHA_ORDER_CREATION_ROUTING_KEY = "v2.miaosha.order.creation.key";
 
+    // 最终版移动端异步预约队列名称
+    public static final String MIAOSHA_FINAL_PURCHASE_QUEUE = "v3.miaosha.final.purchase.queue";
+
+    // 最终版移动端异步预约路由键
+    public static final String MIAOSHA_FINAL_PURCHASE_ROUTING_KEY = "v3.miaosha.final.purchase.key";
+
     /**
      * 抢购交换机
      */
@@ -71,6 +77,24 @@ public class RabbitMqPurchaseConfig {
         return BindingBuilder.bind(miaoshaOrderCreationQueue())
                 .to(miaoshaPurchaseExchange())
                 .with(MIAOSHA_ORDER_CREATION_ROUTING_KEY);
+    }
+
+    /**
+     * 最终版移动端异步预约队列。
+     */
+    @Bean
+    public Queue miaoshaFinalPurchaseQueue() {
+        return QueueBuilder.durable(MIAOSHA_FINAL_PURCHASE_QUEUE).build();
+    }
+
+    /**
+     * 最终版移动端异步预约队列绑定。
+     */
+    @Bean
+    public Binding miaoshaFinalPurchaseBinding() {
+        return BindingBuilder.bind(miaoshaFinalPurchaseQueue())
+                .to(miaoshaPurchaseExchange())
+                .with(MIAOSHA_FINAL_PURCHASE_ROUTING_KEY);
     }
 
 

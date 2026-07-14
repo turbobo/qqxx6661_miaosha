@@ -9,6 +9,17 @@ public class PurchaseRequest {
 
     // 添加verifyHash属性
     private String verifyHash;
+
+    /**
+     * 预约场次，当前库存仍按date维度扣减，字段用于最终移动端方案的场次展示和订单备注。
+     */
+    private String sessionId;
+
+    private String sessionName;
+
+    private String visitorName;
+
+    private String visitorPhone;
     
     // getter和setter方法
     public Long getUserId() {
@@ -33,6 +44,38 @@ public class PurchaseRequest {
 
     public void setVerifyHash(String verifyHash) {
         this.verifyHash = verifyHash;
+    }
+
+    public String getSessionId() {
+        return sessionId;
+    }
+
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
+    }
+
+    public String getSessionName() {
+        return sessionName;
+    }
+
+    public void setSessionName(String sessionName) {
+        this.sessionName = sessionName;
+    }
+
+    public String getVisitorName() {
+        return visitorName;
+    }
+
+    public void setVisitorName(String visitorName) {
+        this.visitorName = visitorName;
+    }
+
+    public String getVisitorPhone() {
+        return visitorPhone;
+    }
+
+    public void setVisitorPhone(String visitorPhone) {
+        this.visitorPhone = visitorPhone;
     }
 
     /**
