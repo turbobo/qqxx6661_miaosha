@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抢票版本方案效果对比</title>
+    <style>
+        :root {
+            --bg: #f6f8fb;
+            --panel: #ffffff;
+            --text: #172033;
+            --muted: #667085;
+            --line: #e6ebf2;
+            --primary: #2563eb;
+            --primary-soft: #dbeafe;
+            --green: #10b981;
+            --green-soft: #d1fae5;
+            --amber: #f59e0b;
+            --amber-soft: #fef3c7;
+            --purple: #7c3aed;
+            --purple-soft: #ede9fe;
+            --red: #ef4444;
+            --red-soft: #fee2e2;
+            --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 34rem),
+                radial-gradient(circle at top right, rgba(124, 58, 237, 0.10), transparent 30rem),
+                var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            line-height: 1.6;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        button, input, select {
+            font: inherit;
+        }
+
+        .page {
+            width: min(1180px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 32px 0 56px;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+            gap: 24px;
+            align-items: stretch;
+            margin-bottom: 24px;
+        }
+
+        .hero-main, .panel {
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(230, 235, 242, 0.86);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(16px);
+        }
+
+        .hero-main {
+            padding: 34px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .hero-main::after {
+            content: "";
+            position: absolute;
+            right: -80px;
+            top: -80px;
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(124, 58, 237, 0.16));
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: var(--primary-soft);
+            color: #1d4ed8;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            margin: 0 0 14px;
+            max-width: 760px;
+            font-size: clamp(30px, 5vw, 52px);
+            line-height: 1.08;
+            letter-spacing: -0.04em;
+        }
+
+        .hero-desc {
+            max-width: 720px;
+            margin: 0 0 26px;
+            color: var(--muted);
+            font-size: 17px;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .btn {
+            border: 0;
+            border-radius: 14px;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-weight: 800;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:focus-visible, input:focus-visible, select:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, 0.25);
+            outline-offset: 2px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+        }
+
+        .btn-secondary {
+            background: #eef4ff;
+            color: #1d4ed8;
+        }
+
+        .btn-danger {
+            background: var(--red-soft);
+            color: #b91c1c;
+        }
+
+        .btn:disabled {
+            opacity: 0.52;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .hero-side {
+            padding: 24px;
+        }
+
+        .mini-title {
+            margin: 0 0 14px;
+            font-size: 15px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        .score-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .score-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: #fff;
+        }
+
+        .score-name {
+            font-weight: 900;
+        }
+
+        .score-meta {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 64px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .badge-low { background: var(--red-soft); color: #b91c1c; }
+        .badge-mid { background: var(--amber-soft); color: #92400e; }
+        .badge-high { background: var(--green-soft); color: #047857; }
+        .badge-best { background: var(--purple-soft); color: #5b21b6; }
+
+        .section {
+            margin-top: 24px;
+        }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 24px;
+            letter-spacing: -0.02em;
+        }
+
+        .section-tip {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .version-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .version-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 18px;
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+        }
+
+        .version-card.featured {
+            border-color: rgba(124, 58, 237, 0.35);
+            background: linear-gradient(180deg, #fff, #faf8ff);
+        }
+
+        .version-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .version-icon {
+            width: 42px;
+            height: 42px;
+            display: grid;
+            place-items: center;
+            border-radius: 15px;
+            background: var(--primary-soft);
+            color: var(--primary);
+            font-weight: 1000;
+        }
+
+        .version-card h3 {
+            margin: 0 0 8px;
+            font-size: 18px;
+        }
+
+        .version-card p {
+            margin: 0 0 14px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .metric {
+            margin-top: 10px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 5px;
+        }
+
+        .bar {
+            height: 8px;
+            border-radius: 999px;
+            background: #edf1f7;
+            overflow: hidden;
+        }
+
+        .bar > span {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--primary), var(--purple));
+        }
+
+        .matrix {
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        table {
+            width: 100%;
+            min-width: 980px;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 16px;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #344054;
+            font-size: 13px;
+        }
+
+        td {
+            color: #344054;
+            font-size: 14px;
+        }
+
+        tr:last-child td {
+            border-bottom: 0;
+        }
+
+        code {
+            padding: 3px 6px;
+            border-radius: 8px;
+            background: #eef2f7;
+            color: #334155;
+            font-size: 12px;
+        }
+
+        .timeline {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .step {
+            position: relative;
+            padding: 18px;
+            border-radius: 22px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+        }
+
+        .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            background: #111827;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 900;
+            margin-bottom: 12px;
+        }
+
+        .step h3 {
+            margin: 0 0 8px;
+            font-size: 16px;
+        }
+
+        .step p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .lab {
+            display: grid;
+            grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .panel {
+            padding: 22px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .field {
+            display: grid;
+            gap: 6px;
+        }
+
+        .field.full {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: 13px;
+            font-weight: 900;
+            color: #344054;
+        }
+
+        input, select {
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 11px 12px;
+            background: #fff;
+            color: var(--text);
+        }
+
+        .warning {
+            margin: 14px 0;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: var(--amber-soft);
+            color: #92400e;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .result-box {
+            min-height: 280px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: #0f172a;
+            color: #dbeafe;
+            padding: 16px;
+            overflow: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+
+        .status-strip {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .status-card {
+            padding: 14px;
+            border-radius: 18px;
+            background: #fff;
+            border: 1px solid var(--line);
+        }
+
+        .status-card strong {
+            display: block;
+            font-size: 20px;
+            line-height: 1.2;
+        }
+
+        .status-card span {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .conclusion {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .conclusion-card {
+            padding: 20px;
+            border-radius: 24px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+        }
+
+        .conclusion-card h3 {
+            margin: 0 0 8px;
+        }
+
+        .conclusion-card p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        @media (max-width: 980px) {
+            .hero, .lab {
+                grid-template-columns: 1fr;
+            }
+
+            .version-grid, .timeline, .conclusion {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .page {
+                width: min(100% - 20px, 1180px);
+                padding-top: 16px;
+            }
+
+            .hero-main, .panel {
+                border-radius: 20px;
+            }
+
+            .hero-main {
+                padding: 24px;
+            }
+
+            .version-grid, .timeline, .conclusion, .form-grid, .status-strip {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <section class="hero">
+        <div class="hero-main">
+            <div class="eyebrow">当前代码版本效果对比 · Museum Ticket Rush</div>
+            <h1>抢票接口从同步扣库到异步削峰的演进看板</h1>
+            <p class="hero-desc">
+                基于当前 `TicketController` 和 `TicketServiceImpl` 中已有的 V1、V1 乐观锁、V2 异步、V3 实验链路，
+                用一个页面展示每个版本的技术路径、适用场景、瓶颈和高峰期效果差异。
+            </p>
+            <div class="hero-actions">
+                <a class="btn btn-primary" href="#compare">查看对比矩阵</a>
+                <a class="btn btn-secondary" href="#lab">单版本实测</a>
+                <a class="btn btn-secondary" href="index.html">返回抢票首页</a>
+            </div>
+        </div>
+        <aside class="hero-side panel">
+            <p class="mini-title">推荐结论</p>
+            <div class="score-list">
+                <div class="score-item">
+                    <div><span class="score-name">V1 悲观锁</span><span class="score-meta">强一致，吞吐低</span></div>
+                    <span class="badge badge-low">保底</span>
+                </div>
+                <div class="score-item">
+                    <div><span class="score-name">V1 乐观锁</span><span class="score-meta">冲突重试，吞吐中</span></div>
+                    <span class="badge badge-mid">过渡</span>
+                </div>
+                <div class="score-item">
+                    <div><span class="score-name">V2 MQ 异步</span><span class="score-meta">快速返回，结果轮询</span></div>
+                    <span class="badge badge-high">推荐</span>
+                </div>
+                <div class="score-item">
+                    <div><span class="score-name">目标 V3</span><span class="score-meta">Redis Lua + MQ + 幂等</span></div>
+                    <span class="badge badge-best">最佳</span>
+                </div>
+            </div>
+        </aside>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <div>
+                <h2>版本效果卡片</h2>
+                <p class="section-tip">数值是基于当前代码链路的工程评估，用于页面对比展示；真实效果以压测为准。</p>
+            </div>
+        </div>
+        <div id="versionCards" class="version-grid"></div>
+    </section>
+
+    <section id="compare" class="section">
+        <div class="section-head">
+            <div>
+                <h2>方案对比矩阵</h2>
+                <p class="section-tip">重点比较高峰期最关心的吞吐、库存正确性、数据库压力、用户体验和实现复杂度。</p>
+            </div>
+        </div>
+        <div class="matrix">
+            <table>
+                <thead>
+                <tr>
+                    <th>版本</th>
+                    <th>当前接口</th>
+                    <th>核心链路</th>
+                    <th>优势</th>
+                    <th>瓶颈/风险</th>
+                    <th>适用阶段</th>
+                </tr>
+                </thead>
+                <tbody id="matrixBody"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <div>
+                <h2>逐步演进路径</h2>
+                <p class="section-tip">面试和简历描述时，可以按问题驱动讲清每一步为什么要升级。</p>
+            </div>
+        </div>
+        <div class="timeline">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3>同步下单</h3>
+                <p>先完成票务查询、抢票、扣库存和订单创建的基础闭环。</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3>数据库锁</h3>
+                <p>使用悲观锁或乐观锁解决并发扣库存下的超卖问题。</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3>MQ 削峰</h3>
+                <p>接口快速提交，订单异步消费，降低开票瞬间数据库写压力。</p>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <h3>Redis Lua 预扣</h3>
+                <p>目标形态：Redis 原子预扣库存 + MQ 幂等落单 + 结果查询。</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="lab" class="section lab">
+        <div class="panel">
+            <h2>单版本实测面板</h2>
+            <p class="section-tip">选择一个版本发起一次请求。注意：这里会调用真实抢票接口，可能真实消耗库存或生成订单。</p>
+            <div class="warning">建议使用测试用户、测试日期和可重置库存环境，不要在生产库存上连续点击。</div>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="userId">用户 ID</label>
+                    <input id="userId" type="number" value="1001">
+                </div>
+                <div class="field">
+                    <label for="ticketDate">票券日期</label>
+                    <input id="ticketDate" type="date">
+                </div>
+                <div class="field full">
+                    <label for="versionSelect">测试版本</label>
+                    <select id="versionSelect"></select>
+                </div>
+                <div class="field full">
+                    <label for="verifyHash">verifyHash</label>
+                    <input id="verifyHash" type="text" placeholder="可点击下方按钮自动获取">
+                </div>
+            </div>
+            <div class="hero-actions" style="margin-top: 14px;">
+                <button class="btn btn-secondary" id="hashBtn">获取 verifyHash</button>
+                <button class="btn btn-primary" id="runBtn">调用选中版本</button>
+                <button class="btn btn-danger" id="clearBtn">清空输出</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="status-strip">
+                <div class="status-card"><strong id="lastStatus">未开始</strong><span>最近状态</span></div>
+                <div class="status-card"><strong id="lastCost">-</strong><span>接口耗时</span></div>
+                <div class="status-card"><strong id="lastVersion">-</strong><span>测试版本</span></div>
+            </div>
+            <div class="hero-actions" style="margin-bottom: 14px;">
+                <button class="btn btn-secondary" id="statsBtn">读取响应统计</button>
+                <button class="btn btn-secondary" id="clearStatsBtn">清空响应统计</button>
+            </div>
+            <div id="output" class="result-box">等待操作...</div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <div>
+                <h2>页面结论</h2>
+                <p class="section-tip">当前代码适合展示演进思路；真正节假日高峰建议继续升级到目标 V3。</p>
+            </div>
+        </div>
+        <div class="conclusion">
+            <div class="conclusion-card">
+                <h3>正确性优先</h3>
+                <p>悲观锁和乐观锁都能解决数据库层超卖，但无法从根上降低数据库入口流量。</p>
+            </div>
+            <div class="conclusion-card">
+                <h3>性能靠削峰</h3>
+                <p>V2 异步链路把用户请求和订单创建解耦，是从同步抢票走向高并发抢票的关键一步。</p>
+            </div>
+            <div class="conclusion-card">
+                <h3>最终形态</h3>
+                <p>Redis Lua 原子预扣库存、MQ 幂等落单、Redis 结果查询和补偿对账，才适合节假日峰值流量。</p>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    const versions = [
+        {
+            id: 'pessimistic',
+            icon: 'V1',
+            name: 'V1 同步悲观锁',
+            endpoint: '/api/tickets/v1/purchase',
+            tag: '强一致保底',
+            summary: '使用用户维度 Redis 锁 + DB 悲观锁扣库存，同步创建订单后返回。',
+            flow: '参数校验 → 限流 → 用户锁 → select for update → 扣库存 → 创建订单',
+            pros: '库存正确性强，逻辑直观，适合作为基础版本和保底方案。',
+            cons: '锁等待明显，数据库热点行压力大，高峰期响应时间容易抖动。',
+            stage: '低并发/正确性验证阶段',
+            metrics: { throughput: 42, stability: 72, dbPressure: 24, experience: 46 }
+        },
+        {
+            id: 'optimistic',
+            icon: 'V1+',
+            name: 'V1 乐观锁同步',
+            endpoint: '/api/tickets/v1/purchase/optimistic',
+            tag: '过渡优化',
+            summary: '通过 version 字段 CAS 扣库存，冲突时有限重试，同步创建订单。',
+            flow: '参数校验 → 限流 → 用户锁 → version CAS 更新库存 → 创建订单',
+            pros: '减少行锁等待，正常冲突下吞吐高于悲观锁。',
+            cons: '热点库存下 CAS 冲突频繁，重试会放大数据库读写。',
+            stage: '中等并发/数据库优化阶段',
+            metrics: { throughput: 58, stability: 66, dbPressure: 38, experience: 58 }
+        },
+        {
+            id: 'async',
+            icon: 'V2',
+            name: 'V2 异步 MQ',
+            endpoint: '/api/tickets/v2/purchase/optimistic',
+            resultEndpoint: '/api/tickets/v2/purchaseResult',
+            tag: '当前推荐',
+            summary: '抢票接口校验后发送 MQ，返回 requestId，前端轮询查询最终结果。',
+            flow: '参数校验 → 限流 → 发送抢票 MQ → 返回 requestId → 消费者落单',
+            pros: '接口快速返回，MQ 削峰，用户体验从等待结果变为排队查询。',
+            cons: '当前代码仍在入队前做较多校验，且最终一致性和结果状态还可继续增强。',
+            stage: '高并发削峰阶段',
+            metrics: { throughput: 78, stability: 74, dbPressure: 68, experience: 82 }
+        },
+        {
+            id: 'v3',
+            icon: 'V3',
+            name: 'V3 实验链路',
+            endpoint: '/api/tickets/v12/purchase/optimistic',
+            tag: '待标准化',
+            summary: '当前路径为 v12，但方法名和日志是 V3；代码中会先乐观锁扣库存再发订单创建 MQ。',
+            flow: '参数校验 → 用户锁 → 乐观锁扣库存 → 发送订单创建 MQ',
+            pros: '开始拆分库存扣减和订单创建，为异步落单做铺垫。',
+            cons: '接口路径命名需修正；当前返回值没有 requestId，不利于前端轮询。目标形态应升级为 Redis Lua 预扣。',
+            stage: '架构演进实验阶段',
+            metrics: { throughput: 72, stability: 70, dbPressure: 56, experience: 62 },
+            featured: true
+        }
+    ];
+
+    const output = document.getElementById('output');
+    const statusNode = document.getElementById('lastStatus');
+    const costNode = document.getElementById('lastCost');
+    const versionNode = document.getElementById('lastVersion');
+
+    function initializeDate() {
+        const today = new Date();
+        document.getElementById('ticketDate').value = today.toISOString().slice(0, 10);
+    }
+
+    function renderVersionCards() {
+        const container = document.getElementById('versionCards');
+        container.innerHTML = versions.map(version => `
+            <article class="version-card ${version.featured ? 'featured' : ''}">
+                <div class="version-top">
+                    <div class="version-icon">${version.icon}</div>
+                    <span class="badge ${version.featured ? 'badge-best' : 'badge-mid'}">${version.tag}</span>
+                </div>
+                <h3>${version.name}</h3>
+                <p>${version.summary}</p>
+                ${metricBar('吞吐能力', version.metrics.throughput)}
+                ${metricBar('稳定性', version.metrics.stability)}
+                ${metricBar('数据库减压', version.metrics.dbPressure)}
+                ${metricBar('用户体验', version.metrics.experience)}
+            </article>
+        `).join('');
+    }
+
+    function metricBar(name, value) {
+        return `
+            <div class="metric">
+                <div class="metric-row"><span>${name}</span><strong>${value}</strong></div>
+                <div class="bar"><span style="width: ${value}%"></span></div>
+            </div>
+        `;
+    }
+
+    function renderMatrix() {
+        const body = document.getElementById('matrixBody');
+        body.innerHTML = versions.map(version => `
+            <tr>
+                <td><strong>${version.name}</strong><br><span class="badge badge-mid">${version.tag}</span></td>
+                <td><code>${version.endpoint}</code></td>
+                <td>${version.flow}</td>
+                <td>${version.pros}</td>
+                <td>${version.cons}</td>
+                <td>${version.stage}</td>
+            </tr>
+        `).join('');
+    }
+
+    function renderVersionOptions() {
+        const select = document.getElementById('versionSelect');
+        select.innerHTML = versions.map(version => `<option value="${version.id}">${version.name}｜${version.endpoint}</option>`).join('');
+    }
+
+    function getSelectedVersion() {
+        const selectedId = document.getElementById('versionSelect').value;
+        return versions.find(version => version.id === selectedId);
+    }
+
+    function appendLog(title, data) {
+        const time = new Date().toLocaleTimeString();
+        const payload = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        output.textContent += `\n\n[${time}] ${title}\n${payload}`;
+        output.scrollTop = output.scrollHeight;
+    }
+
+    function setStatus(status, cost, versionName) {
+        statusNode.textContent = status;
+        costNode.textContent = cost || '-';
+        versionNode.textContent = versionName || '-';
+    }
+
+    async function requestJson(url, options = {}) {
+        const response = await fetch(url, options);
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            return { code: response.status, message: text || error.message, data: null };
+        }
+    }
+
+    async function fetchVerifyHash() {
+        const userId = document.getElementById('userId').value;
+        const date = document.getElementById('ticketDate').value;
+        if (!userId || !date) {
+            appendLog('参数错误', '请先填写用户 ID 和票券日期');
+            return;
+        }
+
+        setStatus('获取凭证中', '-', 'getVerifyHash');
+        const startedAt = performance.now();
+        try {
+            const data = await requestJson(`/api/tickets/getVerifyHash?userId=${encodeURIComponent(userId)}&date=${encodeURIComponent(date)}`);
+            const cost = `${Math.round(performance.now() - startedAt)}ms`;
+            if (data.code === 200) {
+                document.getElementById('verifyHash').value = data.data || '';
+                setStatus('凭证成功', cost, 'getVerifyHash');
+            } else {
+                setStatus('凭证失败', cost, 'getVerifyHash');
+            }
+            appendLog('getVerifyHash 响应', data);
+        } catch (error) {
+            setStatus('凭证异常', '-', 'getVerifyHash');
+            appendLog('getVerifyHash 异常', error.message);
+        }
+    }
+
+    async function runSelectedVersion() {
+        const version = getSelectedVersion();
+        const userId = Number(document.getElementById('userId').value);
+        const date = document.getElementById('ticketDate').value;
+        const verifyHash = document.getElementById('verifyHash').value.trim();
+
+        if (!userId || !date || !verifyHash) {
+            appendLog('参数错误', '请填写用户 ID、票券日期，并先获取或输入 verifyHash。');
+            return;
+        }
+
+        setStatus('请求中', '-', version.name);
+        appendLog('开始调用', { version: version.name, endpoint: version.endpoint, userId, date });
+
+        const startedAt = performance.now();
+        try {
+            const data = await requestJson(version.endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, date, verifyHash })
+            });
+            const cost = `${Math.round(performance.now() - startedAt)}ms`;
+            setStatus(data.code === 200 ? '提交成功' : '提交失败', cost, version.name);
+            appendLog(`${version.name} 响应`, data);
+
+            if (version.id === 'async' && data.code === 200 && data.data && data.data.requestId) {
+                await pollAsyncResult(data.data.requestId, userId, date, version.name);
+            }
+
+            if (version.id === 'v3' && data.code === 200 && (!data.data || !data.data.requestId)) {
+                appendLog('V3 当前代码提示', '当前 V3 实验接口返回中没有 requestId，页面无法直接轮询最终订单结果。建议后续将 /v12 改为 /v3，并返回 requestId。');
+            }
+        } catch (error) {
+            setStatus('请求异常', '-', version.name);
+            appendLog(`${version.name} 异常`, error.message);
+        }
+    }
+
+    async function pollAsyncResult(requestId, userId, date, versionName) {
+        appendLog('开始轮询', { requestId, interval: '1000ms', maxAttempts: 10 });
+        for (let attempt = 1; attempt <= 10; attempt++) {
+            await sleep(1000);
+            const data = await requestJson(`/api/tickets/v2/purchaseResult?requestId=${encodeURIComponent(requestId)}&userId=${encodeURIComponent(userId)}&date=${encodeURIComponent(date)}`);
+            appendLog(`第 ${attempt} 次轮询`, data);
+            const status = data && data.data && data.data.status;
+            if (status === 'SUCCESS' || status === 'FAILED' || status === 'TIMEOUT') {
+                setStatus(status, '-', versionName);
+                return;
+            }
+        }
+        setStatus('轮询结束', '-', versionName);
+    }
+
+    async function readStatistics() {
+        setStatus('读取统计中', '-', '响应统计');
+        const data = await requestJson('/api/tickets/statistics/responseTime');
+        setStatus(data.code === 200 ? '统计成功' : '统计失败', '-', '响应统计');
+        appendLog('响应时间统计', data);
+    }
+
+    async function clearStatistics() {
+        setStatus('清空统计中', '-', '响应统计');
+        const data = await requestJson('/api/tickets/statistics/responseTime/clear');
+        setStatus(data.code === 200 ? '清空成功' : '清空失败', '-', '响应统计');
+        appendLog('清空响应统计', data);
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function clearOutput() {
+        output.textContent = '输出已清空。';
+        setStatus('未开始', '-', '-');
+    }
+
+    document.getElementById('hashBtn').addEventListener('click', fetchVerifyHash);
+    document.getElementById('runBtn').addEventListener('click', runSelectedVersion);
+    document.getElementById('clearBtn').addEventListener('click', clearOutput);
+    document.getElementById('statsBtn').addEventListener('click', readStatistics);
+    document.getElementById('clearStatsBtn').addEventListener('click', clearStatistics);
+
+    initializeDate();
+    renderVersionCards();
+    renderMatrix();
+    renderVersionOptions();
+</script>
+</body>
+</html>

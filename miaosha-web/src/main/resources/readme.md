@@ -20,3 +20,7 @@ end
 redis.call('incr', key)
 redis.call('expire', key, window)
 return 1  -- 允许请求
+
+## 页面入口
+
+- `purchase-version-comparison.html`：抢票版本方案效果对比页，对比 V1 悲观锁、V1 乐观锁、V2 异步 MQ、V3 实验链路的核心流程、效果指标、瓶颈与适用阶段，并提供单版本接口实测面板。
