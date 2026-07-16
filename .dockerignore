@@ -1,0 +1,17 @@
+target/
+.idea/
+.git/
+.gitignore
+*.iml
+*.log
+*.md
+!README.md
+jmeter/
+*.sql
+!miaosha.sql
+miaosha-job/
+.DS_Store
+docker-compose.yml
+Dockerfile
+.dockerignore
+*.bat
