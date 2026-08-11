@@ -346,7 +346,6 @@ public class OrderControllerV2 {
             cachedThreadPool.execute(new delCacheByThread(sid));
             // 假设上述再次删除缓存没成功，通知消息队列进行删除缓存
             sendToDelCache(String.valueOf(sid));
-            List<Integer> list = new ArrayList(10000);
 
         } catch (Exception e) {
             LOGGER.error("购买失败：[{}]", e.getMessage());
