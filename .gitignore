@@ -4,6 +4,15 @@ target/
 !**/src/main/**
 !**/src/test/**
 
+### 应用运行产物 ###
+logs/
+*.log
+
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride
+
 ### STS ###
 .apt_generated
 .classpath
