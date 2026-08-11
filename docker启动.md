@@ -81,11 +81,11 @@ docker compose ps                # 等 STATUS 都变成 healthy
 
 ### Step 5 · 初始化数据库
 
-`docker-compose.yml` 只挂载了 `miaosha.sql`（基础表），票券相关的表需要补充：
+`docker-compose.yml` 只挂载了 `sql/miaosha.sql`（基础表），票券相关的表需要补充：
 
 ```bash
-docker exec -i miaosha-mysql mysql -uroot -proot m4a_miaosha < init_ticket_database.sql
-docker exec -i miaosha-mysql mysql -uroot -proot m4a_miaosha < ticket_order_table.sql
+docker exec -i miaosha-mysql mysql -uroot -proot m4a_miaosha < sql/init_ticket_database.sql
+docker exec -i miaosha-mysql mysql -uroot -proot m4a_miaosha < sql/ticket_order_table.sql
 ```
 
 验证：
@@ -200,7 +200,7 @@ docker exec -it miaosha-redis redis-cli
 | 业务配置 | `miaosha-web/src/main/resources/application.properties` |
 | 服务配置（含 Redis） | `miaosha-service/src/main/resources/application.properties` |
 | 前端页面 | `miaosha-web/src/main/resources/*.html` |
-| 数据库初始化 | `miaosha.sql` + `init_ticket_database.sql` + `ticket_order_table.sql` |
+| 数据库初始化 | `sql/miaosha.sql` + `init_ticket_database.sql` + `ticket_order_table.sql` |
 | Maven 本地仓库 | `~/.m2/repository`（已有 205MB 缓存） |
 | Maven 安装位置 | `/Users/qinghang/Documents/develop/apache-maven-3.9.11` |
 | JDK 8 | 系统自带 `openjdk 1.8.0_472` |
