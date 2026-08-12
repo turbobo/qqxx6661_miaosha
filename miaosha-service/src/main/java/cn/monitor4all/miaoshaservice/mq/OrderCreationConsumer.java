@@ -70,6 +70,15 @@ public class OrderCreationConsumer {
             
             LOGGER.info("开始处理订单创建任务，用户ID: {}, 日期: {}", userId, purchaseDate);
 
+            // 幂等检查：查询是否已存在同一用户同一日期的订单
+            TicketOrder existingOrder = ticketOrderMapper.selectByUserIdAndDate(userId, purchaseDate);
+            if (existingOrder != null) {
+                LOGGER.warn("检测到重复消费：用户ID: {}, 日期: {} 已存在订单 {}, 跳过创建",
+                        userId, purchaseDate, existingOrder.getOrderNo());
+                channel.basicAck(deliveryTag, false);
+                return;
+            }
+
             // 7. 生成唯一票券编码（使用专业服务）
             String ticketCode = ticketCodeGeneratorService.generateUniqueTicketCode(userId, purchaseDate);
 

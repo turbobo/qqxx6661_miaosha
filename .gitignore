@@ -39,3 +39,8 @@ build/
 ### VS Code ###
 .vscode/
 /miaosha-dao/target/
+
+### JMeter test outputs ###
+jmeter/result/
+jmeter/reports/
+jmeter/*.log

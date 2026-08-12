@@ -285,9 +285,6 @@ public class OrderServiceImpl implements OrderService {
      */
     public void createOnlyOrderByMq(String orderId, Integer sid, Long userId) throws Exception {
 
-        // 模拟多个用户同时抢购，导致消息队列排队等候10秒
-        Thread.sleep(10000);
-
         // TODO 创建订单信息 order_mesage，代下发状态，保存到数据库
 
         // 异步创建订单

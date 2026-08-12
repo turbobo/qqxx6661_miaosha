@@ -20,6 +20,12 @@ public class PurchaseRequest {
     private String visitorName;
 
     private String visitorPhone;
+
+    /**
+     * 幂等请求ID，由前端生成的UUID。
+     * 用于防止同一请求被重复提交和处理。
+     */
+    private String requestId;
     
     // getter和setter方法
     public Long getUserId() {
@@ -76,6 +82,14 @@ public class PurchaseRequest {
 
     public void setVisitorPhone(String visitorPhone) {
         this.visitorPhone = visitorPhone;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 
     /**

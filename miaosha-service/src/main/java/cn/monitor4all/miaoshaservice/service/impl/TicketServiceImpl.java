@@ -12,9 +12,6 @@ import cn.monitor4all.miaoshadao.utils.CacheKey;
 import cn.monitor4all.miaoshaservice.config.CacheConfig;
 import cn.monitor4all.miaoshaservice.config.RabbitMqPurchaseConfig;
 import cn.monitor4all.miaoshaservice.service.*;
-import cn.monitor4all.miaoshaservice.utils.redis.CacheExpiredTime;
-import cn.monitor4all.miaoshaservice.utils.redis.RedisCache;
-import cn.monitor4all.miaoshaservice.utils.redis.RedisLock;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.util.concurrent.RateLimiter;
@@ -87,6 +84,15 @@ public class TicketServiceImpl implements TicketService {
 
     @Resource
     private CacheDeleteMessageService cacheDeleteMessageService;
+
+    @Resource
+    private StockRedisService stockRedisService;
+
+    @Resource
+    private DistributedLockService distributedLockService;
+
+    @Resource
+    private IdempotencyService idempotencyService;
 
 
     // Guava令牌桶：每秒放行10个请求
@@ -546,11 +552,11 @@ public class TicketServiceImpl implements TicketService {
 
         // TODO  //订单锁 新锁定同一时间内相同订单只有一个线程在创建或者更新
         final String lockKey = CacheKey.LOCK_USER_TICKET_DATE.getKey() + request.getUserId() + request.getDate();
-        // 接口响应时间平均1-2 s 设置3s超时
-        RedisLock redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 3000);
+        // 使用 Redisson 分布式锁，waitTime=3s，leaseTime=-1 启用 Watchdog 自动续期
+        boolean locked = distributedLockService.tryLock(lockKey, 3, -1, TimeUnit.SECONDS);
         try {
 
-            if (null != redisLock && redisLock.lock()) {
+            if (locked) {
                 // 从数据库获取票券信息（使用悲观锁）
                 PurchaseRecord purchaseRecord = doPurchaseTicketWithPessimisticLockV2(request);
 
@@ -558,15 +564,13 @@ public class TicketServiceImpl implements TicketService {
                 LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
                 return ApiResponse.success(purchaseRecord);
             } else {
-                throw new BusinessException("获取订单创建锁超时");
+                throw new BusinessException("系统繁忙，请稍后重试");
             }
         } catch (Exception e) {
             LOGGER.error("购买票券失败，日期: {}", purchaseDate, e);
             return ApiResponse.error("购买失败");
         } finally {
-            if (null != redisLock) {
-                redisLock.unlock();
-            }
+            distributedLockService.unlock(lockKey);
         }
 
 
@@ -637,23 +641,21 @@ public class TicketServiceImpl implements TicketService {
 
         // TODO  //订单锁 新锁定同一时间内相同订单只有一个线程在创建或者更新
         final String lockKey = CacheKey.LOCK_USER_TICKET_DATE.getKey() + request.getUserId() + request.getDate();
-        RedisLock redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 3000);
+        boolean locked = distributedLockService.tryLock(lockKey, 3, -1, TimeUnit.SECONDS);
         try {
-            if (null != redisLock && redisLock.lock()) {
+            if (locked) {
                 PurchaseRecord purchaseRecord = doPurchaseTicketWithOptimisticLock(request);
 
                 LOGGER.info("用户{}成功购买{}的票券，票券编号：{}", userId, purchaseDate, purchaseRecord.getTicketCode());
                 return ApiResponse.success(purchaseRecord);
             } else {
-                throw new BusinessException("获取订单创建锁超时");
+                throw new BusinessException("系统繁忙，请稍后重试");
             }
         } catch (Exception e) {
             LOGGER.error("购买票券失败，日期: {}", purchaseDate, e);
             return ApiResponse.error("购买失败");
         } finally {
-            if (null != redisLock) {
-                redisLock.unlock();
-            }
+            distributedLockService.unlock(lockKey);
         }
 
     }
@@ -708,24 +710,22 @@ public class TicketServiceImpl implements TicketService {
 
         // TODO  //订单锁 新锁定同一时间内相同订单只有一个线程在创建或者更新
         final String lockKey = CacheKey.LOCK_USER_TICKET_DATE.getKey() + request.getUserId() + request.getDate();
-        RedisLock redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 3000);
+        boolean locked = distributedLockService.tryLock(lockKey, 3, -1, TimeUnit.SECONDS);
         try {
-            if (null != redisLock && redisLock.lock()) {
+            if (locked) {
                 doPurchaseTicketWithOptimisticLockV3(request);
 
                 Map<String, Object> result = new HashMap<>();
                 result.put("message", "提交成功，正在排队");
                 return ApiResponse.success(result);
             } else {
-                throw new BusinessException("获取订单创建锁超时");
+                throw new BusinessException("系统繁忙，请稍后重试");
             }
         } catch (Exception e) {
             LOGGER.error("购买票券失败，日期: {}", purchaseDate, e);
             return ApiResponse.error("购买失败");
         } finally {
-            if (null != redisLock) {
-                redisLock.unlock();
-            }
+            distributedLockService.unlock(lockKey);
         }
     }
 
@@ -743,6 +743,21 @@ public class TicketServiceImpl implements TicketService {
             validateFinalRequestFields(request);
             validateFinalVerifyHash(request);
 
+            // 幂等检查：防止同一请求被重复提交
+            String clientRequestId = request.getRequestId();
+            if (clientRequestId != null && !clientRequestId.isEmpty()) {
+                if (!idempotencyService.checkAndMark(clientRequestId)) {
+                    Map<String, Object> idempotentResult = buildFinalPurchaseResult(
+                            clientRequestId,
+                            "DUPLICATE_REQUEST",
+                            "请勿重复提交",
+                            request
+                    );
+                    writeFinalPurchaseResult(clientRequestId, idempotentResult);
+                    return ApiResponse.error("请勿重复提交");
+                }
+            }
+
             String requestId = generateRequestId(request.getUserId(), request.getDate());
 
             if (hasPurchased(request.getUserId(), request.getDate())) {
@@ -754,6 +769,20 @@ public class TicketServiceImpl implements TicketService {
                 );
                 writeFinalPurchaseResult(requestId, duplicateResult);
                 return ApiResponse.success(duplicateResult);
+            }
+
+            // Redis Lua 原子库存预扣：扣减成功才进入 MQ 队列，避免无效请求占用消费者资源
+            boolean stockDeducted = stockRedisService.deductStock(request.getDate(), 1);
+            if (!stockDeducted) {
+                Map<String, Object> soldOutResult = buildFinalPurchaseResult(
+                        requestId,
+                        "SOLD_OUT",
+                        "票券已售罄",
+                        request
+                );
+                writeFinalPurchaseResult(requestId, soldOutResult);
+                LOGGER.info("Redis 库存预扣失败（库存不足），用户ID: {}, 日期: {}", request.getUserId(), request.getDate());
+                return ApiResponse.success(soldOutResult);
             }
 
             Map<String, Object> queuedResult = buildFinalPurchaseResult(
@@ -792,6 +821,15 @@ public class TicketServiceImpl implements TicketService {
             LOGGER.info("最终版异步预约已入队，请求ID: {}", requestId);
             return ApiResponse.success(result);
         } catch (Exception e) {
+            // 系统异常时移除幂等标记，允许客户端重试
+            if (request != null && request.getRequestId() != null && !request.getRequestId().isEmpty()) {
+                try {
+                    idempotencyService.removeIdempotentMark(request.getRequestId());
+                } catch (Exception idempotentEx) {
+                    LOGGER.warn("移除幂等标记失败，requestId: {}, 错误: {}",
+                            request.getRequestId(), idempotentEx.getMessage());
+                }
+            }
             LOGGER.error("最终版异步预约提交失败，用户ID: {}, 日期: {}, 错误: {}",
                     request == null ? null : request.getUserId(),
                     request == null ? null : request.getDate(),
@@ -807,8 +845,26 @@ public class TicketServiceImpl implements TicketService {
     public void processFinalPurchaseMessage(Map<String, Object> message) {
         String requestId = String.valueOf(message.get("requestId"));
         PurchaseRequest request = buildFinalPurchaseRequest(message);
-        RedisLock redisLock = null;
+        String lockKey = CacheKey.LOCK_USER_TICKET_DATE.getKey()
+                + "_final_" + request.getUserId() + "_" + request.getDate();
         try {
+            // 幂等检查：检查用户是否已购买该日期票券（防止MQ重复消费）
+            TicketOrder existingOrder = ticketOrderMapper.selectByUserIdAndDate(request.getUserId(), request.getDate());
+            if (existingOrder != null) {
+                LOGGER.warn("MQ重复消费检测：用户ID: {}, 日期: {} 已存在订单 {}, 直接ACK",
+                        request.getUserId(), request.getDate(), existingOrder.getOrderNo());
+                Map<String, Object> duplicateSuccessResult = buildFinalPurchaseResult(
+                        requestId,
+                        "SUCCESS",
+                        "预约成功",
+                        request
+                );
+                duplicateSuccessResult.put("ticketCode", existingOrder.getTicketCode());
+                duplicateSuccessResult.put("orderNo", existingOrder.getOrderNo());
+                writeFinalPurchaseResult(requestId, duplicateSuccessResult);
+                return;
+            }
+
             writeFinalPurchaseResult(requestId, buildFinalPurchaseResult(
                     requestId,
                     "PROCESSING",
@@ -816,10 +872,8 @@ public class TicketServiceImpl implements TicketService {
                     request
             ));
 
-            String lockKey = CacheKey.LOCK_USER_TICKET_DATE.getKey()
-                    + "_final_" + request.getUserId() + "_" + request.getDate();
-            redisLock = RedisCache.createRedisLock(lockKey, CacheExpiredTime.ONE_MINUTE, 3000);
-            if (redisLock == null || !redisLock.lock()) {
+            boolean locked = distributedLockService.tryLock(lockKey, 3, -1, TimeUnit.SECONDS);
+            if (!locked) {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
 
@@ -847,12 +901,21 @@ public class TicketServiceImpl implements TicketService {
                     request
             );
             writeFinalPurchaseResult(requestId, failedResult);
+
+            // MQ 消费失败，回补 Redis 预扣库存（Redis 预扣已在 purchaseTicketFinal 中完成，DB 操作未成功需回补）
+            try {
+                String date = String.valueOf(message.get("date"));
+                stockRedisService.revertStock(date, 1);
+                LOGGER.info("MQ消费失败，已回补Redis库存，日期: {}, 请求ID: {}", date, requestId);
+            } catch (Exception revertEx) {
+                LOGGER.error("Redis库存回补异常，日期: {}, 请求ID: {}, 错误: {}",
+                        message.get("date"), requestId, revertEx.getMessage(), revertEx);
+            }
+
             LOGGER.warn("最终版异步预约失败，请求ID: {}, 状态: {}, 原因: {}",
                     requestId, status, e.getMessage(), e);
         } finally {
-            if (redisLock != null) {
-                redisLock.unlock();
-            }
+            distributedLockService.unlock(lockKey);
         }
     }
 
@@ -1784,6 +1847,13 @@ public class TicketServiceImpl implements TicketService {
 
                     // 更新Redis缓存
                     ticketCacheManager.deleteTicket(update.getDate());
+
+                    // 同步 Redis 库存预扣值（管理员修改票数后，保证 Redis 与 DB 一致）
+                    try {
+                        stockRedisService.syncStockFromDb(update.getDate(), update.getRemainingCount());
+                    } catch (Exception syncEx) {
+                        LOGGER.warn("管理员修改票数后同步Redis库存失败，日期: {}, 错误: {}", update.getDate(), syncEx.getMessage(), syncEx);
+                    }
 
                 } catch (Exception e) {
                     LOGGER.error("修改票券失败，日期: {}, 错误: {}", update.getDate(), e.getMessage(), e);

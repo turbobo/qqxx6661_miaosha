@@ -9,6 +9,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
+@Deprecated
+// 已由 DistributedLockService (Redisson) 替代，保留仅供参考
 public class RedisLock {
 
     /**

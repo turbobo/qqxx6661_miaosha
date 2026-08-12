@@ -1,5 +1,7 @@
 package cn.monitor4all.miaoshaservice.mq;
 
+import cn.monitor4all.miaoshadao.dao.TicketOrder;
+import cn.monitor4all.miaoshadao.mapper.TicketOrderMapper;
 import cn.monitor4all.miaoshadao.model.PurchaseRequest;
 import cn.monitor4all.miaoshaservice.config.RabbitMqPurchaseConfig;
 import cn.monitor4all.miaoshaservice.service.TicketService;
@@ -35,6 +37,9 @@ public class PurchaseMessageConsumer {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private TicketOrderMapper ticketOrderMapper;
+
     /**
      * 消费异步抢购消息
      *
@@ -67,6 +72,15 @@ public class PurchaseMessageConsumer {
 
             LOGGER.info("开始处理异步抢购请求，请求ID: {}, 用户ID: {}, 日期: {}, 消息计数: {}", 
                 requestId, userId, date, count);
+
+            // 幂等检查：查询是否已存在同一用户同一日期的订单
+            TicketOrder existingOrder = ticketOrderMapper.selectByUserIdAndDate(userId, date);
+            if (existingOrder != null) {
+                LOGGER.warn("检测到重复消费：用户ID: {}, 日期: {} 已存在订单 {}, 跳过处理",
+                        userId, date, existingOrder.getOrderNo());
+                channel.basicAck(deliveryTag, false);
+                return;
+            }
 
             // 调用乐观锁抢购方法
             ticketService.asyncPurchaseTicketWithOptimisticLock(request);

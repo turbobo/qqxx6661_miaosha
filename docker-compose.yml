@@ -81,7 +81,7 @@ services:
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
       # Windows 兼容：JVM 内存设置
-      JAVA_OPTS: "-Xms256m -Xmx512m"
+      JAVA_OPTS: "-Xms1g -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof"
     depends_on:
       mysql:
         condition: service_healthy
@@ -91,7 +91,7 @@ services:
         condition: service_healthy
     networks:
       - miaosha-network
-    mem_limit: 1g
+    mem_limit: 2g
 
 volumes:
   mysql-data:

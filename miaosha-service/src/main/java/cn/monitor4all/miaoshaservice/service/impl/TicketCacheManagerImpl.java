@@ -6,6 +6,7 @@ import cn.monitor4all.miaoshadao.mapper.TicketEntityMapper;
 import cn.monitor4all.miaoshadao.mapper.TicketPurchaseRecordMapper;
 import cn.monitor4all.miaoshadao.model.PurchaseRecord;
 import cn.monitor4all.miaoshadao.model.Ticket;
+import cn.monitor4all.miaoshaservice.cache.MultiLevelCacheManager;
 import cn.monitor4all.miaoshaservice.service.TicketCacheManager;
 import cn.monitor4all.miaoshaservice.service.AsyncCacheDeleteService;
 import com.alibaba.fastjson.JSON;
@@ -25,27 +26,32 @@ import cn.monitor4all.miaoshadao.utils.CacheKey;
 
 /**
  * 票券缓存管理器实现类
- * 提供票券缓存的基本操作方法
+ * <p>
+ * 使用二级缓存架构：L1(Caffeine 本地缓存) + L2(Redis 远程缓存)
+ * 库存相关 key（ticket:stock:*）不走本地缓存，通过 StockRedisService 直接操作 Redis
  */
 @Service
 public class TicketCacheManagerImpl implements TicketCacheManager {
     
     private static final Logger LOGGER = LoggerFactory.getLogger(TicketCacheManagerImpl.class);
     
-    // 缓存过期时间：1小时
+    /** 缓存过期时间：1小时 */
     private static final long CACHE_EXPIRE_TIME = 3600L;
     
-    // 票券缓存key前缀
+    /** 票券缓存key前缀 */
     private static final String TICKET_CACHE_PREFIX = "ticket:";
     
-    // 票券列表缓存key
+    /** 票券列表缓存key */
     private static final String TICKET_LIST_CACHE_KEY = "ticket:list";
     
-    // 购买记录缓存key前缀
+    /** 购买记录缓存key前缀 */
     private static final String PURCHASE_RECORD_CACHE_PREFIX = "purchase:";
     
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    
+    @Resource
+    private MultiLevelCacheManager multiLevelCacheManager;
     
     @Resource
     private TicketPurchaseRecordMapper ticketPurchaseRecordMapper;
@@ -53,36 +59,29 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
     @Resource
     private TicketEntityMapper ticketEntityMapper;
     
+    @Resource
+    private AsyncCacheDeleteService asyncCacheDeleteService;
+    
+    /**
+     * 获取票券信息（带降级）
+     * 读取链路：L1(Caffeine) → L2(Redis) → DB
+     */
     @Override
     public Ticket getTicketWithFallback(String date) {
         try {
-            // 1. 先从缓存获取
             String key = TICKET_CACHE_PREFIX + date;
-            String ticketJson = stringRedisTemplate.opsForValue().get(key);
             
-            if (ticketJson != null) {
-                Ticket ticket = JSON.parseObject(ticketJson, Ticket.class);
-                LOGGER.debug("从缓存获取票券成功，日期: {}, 票券: {}", date, ticket);
-                return ticket;
-            }
-            
-            LOGGER.debug("缓存中未找到票券，尝试从数据库获取，日期: {}", date);
-            
-            // 2. 缓存中没有，从数据库获取
-            TicketEntity ticketEntity = ticketEntityMapper.selectByDate(date);
-            if (ticketEntity != null) {
-                // 3. 转换为Ticket对象
-                Ticket ticket = convertToTicket(ticketEntity);
-                
-                // 4. 更新到缓存
-                saveTicket(date, ticket);
-                
-                LOGGER.info("从数据库获取票券成功并更新缓存，日期: {}, 票券: {}", date, ticket);
-                return ticket;
-            }
-            
-            LOGGER.debug("数据库中未找到票券，日期: {}", date);
-            return null;
+            return multiLevelCacheManager.get(key, Ticket.class, k -> {
+                LOGGER.debug("缓存未命中，从数据库获取票券，日期: {}", date);
+                TicketEntity ticketEntity = ticketEntityMapper.selectByDate(date);
+                if (ticketEntity != null) {
+                    Ticket ticket = convertToTicket(ticketEntity);
+                    LOGGER.info("从数据库获取票券成功，日期: {}, 票券: {}", date, ticket);
+                    return ticket;
+                }
+                LOGGER.debug("数据库中未找到票券，日期: {}", date);
+                return null;
+            });
             
         } catch (Exception e) {
             LOGGER.error("获取票券失败，日期: {}", date, e);
@@ -90,33 +89,35 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
         }
     }
     
+    /**
+     * 保存票券到二级缓存
+     */
     @Override
     public void saveTicket(String date, Ticket ticket) {
         try {
             String key = TICKET_CACHE_PREFIX + date;
-            String ticketJson = JSON.toJSONString(ticket);
-            
-            stringRedisTemplate.opsForValue().set(key, ticketJson, CACHE_EXPIRE_TIME, TimeUnit.SECONDS);
-            
-            LOGGER.debug("票券保存到缓存成功，日期: {}, key: {}", date, key);
+            multiLevelCacheManager.put(key, ticket, CACHE_EXPIRE_TIME);
+            LOGGER.debug("票券保存到二级缓存成功，日期: {}, key: {}", date, key);
         } catch (Exception e) {
             LOGGER.error("票券保存到缓存失败，日期: {}", date, e);
         }
     }
-
-    @Resource
-    private AsyncCacheDeleteService asyncCacheDeleteService;
     
-    // 使用双重异步删除：先线程池，再队列
+    /**
+     * 删除票券缓存（双重异步 + 二级缓存失效）
+     */
     @Override
     public void deleteTicket(String date) {
         try {
             String key = TICKET_CACHE_PREFIX + date;
             
-            // 使用双重异步删除：先线程池，再队列
+            // 先失效 L1 本地缓存（立即生效）
+            multiLevelCacheManager.evictLocal(key);
+            
+            // 使用双重异步删除 Redis 缓存：先线程池，再队列
             asyncCacheDeleteService.deleteCacheDualAsync(key);
             
-            LOGGER.info("票券缓存删除任务已提交（双重异步），日期: {}, key: {}", date, key);
+            LOGGER.info("票券缓存删除任务已提交（L1立即失效 + Redis双重异步），日期: {}, key: {}", date, key);
             
         } catch (Exception e) {
             LOGGER.error("提交票券缓存删除任务失败，日期: {}, key: {}", date, TICKET_CACHE_PREFIX + date, e);
@@ -135,25 +136,7 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
     @Override
     public List<Ticket> getTicketList() {
         try {
-            // 先尝试从缓存获取票券列表
             List<Ticket> tickets = getTicketsFromRecentDates();
-            
-//            if () {
-//                List<Ticket> tickets = JSON.parseArray(ticketListJson, Ticket.class);
-//                LOGGER.debug("从缓存获取票券列表成功，数量: {}", tickets != null ? tickets.size() : 0);
-//                return tickets;
-//            }
-//
-//            // 如果缓存中没有票券列表，则从最近3天的日期分别获取票券信息
-//            LOGGER.debug("缓存中未找到票券列表，尝试从最近3天日期分别获取");
-//            List<Ticket> tickets = getTicketsFromRecentDates();
-//
-//            if (tickets != null && !tickets.isEmpty()) {
-//                // 将获取到的票券列表保存到缓存
-//                saveTicketList(tickets);
-//                LOGGER.info("从最近3天日期获取票券信息成功，数量: {}, 已保存到缓存", tickets.size());
-//            }
-            
             return tickets;
         } catch (Exception e) {
             LOGGER.error("从缓存获取票券列表失败", e);
@@ -167,7 +150,6 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
      */
     private List<Ticket> getTicketsFromRecentDates() {
         try {
-            // 计算最近3天的日期
             LocalDate today = LocalDate.now();
             String todayStr = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             String tomorrowStr = today.plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
@@ -177,7 +159,6 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
             
             List<Ticket> tickets = new ArrayList<>();
             
-            // 分别获取每个日期的票券信息
             Ticket todayTicket = getTicketWithFallback(todayStr);
             if (todayTicket != null) {
                 tickets.add(todayTicket);
@@ -209,46 +190,40 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
     public void saveTicketList(List<Ticket> tickets) {
         try {
             if (tickets != null && !tickets.isEmpty()) {
-                String ticketListJson = JSON.toJSONString(tickets);
-                
-                stringRedisTemplate.opsForValue().set(TICKET_LIST_CACHE_KEY, ticketListJson, CACHE_EXPIRE_TIME, TimeUnit.SECONDS);
-                
-                LOGGER.debug("票券列表保存到缓存成功，数量: {}, key: {}", tickets.size(), TICKET_LIST_CACHE_KEY);
+                multiLevelCacheManager.put(TICKET_LIST_CACHE_KEY, tickets, CACHE_EXPIRE_TIME);
+                LOGGER.debug("票券列表保存到二级缓存成功，数量: {}, key: {}", tickets.size(), TICKET_LIST_CACHE_KEY);
             }
         } catch (Exception e) {
             LOGGER.error("票券列表保存到缓存失败", e);
         }
     }
     
+    /**
+     * 添加购买记录到二级缓存
+     */
     @Override
     public void addPurchaseRecord(Long userId, String date, PurchaseRecord record) {
         try {
             String key = PURCHASE_RECORD_CACHE_PREFIX + userId + ":" + date;
-            
-            // 保存到缓存
-            String recordJson = JSON.toJSONString(record);
-            stringRedisTemplate.opsForValue().set(key, recordJson, CACHE_EXPIRE_TIME, TimeUnit.SECONDS);
-            
-            LOGGER.debug("购买记录添加到缓存成功，用户ID: {}, 日期: {}, key: {}", userId, date, key);
+            multiLevelCacheManager.put(key, record, CACHE_EXPIRE_TIME);
+            LOGGER.debug("购买记录添加到二级缓存成功，用户ID: {}, 日期: {}, key: {}", userId, date, key);
         } catch (Exception e) {
             LOGGER.error("购买记录添加到缓存失败，用户ID: {}, 日期: {}", userId, date, e);
         }
     }
     
+    /**
+     * 获取购买记录（仅从 Redis 读取，不走 L1 本地缓存的 loader 模式）
+     */
     @Override
     public PurchaseRecord getPurchaseRecord(Long userId, String date) {
         try {
             String key = PURCHASE_RECORD_CACHE_PREFIX + userId + ":" + date;
-            String recordJson = stringRedisTemplate.opsForValue().get(key);
             
-            if (recordJson != null) {
-                PurchaseRecord record = JSON.parseObject(recordJson, PurchaseRecord.class);
-                LOGGER.debug("从缓存获取购买记录成功，用户ID: {}, 日期: {}, key: {}", userId, date, key);
-                return record;
-            }
-            
-            LOGGER.debug("缓存中未找到购买记录，用户ID: {}, 日期: {}", userId, date);
-            return null;
+            return multiLevelCacheManager.get(key, PurchaseRecord.class, k -> {
+                LOGGER.debug("缓存中未找到购买记录，用户ID: {}, 日期: {}", userId, date);
+                return null;
+            });
         } catch (Exception e) {
             LOGGER.error("从缓存获取购买记录失败，用户ID: {}, 日期: {}", userId, date, e);
             return null;
@@ -258,8 +233,7 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
     @Override
     public List<PurchaseRecord> getPurchaseRecords(Long userId) {
         try {
-            // 由于现在缓存key包含了日期，需要获取用户的所有购买记录
-            // 这里可以通过pattern匹配来获取所有相关的key
+            // pattern 匹配无法走本地缓存，直接查 Redis
             String pattern = PURCHASE_RECORD_CACHE_PREFIX + userId + ":*";
             Set<String> keys = stringRedisTemplate.keys(pattern);
             
@@ -285,29 +259,25 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
         }
     }
     
+    /**
+     * 获取购买记录（带降级到 DB）
+     */
     @Override
     public PurchaseRecord getPurchaseRecordWithFallback(Long userId, String date) {
         try {
-            // 首先尝试从缓存获取
-            PurchaseRecord cachedRecord = getPurchaseRecord(userId, date);
-            if (cachedRecord != null) {
-                LOGGER.debug("从缓存获取购买记录成功，用户ID: {}, 日期: {}", userId, date);
-                return cachedRecord;
+            String key = PURCHASE_RECORD_CACHE_PREFIX + userId + ":" + date;
+            
+            PurchaseRecord record = multiLevelCacheManager.get(key, PurchaseRecord.class, k -> {
+                LOGGER.debug("缓存未命中，尝试从数据库获取，用户ID: {}, 日期: {}", userId, date);
+                return getPurchaseRecordFromDatabase(userId, date);
+            });
+            
+            if (record != null) {
+                LOGGER.debug("获取购买记录成功，用户ID: {}, 日期: {}", userId, date);
+                return record;
             }
             
-            // 缓存中没有，尝试从数据库获取
-            LOGGER.debug("缓存中未找到购买记录，尝试从数据库获取，用户ID: {}, 日期: {}", userId, date);
-            PurchaseRecord dbRecord = getPurchaseRecordFromDatabase(userId, date);
-            
-            if (dbRecord != null) {
-                // 将数据库数据同步到缓存
-                addPurchaseRecord(userId, date, dbRecord);
-                LOGGER.debug("从数据库获取购买记录成功并同步到缓存，用户ID: {}, 日期: {}", userId, date);
-                return dbRecord;
-            }
-            
-            // 数据库也没有数据，返回null
-            LOGGER.debug("数据库中也未找到购买记录，用户ID: {}, 日期: {}", userId, date);
+            LOGGER.debug("所有层级均未找到购买记录，用户ID: {}, 日期: {}", userId, date);
             return null;
             
         } catch (Exception e) {
@@ -337,7 +307,6 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
                 return dbRecords;
             }
             
-            // 数据库也没有数据，返回空列表
             LOGGER.debug("数据库中也未找到购买记录，用户ID: {}", userId);
             return new ArrayList<>();
             
@@ -354,11 +323,9 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
      */
     private List<PurchaseRecord> getPurchaseRecordsFromDatabase(Long userId) {
         try {
-            // 从数据库查询用户的购买记录
             List<TicketPurchaseRecord> dbRecords = ticketPurchaseRecordMapper.selectByUserId(userId);
             
             if (dbRecords != null && !dbRecords.isEmpty()) {
-                // 将数据库实体转换为前端模型
                 List<PurchaseRecord> purchaseRecords = new ArrayList<>();
                 for (TicketPurchaseRecord dbRecord : dbRecords) {
                     PurchaseRecord record = new PurchaseRecord(
@@ -390,11 +357,9 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
      */
     private PurchaseRecord getPurchaseRecordFromDatabase(Long userId, String date) {
         try {
-            // 从数据库查询用户的指定日期购买记录
             TicketPurchaseRecord dbRecord = ticketPurchaseRecordMapper.selectByUserIdAndDate(userId, date);
             
             if (dbRecord != null) {
-                // 将数据库实体转换为前端模型
                 PurchaseRecord record = new PurchaseRecord(
                     dbRecord.getUserId(),
                     java.time.LocalDate.parse(dbRecord.getTicketDate()),
@@ -433,22 +398,28 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
         }
     }
     
+    /**
+     * 删除购买记录缓存（L1 + L2 同时失效）
+     */
     @Override
     public void deletePurchaseRecord(Long userId, String date) {
         try {
             String key = PURCHASE_RECORD_CACHE_PREFIX + userId + ":" + date;
-            stringRedisTemplate.delete(key);
-            LOGGER.debug("购买记录缓存删除成功，用户ID: {}, 日期: {}, key: {}", userId, date, key);
+            multiLevelCacheManager.evict(key);
+            LOGGER.debug("购买记录缓存删除成功（L1+L2），用户ID: {}, 日期: {}, key: {}", userId, date, key);
         } catch (Exception e) {
             LOGGER.error("购买记录缓存删除失败，用户ID: {}, 日期: {}", userId, date, e);
         }
     }
     
+    /**
+     * 删除票券列表缓存（L1 + L2 同时失效）
+     */
     @Override
     public void deleteTicketList() {
         try {
-            stringRedisTemplate.delete(TICKET_LIST_CACHE_KEY);
-            LOGGER.debug("票券列表缓存删除成功，key: {}", TICKET_LIST_CACHE_KEY);
+            multiLevelCacheManager.evict(TICKET_LIST_CACHE_KEY);
+            LOGGER.debug("票券列表缓存删除成功（L1+L2），key: {}", TICKET_LIST_CACHE_KEY);
         } catch (Exception e) {
             LOGGER.error("票券列表缓存删除失败", e);
         }
@@ -457,14 +428,8 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
     @Override
     public void clearAllTicketCache() {
         try {
-            // 删除票券列表缓存
-            Boolean deleted = stringRedisTemplate.delete(TICKET_LIST_CACHE_KEY);
-            LOGGER.info("删除票券列表缓存: {}", Boolean.TRUE.equals(deleted) ? "成功" : "失败");
-            
-            // 删除所有票券缓存（这里可以根据实际需求优化，比如使用pattern匹配删除）
-            // 由于Redis的keys命令在生产环境中要谨慎使用，这里只删除列表缓存
-            // 如果需要删除所有票券缓存，建议使用定时任务或者在业务逻辑中逐个删除
-            
+            multiLevelCacheManager.evict(TICKET_LIST_CACHE_KEY);
+            LOGGER.info("删除票券列表缓存: 成功");
         } catch (Exception e) {
             LOGGER.error("清空票券缓存失败", e);
         }
@@ -473,7 +438,6 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
     @Override
     public boolean isRedisConnected() {
         try {
-            // 尝试执行一个简单的Redis命令来检查连接状态
             String testKey = "test:connection";
             stringRedisTemplate.opsForValue().set(testKey, "test", 1, TimeUnit.SECONDS);
             String result = stringRedisTemplate.opsForValue().get(testKey);
@@ -497,10 +461,7 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
             return null;
         }
         
-        // 使用Ticket的构造函数，它会自动计算remaining
         Ticket ticket = new Ticket(ticketEntity.getDate(), ticketEntity.getTotalCount());
-        
-        // 手动设置remaining，因为构造函数会将其设置为total
         ticket.setRemaining(ticketEntity.getRemainingCount());
         
         return ticket;
@@ -510,7 +471,10 @@ public class TicketCacheManagerImpl implements TicketCacheManager {
     public void clearUserPurchaseStatus(Long userId, String date) {
         String key = CacheKey.USER_HAS_ORDER.getKey() + "_" + date + "_" + userId;
 
-        // 使用双重异步删除：先线程池，再队列
+        // 先失效 L1 本地缓存
+        multiLevelCacheManager.evictLocal(key);
+
+        // 使用双重异步删除 Redis 缓存：先线程池，再队列
         asyncCacheDeleteService.deleteCacheDualAsync(key);
 
         LOGGER.info("Cleared user purchase status cache for userId: {}, date: {}", userId, date);

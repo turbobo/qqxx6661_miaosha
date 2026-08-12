@@ -9,6 +9,7 @@ import cn.monitor4all.miaoshadao.model.CancelPurchaseRequest;
 import cn.monitor4all.miaoshadao.model.CancelPurchaseResponse;
 import cn.monitor4all.miaoshadao.dao.TicketOrder;
 import cn.monitor4all.miaoshaservice.service.*;
+import cn.monitor4all.miaoshaservice.ratelimit.DistributedRateLimiter;
 import cn.monitor4all.miaoshadao.model.MiaoshaOperationResponse;
 import cn.monitor4all.miaoshadao.model.MiaoshaStatusResponse;
 import com.google.common.util.concurrent.RateLimiter;
@@ -48,8 +49,14 @@ public class TicketController {
     @Resource
     private ResponseTimeStatisticsService responseTimeStatisticsService;
 
+    @Resource
+    private CircuitBreakerService circuitBreakerService;
 
-    // Guava令牌桶：每秒放行10个请求
+    @Resource
+    private DistributedRateLimiter distributedRateLimiter;
+
+    // Guava令牌桶：每秒放行10个请求（本地降级方案，Redis不可用时生效）
+    @SuppressWarnings("UnstableApiUsage")
     RateLimiter rateLimiter = RateLimiter.create(10);
     
     // 获取最近3天的票券信息
@@ -400,6 +407,13 @@ public class TicketController {
         try {
             LOGGER.info("最终版异步预约请求，用户ID: {}, 日期: {}, 场次: {}",
                     request.getUserId(), request.getDate(), request.getSessionId());
+
+            // 分布式限流检查：全局接口限流 + 用户级限流
+            if (request.getUserId() != null
+                    && !distributedRateLimiter.isAllowed("/api/tickets/v3/purchase", request.getUserId())) {
+                LOGGER.warn("分布式限流拒绝请求，用户ID: {}", request.getUserId());
+                return ApiResponse.error("系统繁忙，请稍后重试");
+            }
 
             ApiResponse<Map<String, Object>> result = ticketService.purchaseTicketFinal(request);
 
@@ -773,6 +787,26 @@ public class TicketController {
         } catch (Exception e) {
             LOGGER.error("清空响应时间统计信息失败: {}", e.getMessage(), e);
             return ApiResponse.error("清空统计信息失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 管理接口：获取所有熔断器当前状态
+     * <p>
+     * 返回 redis、db、mq 三个熔断器的状态（CLOSED / OPEN / HALF_OPEN / DISABLED / FORCED_OPEN）
+     * </p>
+     *
+     * @return 熔断器状态 Map
+     */
+    @GetMapping("/admin/circuitBreaker/status")
+    public ApiResponse<Map<String, String>> getCircuitBreakerStatus() {
+        try {
+            Map<String, String> status = circuitBreakerService.getCircuitBreakerStatus();
+            LOGGER.info("获取熔断器状态: {}", status);
+            return ApiResponse.success(status);
+        } catch (Exception e) {
+            LOGGER.error("获取熔断器状态失败: {}", e.getMessage(), e);
+            return ApiResponse.error("获取熔断器状态失败: " + e.getMessage());
         }
     }
 }
