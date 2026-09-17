@@ -3,9 +3,10 @@ package cn.monitor4all.miaoshaservice.service;
 import cn.monitor4all.miaoshadao.model.PurchaseRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -21,6 +22,7 @@ import static org.mockito.Mockito.*;
  * TicketCacheManager测试类
  * 测试缓存优先，数据库兜底的购买记录获取逻辑
  */
+@ExtendWith(MockitoExtension.class)
 public class TicketCacheManagerTest {
 
     @Mock
@@ -37,7 +39,6 @@ public class TicketCacheManagerTest {
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 

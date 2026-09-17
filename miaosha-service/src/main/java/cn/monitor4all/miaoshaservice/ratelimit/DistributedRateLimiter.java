@@ -35,7 +35,7 @@ public class DistributedRateLimiter {
     private static final int REQUESTED_TOKENS = 1;
 
     @Resource
-    private StringRedisTemplate redisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
 
     private DefaultRedisScript<Long> rateLimitScript;
 
@@ -138,7 +138,7 @@ public class DistributedRateLimiter {
      */
     private boolean executeRateLimitScript(String key, int maxTokens, int refillRate) {
         try {
-            Long result = redisTemplate.execute(
+            Long result = stringRedisTemplate.execute(
                     rateLimitScript,
                     Collections.singletonList(key),
                     String.valueOf(maxTokens),
