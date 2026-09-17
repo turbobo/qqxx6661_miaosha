@@ -3,10 +3,13 @@ package cn.monitor4all.miaoshaweb.receiver;
 import cn.monitor4all.miaoshaservice.service.OrderService;
 import cn.monitor4all.miaoshaservice.service.StockService;
 import com.alibaba.fastjson.JSONObject;
+import com.rabbitmq.client.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitHandler;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import javax.annotation.Resource;
 import org.springframework.stereotype.Component;
 @Component
@@ -22,7 +25,9 @@ public class OrderMqReceiver {
     private OrderService orderService;
 
     @RabbitHandler
-    public void process(String message) {
+    public void process(String message,
+                        @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag,
+                        Channel channel) {
         LOGGER.info("OrderMqReceiver收到消息开始用户下单流程: " + message);
         JSONObject jsonObject = JSONObject.parseObject(message);
         try {
@@ -32,9 +37,16 @@ public class OrderMqReceiver {
 
              orderService.createOrderByMq(jsonObject.getString("orderId"), jsonObject.getInteger("sid"), jsonObject.getLong("userId"));
             // TODO 订单创建成功后，修改 order_message表记录
-
+            // 手动确认消息（application.properties 配置 acknowledge-mode=manual）
+            channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
             LOGGER.error("消息处理异常：", e);
+            try {
+                // 处理失败：拒绝消息且不重新入队，避免死循环堆积
+                channel.basicNack(deliveryTag, false, false);
+            } catch (Exception ackException) {
+                LOGGER.error("消息拒绝确认失败：", ackException);
+            }
         }
     }
 }

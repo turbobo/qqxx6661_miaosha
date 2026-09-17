@@ -1431,11 +1431,12 @@
             },
             {
                 id: 'lab-s5', stage: '阶段 5', name: 'MQ 异步削峰', tag: '吞吐之王', tagClass: 'badge-best',
-                desc: '接口只查缓存 + 入队（不碰 DB），消费者异步扣减落库；提交后自动轮询结果。每个 userId 限购一次。',
+                desc: '接口只查缓存 + 入队（不碰 DB），消费者异步扣减落库；提交后自动轮询结果。每个 userId 限购一次，并发模拟自动为每个请求分配不同用户；并发消费时消费者内乐观锁 CAS 无重试会丢单（账实核对可见差异）。',
                 endpointHint: 'GET /seckill/stage5/order-with-mq → purchase-result 轮询',
                 endpoint: () => `/seckill/stage5/order-with-mq?sid=${sid()}&userId=${uid()}`,
                 buttons: [
-                    { label: '模拟异步抢购（自动轮询）', kind: 'flow5', primary: true }
+                    { label: '模拟异步抢购（自动轮询）', kind: 'flow5', primary: true },
+                    { label: '并发 ×50（不同用户，测 QPS）', kind: 'concurrent5', n: 50 }
                 ]
             },
             {
@@ -1655,6 +1656,50 @@
             fetchStock();
         }
 
+        async function runConcurrentMq(cardId, n) {
+            setBusy(cardId, true);
+            clearLog(cardId);
+            const s = sid(), u = uid();
+            log(cardId, '并发模拟：' + n + ' 个不同用户（userId ' + u + '~' + (u + n - 1) + '）同时提交异步下单…', 'cmt');
+            const before = await fetchStock();
+            const started = performance.now();
+            const results = await Promise.all(Array.from({ length: n }, (_, i) =>
+                call('/seckill/stage5/order-with-mq?sid=' + s + '&userId=' + (u + i))));
+            const wallMs = Math.round(performance.now() - started);
+            const stats = { ok: 0, limited: 0, lockfail: 0, dup: 0, queued: 0, fail: 0 };
+            let sumMs = 0, maxMs = 0;
+            results.forEach(r => { stats[classify(r.body)]++; sumMs += r.ms; maxMs = Math.max(maxMs, r.ms); });
+            const submitted = stats.ok + stats.queued;
+            log(cardId, '完成：总耗时 ' + wallMs + 'ms · QPS ≈ ' + (n * 1000 / wallMs).toFixed(1) + '/s · 平均 ' +
+                Math.round(sumMs / n) + 'ms · 最大 ' + maxMs + 'ms', 'cmt');
+            log(cardId, '结果分布：提交成功（入队） ' + submitted + ' · 已抢购过 ' + stats.dup + ' · 失败 ' + stats.fail, 'cmt');
+            log(cardId, '接口只做缓存校验+入队即返回（毫秒级），扣库由消费者异步完成——等待消费者处理稳定后再核对…', 'cmt');
+            let prev = null, after = null, stable = 0;
+            for (let i = 0; i < 15; i++) {
+                await sleep(1000);
+                after = await fetchStock();
+                if (after === null) break;
+                if (after === prev) {
+                    stable++;
+                    if (stable >= 2) break;
+                } else {
+                    stable = 0;
+                }
+                prev = after;
+            }
+            if (before !== null && after !== null) {
+                const delta = before - after;
+                const same = delta === submitted;
+                log(cardId, '账实核对：提交成功 ' + submitted + ' 次，消费者实际扣减 ' + delta + ' 件' +
+                    (same ? '（最终一致 ✓）'
+                        : '（差值 ' + (submitted - delta) + ' 件：并发消费者内乐观锁 CAS 无重试，冲突消息被丢弃——阶段 5 教学版的真实缺陷）'),
+                    same ? 'ok' : 'fail');
+            }
+            results.slice(0, 3).forEach((r, i) =>
+                log(cardId, '样例#' + (i + 1) + ' · ' + r.status + ' · ' + r.ms + 'ms · ' + r.body, lineClassFor(r.body)));
+            setBusy(cardId, false);
+        }
+
         async function runFlow5(cardId) {
             setBusy(cardId, true);
             clearLog(cardId);
@@ -1719,6 +1764,9 @@
             }
             if (btn.kind === 'flow5') {
                 return runFlow5(card.id);
+            }
+            if (btn.kind === 'concurrent5') {
+                return runConcurrentMq(card.id, btn.n);
             }
             if (btn.kind === 'idem') {
                 return runIdem(card.id);
