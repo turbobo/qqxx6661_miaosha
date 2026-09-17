@@ -33,6 +33,9 @@ docker compose logs -f app            # 看到 Started MiaoshaWebApplication 即
 
 ### SeckillController 全接口验证清单
 
+> 可视化交互模拟：打开 `http://localhost:8081/api-evolution-board.html` 的「实时模拟实验室」章节，
+> 阶段 0~6 每个方案一键模拟（含并发「账实核对」、验签两段式、MQ 自动轮询、幂等对比、熔断状态）。
+
 ```bash
 # 阶段 0：无锁（反面教材）
 curl http://localhost:8081/seckill/stage0/wrong-order/1

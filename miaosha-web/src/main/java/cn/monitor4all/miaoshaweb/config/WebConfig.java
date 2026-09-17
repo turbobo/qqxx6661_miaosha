@@ -28,4 +28,12 @@ public class WebConfig implements WebMvcConfigurer {
         // 添加默认页面映射
         registry.addViewController("/").setViewName("index.html");
     }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // 将 src/main/resources 根目录下的 HTML 页面映射到 URL 根路径（如 /api-evolution-board.html）
+        // 仅映射 html，避免暴露 classpath 中的其他文件（properties / lua 等）
+        registry.addResourceHandler("/*.html")
+                .addResourceLocations("classpath:/");
+    }
 }

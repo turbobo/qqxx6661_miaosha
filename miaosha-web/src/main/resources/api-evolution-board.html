@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后端接口演进看板</title>
+    <style>
+        :root {
+            --bg: #f6f8fb;
+            --panel: #ffffff;
+            --text: #172033;
+            --muted: #667085;
+            --line: #e6ebf2;
+            --primary: #2563eb;
+            --primary-soft: #dbeafe;
+            --green: #10b981;
+            --green-soft: #d1fae5;
+            --amber: #f59e0b;
+            --amber-soft: #fef3c7;
+            --purple: #7c3aed;
+            --purple-soft: #ede9fe;
+            --red: #ef4444;
+            --red-soft: #fee2e2;
+            --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 34rem),
+                radial-gradient(circle at top right, rgba(124, 58, 237, 0.10), transparent 30rem),
+                var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            line-height: 1.6;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        button, input, select {
+            font: inherit;
+        }
+
+        .page {
+            width: min(1180px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 32px 0 56px;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+            gap: 24px;
+            align-items: stretch;
+            margin-bottom: 24px;
+        }
+
+        .hero-main, .panel {
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(230, 235, 242, 0.86);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(16px);
+        }
+
+        .hero-main {
+            padding: 34px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .hero-main::after {
+            content: "";
+            position: absolute;
+            right: -80px;
+            top: -80px;
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(124, 58, 237, 0.16));
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: var(--primary-soft);
+            color: #1d4ed8;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            margin: 0 0 14px;
+            max-width: 760px;
+            font-size: clamp(28px, 4.6vw, 48px);
+            line-height: 1.1;
+            letter-spacing: -0.04em;
+        }
+
+        .hero-desc {
+            max-width: 720px;
+            margin: 0 0 26px;
+            color: var(--muted);
+            font-size: 16px;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .btn {
+            border: 0;
+            border-radius: 14px;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-weight: 800;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:focus-visible, input:focus-visible, select:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, 0.25);
+            outline-offset: 2px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+        }
+
+        .btn-secondary {
+            background: #eef4ff;
+            color: #1d4ed8;
+        }
+
+        .hero-side {
+            padding: 24px;
+        }
+
+        .mini-title {
+            margin: 0 0 14px;
+            font-size: 15px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        .axis-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .axis-item {
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: #fff;
+        }
+
+        .axis-name {
+            display: block;
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+
+        .axis-desc {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 64px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .badge-low { background: var(--red-soft); color: #b91c1c; }
+        .badge-mid { background: var(--amber-soft); color: #92400e; }
+        .badge-high { background: var(--green-soft); color: #047857; }
+        .badge-best { background: var(--purple-soft); color: #5b21b6; }
+        .badge-blue { background: var(--primary-soft); color: #1d4ed8; }
+
+        .section {
+            margin-top: 24px;
+        }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 24px;
+            letter-spacing: -0.02em;
+        }
+
+        .section-tip {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .timeline {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .step {
+            position: relative;
+            padding: 18px;
+            border-radius: 22px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+        }
+
+        .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            background: #111827;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 900;
+            margin-bottom: 12px;
+        }
+
+        .step h3 {
+            margin: 0 0 8px;
+            font-size: 16px;
+        }
+
+        .step p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .chip-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .chip-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .chip {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 7px 13px;
+            background: #fff;
+            color: #344054;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 800;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .chip:hover {
+            border-color: rgba(37, 99, 235, 0.4);
+        }
+
+        .chip.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+        }
+
+        .gen-list {
+            display: grid;
+            gap: 18px;
+        }
+
+        .gen-card {
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            background: var(--panel);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+            padding: 22px;
+            scroll-margin-top: 18px;
+        }
+
+        .gen-card.featured {
+            border-color: rgba(124, 58, 237, 0.35);
+            background: linear-gradient(180deg, #fff, #faf8ff);
+        }
+
+        .gen-card.hidden {
+            display: none;
+        }
+
+        .gen-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .gen-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .gen-badge {
+            width: 46px;
+            height: 46px;
+            display: grid;
+            place-items: center;
+            border-radius: 15px;
+            background: #111827;
+            color: #fff;
+            font-weight: 1000;
+            font-size: 14px;
+            flex: none;
+        }
+
+        .gen-card.featured .gen-badge {
+            background: linear-gradient(135deg, #7c3aed, #5b21b6);
+        }
+
+        .gen-head h3 {
+            margin: 0 0 4px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .gen-sub {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .file-ref {
+            color: #98a2b3;
+        }
+
+        .sample-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .sample-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .sample-label.req { color: #1d4ed8; }
+        .sample-label.res { color: #047857; }
+
+        .code-box {
+            margin: 0;
+            min-height: 160px;
+            border-radius: 18px;
+            background: #0f172a;
+            color: #dbeafe;
+            padding: 16px;
+            overflow: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .code-box .cmt { color: #7c8db5; }
+        .code-box .warn { color: #fca5a5; }
+        .code-box .ok { color: #6ee7b7; }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        .meta-cell {
+            padding: 13px 15px;
+            border-radius: 16px;
+            border: 1px solid var(--line);
+            background: #fbfcfe;
+        }
+
+        .meta-cell p {
+            margin: 6px 0 0;
+            color: #344054;
+            font-size: 13px;
+        }
+
+        .meta-label {
+            display: inline-flex;
+            padding: 3px 9px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .meta-label.ok { background: var(--green-soft); color: #047857; }
+        .meta-label.bad { background: var(--red-soft); color: #b91c1c; }
+
+        .gen-note {
+            margin: 14px 0 0;
+            padding: 11px 14px;
+            border-radius: 14px;
+            background: var(--primary-soft);
+            color: #1e40af;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .matrix {
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        table {
+            width: 100%;
+            min-width: 860px;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 15px 16px;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #344054;
+            font-size: 13px;
+        }
+
+        td {
+            color: #344054;
+            font-size: 14px;
+        }
+
+        tr:last-child td {
+            border-bottom: 0;
+        }
+
+        code {
+            padding: 3px 6px;
+            border-radius: 8px;
+            background: #eef2f7;
+            color: #334155;
+            font-size: 12px;
+        }
+
+        .vocab-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .vocab-panel {
+            padding: 18px;
+            border-radius: 22px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+        }
+
+        .vocab-panel h3 {
+            margin: 0 0 6px;
+            font-size: 16px;
+        }
+
+        .vocab-panel .section-tip {
+            margin-bottom: 12px;
+        }
+
+        .vocab-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .vocab-chip {
+            padding: 5px 11px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 900;
+            background: #eef2f7;
+            color: #475467;
+        }
+
+        .vocab-chip.blue { background: var(--primary-soft); color: #1d4ed8; }
+        .vocab-chip.green { background: var(--green-soft); color: #047857; }
+        .vocab-chip.purple { background: var(--purple-soft); color: #5b21b6; }
+        .vocab-chip.red { background: var(--red-soft); color: #b91c1c; }
+        .vocab-chip.amber { background: var(--amber-soft); color: #92400e; }
+
+        .conclusion {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .conclusion-card {
+            padding: 20px;
+            border-radius: 24px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+        }
+
+        .conclusion-card h3 {
+            margin: 0 0 8px;
+        }
+
+        .conclusion-card p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .footer-note {
+            margin-top: 26px;
+            color: #98a2b3;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        /* ===== 实时模拟实验室（SeckillController） ===== */
+        .lab-console {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            margin-bottom: 18px;
+        }
+
+        .lab-console .field {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 800;
+            color: #344054;
+        }
+
+        .lab-console input[type="number"] {
+            width: 84px;
+            padding: 8px 10px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #fff;
+            font-weight: 700;
+        }
+
+        .lab-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 13px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 900;
+            background: #eef2f7;
+            color: #475467;
+        }
+
+        .lab-status .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #98a2b3;
+        }
+
+        .lab-status.online { background: var(--green-soft); color: #047857; }
+        .lab-status.online .dot { background: #10b981; }
+        .lab-status.offline { background: var(--red-soft); color: #b91c1c; }
+        .lab-status.offline .dot { background: #ef4444; }
+
+        .lab-stock {
+            font-size: 13px;
+            font-weight: 900;
+            color: #1d4ed8;
+        }
+
+        .lab-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .lab-card {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 20px;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: var(--panel);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+        }
+
+        .lab-head {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .lab-head h3 {
+            margin: 0;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .lab-stage {
+            padding: 4px 10px;
+            border-radius: 9px;
+            background: #111827;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 900;
+            flex: none;
+        }
+
+        .lab-desc {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            min-height: 40px;
+        }
+
+        .lab-endpoint {
+            padding: 8px 11px;
+            border: 1px dashed var(--line);
+            border-radius: 10px;
+            background: #f8fafc;
+            color: #64748b;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 11.5px;
+            word-break: break-all;
+        }
+
+        .lab-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .lab-btn {
+            border: 0;
+            border-radius: 12px;
+            padding: 9px 14px;
+            background: #eef4ff;
+            color: #1d4ed8;
+            font-size: 12.5px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+
+        .lab-btn:hover { transform: translateY(-1px); }
+        .lab-btn:disabled { opacity: 0.55; cursor: wait; transform: none; }
+        .lab-btn.primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; }
+        .lab-btn.warn { background: var(--amber-soft); color: #92400e; }
+
+        .lab-result {
+            min-height: 130px;
+            max-height: 250px;
+            overflow: auto;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: #0f172a;
+            color: #dbeafe;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 11.5px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .lab-result:empty::before {
+            content: "点击上方按钮开始模拟…";
+            color: #64748b;
+        }
+
+        .lab-result .ok { color: #6ee7b7; }
+        .lab-result .fail { color: #fca5a5; }
+        .lab-result .warn { color: #fcd34d; }
+        .lab-result .cmt { color: #7c8db5; }
+
+        .lab-tip {
+            margin: 16px 0 0;
+            padding: 12px 16px;
+            border-radius: 16px;
+            background: var(--amber-soft);
+            color: #92400e;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.9;
+            word-break: break-all;
+        }
+
+        .lab-tip code { background: rgba(255, 255, 255, 0.75); }
+
+        @media (max-width: 980px) {
+            .hero {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline, .conclusion, .vocab-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .lab-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .page {
+                width: min(100% - 20px, 1180px);
+                padding-top: 16px;
+            }
+
+            .hero-main, .panel {
+                border-radius: 20px;
+            }
+
+            .hero-main {
+                padding: 24px;
+            }
+
+            .timeline, .conclusion, .vocab-grid, .sample-grid, .meta-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <section class="hero">
+        <div class="hero-main">
+            <div class="eyebrow">后端接口演进 · API Evolution Board</div>
+            <h1>从「动作接口」到「状态接口」——抢票接口进化看板</h1>
+            <p class="hero-desc">
+                基于 <code>OrderControllerV2</code> 与 <code>TicketController</code> 的真实代码,
+                把 G0 裸下单 → G9 最终方案 共 10 代接口的请求/响应样例并排展示。
+                每一代都只解决一个问题,也都会引入一个新问题——这正是这条接口进化路线的学习价值。
+            </p>
+            <div class="hero-actions">
+                <a class="btn btn-primary" href="#lab">实时模拟实验室</a>
+                <a class="btn btn-secondary" href="#generations">查看代际样例</a>
+                <a class="btn btn-secondary" href="#contract">契约进化轨迹</a>
+                <a class="btn btn-secondary" href="#rules">三条规律</a>
+                <a class="btn btn-secondary" href="purchase-version-comparison.html#lab">去版本实测面板</a>
+                <a class="btn btn-secondary" href="index.html">返回抢票首页</a>
+            </div>
+        </div>
+        <aside class="hero-side panel">
+            <p class="mini-title">一句话主线:两条轴同时进化</p>
+            <div class="axis-list">
+                <div class="axis-item">
+                    <span class="axis-name">策略线(接口内部怎么保证正确)</span>
+                    <span class="axis-desc">无锁 → 悲观锁 / 乐观锁 → 缓存一致性 V1~V5 → MQ 异步削峰 → Redis 预扣减 + 可靠入队</span>
+                </div>
+                <div class="axis-item">
+                    <span class="axis-name">契约线(接口对外长什么样)</span>
+                    <span class="axis-desc">裸文本 → 统一包装 ApiResponse → 受理 + 轮询接口对 → messageId 单凭据 + 状态机</span>
+                </div>
+                <div class="axis-item">
+                    <span class="axis-name">终点形态</span>
+                    <span class="axis-desc">接口不再是"做一个动作",而是"发起一个有状态的流程":grab 发起,status 观测。</span>
+                </div>
+            </div>
+        </aside>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <div>
+                <h2>演进主轴(4 步)</h2>
+                <p class="section-tip">G0~G5 改内部、G6 改包装、G7~G8 改交互模式、G9 改为状态机入口。</p>
+            </div>
+        </div>
+        <div class="timeline">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3>实验期 G0–G5</h3>
+                <p>接口"长相"几乎不变,变的全是接口内部:锁 → 缓存 → MQ。接口是策略实验的探针。</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3>契约化 G6</h3>
+                <p>JSON 请求体 + ApiResponse&lt;T&gt; 统一包装首次出现,错误从异常文本收敛为 code/message。</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3>异步化 G7–G8</h3>
+                <p>"受理接口 + 轮询接口"成对出现,requestId 成为查询凭据;状态词表逐步成型。</p>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <h3>状态机化 G9</h3>
+                <p>JWT + messageId 单凭据 + 订单状态机 + 全局降级态;幂等、补偿、对账全部挂在状态机上。</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="generations" class="section">
+        <div class="section-head">
+            <div>
+                <h2>代际样例:请求 / 响应并排对照</h2>
+                <p class="section-tip">样例取自真实接口的请求形态与返回值;G9 为目标方案(openspec 收口版),尚未实施。</p>
+            </div>
+        </div>
+        <div class="chip-bar">
+            <div class="chip-group">
+                <button class="chip active" data-filter="all">全部代际</button>
+                <button class="chip" data-filter="experiment">实验期 G0–G5</button>
+                <button class="chip" data-filter="business">业务化 G6–G8</button>
+                <button class="chip" data-filter="target">目标 G9</button>
+            </div>
+            <div class="chip-group" id="jumpBar"></div>
+        </div>
+        <div id="genList" class="gen-list"></div>
+    </section>
+
+    <section id="lab" class="section">
+        <div class="section-head">
+            <div>
+                <h2>实时模拟实验室（SeckillController · 阶段 0–6）</h2>
+                <p class="section-tip">
+                    把实验期策略做成可运行复刻：点击按钮即向本机后端发起真实请求；
+                    并发按钮附带「账实核对」——自动对比“成功响应数”与“数据库实际扣减”，“无锁 vs 加锁”的差异一目了然。
+                </p>
+            </div>
+        </div>
+
+        <div class="lab-console panel">
+            <span id="labConn" class="lab-status"><span class="dot"></span>检测中…</span>
+            <label class="field">商品 sid <input id="labSid" type="number" min="1" value="1"></label>
+            <label class="field">用户 userId <input id="labUser" type="number" min="1" value="1"></label>
+            <span id="labStock" class="lab-stock">当前库存：--</span>
+            <button id="labRefresh" class="lab-btn">刷新库存 / 连接检测</button>
+        </div>
+
+        <div id="labGrid" class="lab-grid"></div>
+
+        <p class="lab-tip">
+            使用提示：① 推荐从 <code>http://localhost:8081/api-evolution-board.html</code> 打开（与后端同源）；
+            若用 file:// 直接打开，请求会自动指向 8081；
+            ② 「账实核对」在并发模拟后自动执行：无锁方案会出现“成功响应数 &gt; 实际扣减数”（丢失更新）；加锁/限流方案两者一致；
+            ③ 重置库存：<code>docker exec miaosha-mysql mysql -uroot -proot -e "use m4a_miaosha; update stock set sale=0, version=0 where id=1;"</code>；
+            ④ 阶段 3 验签仅在每天 9:00–23:00 可用；单用户限频 60 秒后自动解禁。
+        </p>
+    </section>
+
+    <section id="contract" class="section">
+        <div class="section-head">
+            <div>
+                <h2>契约进化轨迹(五个维度)</h2>
+                <p class="section-tip">同样的业务,接口契约在五个维度上走出了一条清晰的路线。</p>
+            </div>
+        </div>
+        <div class="matrix">
+            <table>
+                <thead>
+                <tr>
+                    <th>维度</th>
+                    <th>G0–G5 实验期</th>
+                    <th>G6–G8 业务化期</th>
+                    <th>G9 最终方案</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td><strong>请求形态</strong></td>
+                    <td>路径参数 <code>/{sid}</code></td>
+                    <td>查询参数 → JSON 请求体</td>
+                    <td>JSON 请求体 + JWT 请求头</td>
+                </tr>
+                <tr>
+                    <td><strong>响应形态</strong></td>
+                    <td>裸文本(含中文提示串)</td>
+                    <td>ApiResponse&lt;T&gt; 统一包装</td>
+                    <td>统一包装 + 状态机状态 + 降级态</td>
+                </tr>
+                <tr>
+                    <td><strong>结果交付</strong></td>
+                    <td>同步返回即结果</td>
+                    <td>requestId + 轮询接口对</td>
+                    <td>messageId 单凭据 + <code>/status</code></td>
+                </tr>
+                <tr>
+                    <td><strong>幂等 / 防重</strong></td>
+                    <td>无 → verifyHash</td>
+                    <td>verifyHash + 限购检查</td>
+                    <td>JWT + messageId 幂等 + 限购标记</td>
+                </tr>
+                <tr>
+                    <td><strong>治理属性</strong></td>
+                    <td>无</td>
+                    <td>Guava 限流 → 分布式限流 → 熔断状态接口</td>
+                    <td>降级开关(DEGRADED)驱动接口行为</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="vocab-grid">
+            <div class="vocab-panel">
+                <h3>状态词表 · 实验期</h3>
+                <p class="section-tip">没有词表:调用方靠匹配中文文本。</p>
+                <div class="vocab-chips">
+                    <span class="vocab-chip">购买成功，剩余库存为：499</span>
+                    <span class="vocab-chip">购买失败，库存不足</span>
+                    <span class="vocab-chip">秒杀请求提交成功</span>
+                </div>
+            </div>
+            <div class="vocab-panel">
+                <h3>状态词表 · 业务化期</h3>
+                <p class="section-tip">固定枚举成型,轮询靠它判断终态。</p>
+                <div class="vocab-chips">
+                    <span class="vocab-chip blue">QUEUED</span>
+                    <span class="vocab-chip blue">PROCESSING</span>
+                    <span class="vocab-chip green">SUCCESS</span>
+                    <span class="vocab-chip red">FAILED</span>
+                    <span class="vocab-chip amber">TIMEOUT</span>
+                    <span class="vocab-chip amber">DUPLICATE</span>
+                    <span class="vocab-chip amber">SOLD_OUT</span>
+                </div>
+            </div>
+            <div class="vocab-panel">
+                <h3>状态词表 · 最终方案</h3>
+                <p class="section-tip">与订单状态机一一对应,外加全局降级态。</p>
+                <div class="vocab-chips">
+                    <span class="vocab-chip blue">RESERVING</span>
+                    <span class="vocab-chip green">SUCCESS</span>
+                    <span class="vocab-chip amber">REFUNDING</span>
+                    <span class="vocab-chip red">REFUNDED</span>
+                    <span class="vocab-chip purple">NORMAL / DEGRADED</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="rules" class="section">
+        <div class="section-head">
+            <div>
+                <h2>三条规律</h2>
+                <p class="section-tip">把 10 代接口压缩成三句可以带走的话。</p>
+            </div>
+        </div>
+        <div class="conclusion">
+            <div class="conclusion-card">
+                <h3>接口形态由一致性模型决定</h3>
+                <p>要强一致,就同步返回结果;接受最终一致,就必须设计"受理 + 查询"接口对,并给出凭据——异步不是少做一步,而是多设计一个接口。</p>
+            </div>
+            <div class="conclusion-card">
+                <h3>只要异步,必有凭据</h3>
+                <p>messageId / requestId 是幂等、查询、补偿、对账四个机制的共同锚点。G5 返回"提交成功"却没有凭据,异步就等于失联——这是最贵的一课。</p>
+            </div>
+            <div class="conclusion-card">
+                <h3>状态词表的收敛度 = 接口成熟度</h3>
+                <p>从匹配中文文本,到固定枚举,再到与订单状态机一一对应;词表越收敛,前端、调用方与运维的沟通成本越低。</p>
+            </div>
+        </div>
+    </section>
+
+    <p class="footer-note">
+        样例对应的源码位置见每张卡片的文件标注 · 目标方案来源:openspec/changes/museum-ticket-reservation ·
+        相关页面:<a href="purchase-version-comparison.html">版本效果对比</a> ·
+        <a href="museum-ticket-purchase.html">移动端抢票页</a> ·
+        <a href="async-purchase-demo.html">异步抢购演示</a>
+    </p>
+</div>
+
+<script>
+    const generations = [
+        {
+            id: 'g0',
+            code: 'G0',
+            name: '裸下单',
+            tag: '反面教材',
+            tagClass: 'badge-low',
+            phase: 'experiment',
+            endpoint: 'GET /v2/createWrongOrder/{sid}',
+            file: 'OrderControllerV2.java:55',
+            request: 'GET /v2/createWrongOrder/101\n\n# 路径参数 sid=101\n# 无鉴权 / 无限流 / 无请求体',
+            response: '6\n\n# 纯文本: 新订单 id\n# HTTP 200 —— 即使超卖也"看起来成功"',
+            solved: '最小可用闭环: 查库存 → 扣库存 → 建订单,先让业务跑起来。',
+            introduced: '三步无原子性,并发下互相覆盖;50 VUs 实测 15741 次请求只落 888 单。',
+            note: '契约点评: 响应是"裸文本",HTTP 层不表达业务成败。'
+        },
+        {
+            id: 'g1',
+            code: 'G1',
+            name: '锁策略: 乐观锁 + 悲观锁',
+            tag: '保底 / 过渡',
+            tagClass: 'badge-mid',
+            phase: 'experiment',
+            endpoint: 'GET /v2/createOptimisticOrder/{sid}、GET /v2/createPessimisticOrder/{sid}',
+            file: 'OrderControllerV2.java:80 / :110',
+            request: 'GET /v2/createOptimisticOrder/101\nGET /v2/createPessimisticOrder/101\n\n# 仍是路径参数,无凭据',
+            response: '乐观锁: 购买成功，剩余库存为：416\n乐观锁: 购买失败，库存不足\n悲观锁: 购买成功，剩余库存为：499\n被限流: 你被限流了，真不幸，直接返回失败',
+            solved: '用 version CAS / SELECT ... FOR UPDATE 把并发正确性下沉到数据库,从根上解决超卖。',
+            introduced: '乐观锁高争用下冲突率 97%、业务成功率 1.1%;悲观锁稳定但 QPS 仅 ~300。',
+            note: '契约点评: 业务结果靠解析中文文本,分不清"库存不足"与"CAS 冲突"。'
+        },
+        {
+            id: 'g2',
+            code: 'G2',
+            name: '两段式防刷',
+            tag: '安全加固',
+            tagClass: 'badge-mid',
+            phase: 'experiment',
+            endpoint: 'GET /v2/getVerifyHash → GET /v2/createOrderWithVerifiedUrl',
+            file: 'OrderControllerV2.java:132 / :153',
+            request: '① GET /v2/getVerifyHash?sid=101&userId=1001\n\n② GET /v2/createOrderWithVerifiedUrl\n       ?sid=101&userId=1001&verifyHash=3d1f8a72c5e94b06',
+            response: '① 请求抢购验证hash值为：3d1f8a72c5e94b06\n\n② 购买成功，剩余库存为：498',
+            solved: '一次性凭证把"脚本直接刷下单接口"挡在门外,凭证用后即删。',
+            introduced: '用户多一步交互;凭证放在 GET 的 URL 里,会进访问日志与浏览器历史。',
+            note: '契约点评: "先取凭证,再下单"的两段式交互首次出现,防刷有了抓手。'
+        },
+        {
+            id: 'g3',
+            code: 'G3',
+            name: '频率治理',
+            tag: '安全加固',
+            tagClass: 'badge-mid',
+            phase: 'experiment',
+            endpoint: 'GET /v2/createOrderWithVerifiedUrlAndLimit',
+            file: 'OrderControllerV2.java:179',
+            request: 'GET /v2/createOrderWithVerifiedUrlAndLimit\n      ?sid=101&userId=1001&verifyHash=3d1f8a72c5e94b06\n\n# 服务端对 userId 计数: 一分钟内超过 6 次即封禁',
+            response: '购买失败，超过频率限制\n\n或: 购买成功，剩余库存为：497',
+            solved: '加入单用户访问频率治理,超频用户被"ban",进一步压缩刷接口空间。',
+            introduced: '治理逻辑堆进接口体,阈值硬编码;响应仍然是没有错误码的文本。',
+            note: '契约点评: 限流/封禁开始侵入接口语义,但没有任何结构化错误码。'
+        },
+        {
+            id: 'g4',
+            code: 'G4',
+            name: '缓存一致性 V1 → V5',
+            tag: '复杂度实验',
+            tagClass: 'badge-mid',
+            phase: 'experiment',
+            endpoint: 'GET /v2/createOrderWithCacheV1..V5/{sid}',
+            file: 'OrderControllerV2.java:207-356',
+            request: 'GET /v2/createOrderWithCacheV2/101\n\n# V1 先删缓存再扣库 → V2 先扣库再删缓存\n# V3 延迟双删 → V4 再挂 MQ 兜底删\n# V5 = 乐观锁 + 全套缓存清理',
+            response: 'V2: 购买成功，剩余库存为：497\nV5: 购买成功\n\n# V5 实测 QPS 7、平均 RT 10 秒(死代码 + sleep)',
+            solved: '引入缓存后,用"删缓存 + 延迟双删 + MQ 兜底"保证缓存与 DB 最终一致。',
+            introduced: 'V1~V4 QPS 都在 269~319(瓶颈是锁不是缓存);V5 堆砌技术反而性能崩塌。',
+            note: '契约点评: 接口签名几乎没变——契约线静止,策略线狂奔。'
+        },
+        {
+            id: 'g5',
+            code: 'G5',
+            name: '异步削峰(无凭据)',
+            tag: '教训节点',
+            tagClass: 'badge-low',
+            phase: 'experiment',
+            endpoint: 'GET /v2/createUserOrderWithMq + GET /v2/checkOrderByUserIdInCache',
+            file: 'OrderControllerV2.java:363 / :430',
+            request: '① GET /v2/createUserOrderWithMq?sid=101&userId=1001\n\n② GET /v2/checkOrderByUserIdInCache?sid=101&userId=1001',
+            response: '① 秒杀请求提交成功\n   ⚠ 没有返回任何凭据(无 requestId / messageId)\n\n② 很抱歉，你的订单尚未生成，继续排队。\n   或: 恭喜您，已经抢购成功！',
+            solved: '接口只做"缓存校验 + 入队",实测 QPS 3944——吞吐为王的一步。',
+            introduced: '结果是"盲查": 查询按 sid+userId 反查,无法对应到具体一次请求,也分不清"排队中"和"失败"。',
+            note: '契约点评: 第一个异步受理接口,但凭据缺位——这成为后续版本要还的最大一笔债。'
+        },
+        {
+            id: 'g6',
+            code: 'G6',
+            name: '业务化 V1: 统一契约',
+            tag: '契约统一',
+            tagClass: 'badge-high',
+            phase: 'business',
+            endpoint: 'POST /api/tickets/v1/purchase',
+            file: 'TicketController.java:242',
+            request: 'POST /api/tickets/v1/purchase\nContent-Type: application/json\n\n{\n  "userId": 1001,\n  "date": "2026-09-18",\n  "verifyHash": "3d1f8a72c5e94b06"\n}',
+            response: '{\n  "code": 200,\n  "message": "success",\n  "data": {\n    "userId": 1001,\n    "date": "2026-09-18",\n    "ticketCode": "TK20260918000123"\n  }\n}\n\n失败: { "code": 500, "message": "票券已售罄", "data": null }',
+            solved: '从"实验接口"走向"业务接口": JSON 请求体 + ApiResponse<T> 统一包装 + 票码结构化返回。',
+            introduced: '仍是同步链路,响应时间受数据库锁与库存热点影响。',
+            note: '契约点评: 统一包装 ApiResponse(code/message/data)首次出现——实验期与业务期的分界线。'
+        },
+        {
+            id: 'g7',
+            code: 'G7',
+            name: '业务化异步: 受理 + 轮询',
+            tag: '当前推荐',
+            tagClass: 'badge-high',
+            phase: 'business',
+            endpoint: 'POST /api/tickets/v2/purchase/optimistic → GET /api/tickets/v2/purchaseResult',
+            file: 'TicketController.java:333 / :446',
+            request: '① POST /api/tickets/v2/purchase/optimistic\n   { "userId": 1001, "date": "2026-09-18", "verifyHash": "..." }\n\n② GET /api/tickets/v2/purchaseResult\n       ?requestId=req-1001-20260918-8f3a2c\n       &userId=1001&date=2026-09-18',
+            response: '① { "code": 200, "data": {\n      "requestId": "req-1001-20260918-8f3a2c",\n      "message": "提交成功，正在排队" } }\n\n② { "code": 200, "data": {\n      "status": "SUCCESS",\n      "ticketCode": "TK20260918000123",\n      "orderNo": "ORD20260918000123" } }',
+            solved: '接口对成型:"受理接口 + 轮询接口";requestId 成为查询凭据,补齐 G5 缺失的锚点。',
+            introduced: '轮询要传三参数(requestId+userId+date)且无鉴权;状态词表还不完整。',
+            note: '契约点评: "只要异步,必有凭据"——requestId 补上了这一课,但凭据还偏"胖"。'
+        },
+        {
+            id: 'g8',
+            code: 'G8',
+            name: '最终版 V3: 移动端完整链路',
+            tag: '当前最佳',
+            tagClass: 'badge-high',
+            phase: 'business',
+            endpoint: 'POST /api/tickets/v3/purchase(+ 实验链路 /v12,轮询复用 /v2/purchaseResult)',
+            file: 'TicketController.java:403 / :366',
+            request: 'POST /api/tickets/v3/purchase\nContent-Type: application/json\n\n{\n  "userId": 1001,\n  "date": "2026-09-18",\n  "verifyHash": "3d1f8a72c5e94b06",\n  "sessionId": "AM",\n  "sessionName": "上午场 09:00-12:00",\n  "visitorName": "张三",\n  "visitorPhone": "138****0000"\n}',
+            response: '{ "code": 200, "data": {\n    "requestId": "req-...",\n    "status": "QUEUED",\n    "message": "提交成功，正在排队处理中" } }\n\n轮询状态词表:\nQUEUED → PROCESSING → SUCCESS\n                  → DUPLICATE / SOLD_OUT / TIMEOUT / FAILED\n\n失败示例: { "status": "SOLD_OUT", "message": "票券已售罄" }',
+            solved: '分布式限流(Redis Lua 令牌桶)进接口;场次/参观人成为契约字段;状态词表成型。',
+            introduced: '实验链路 /v12 命名与实现不一致且不返回 requestId;词表与最终方案尚未统一。',
+            note: '契约点评: 接口开始携带"业务上下文"(场次、参观人),但状态仍是"一锅词表"。'
+        },
+        {
+            id: 'g9',
+            code: 'G9',
+            name: '最终方案: 状态机入口',
+            tag: '目标形态',
+            tagClass: 'badge-best',
+            phase: 'target',
+            featured: true,
+            endpoint: 'POST /api/v1/tickets/grab → GET /api/v1/tickets/status',
+            file: 'openspec/changes/museum-ticket-reservation(设计,待实施)',
+            request: 'POST /api/v1/tickets/grab\nAuthorization: Bearer {访客系统签发的 JWT}\n\n{ "visitDate": "2026-09-18" }',
+            response: '{ "code": 200, "data": {\n    "messageId": "b7e2f1a0-3c4d-4e5f-9a8b-1c2d3e4f5a6b",\n    "status": "处理中" } }\n\nGET /api/v1/tickets/status?messageId=b7e2f1a0-...\n{ "code": 200, "data": {\n    "status": "RESERVING | SUCCESS | REFUNDING | REFUNDED",\n    "visitorId": "V20260918001",\n    "ticketCode": "TK20260918000123" } }\n\n全局态: NORMAL / DEGRADED(降级期文案"预约确认中")',
+            solved: '(目标)JWT 本地验签使主链路零远程调用;messageId 单凭据;Redis 预扣减 + 可靠入队;降级期不退款。',
+            introduced: '(待办)方案尚未实施;依赖访客系统三项契约冻结——验签、预约消息、回执与幂等保证。',
+            note: '契约点评: 接口不再是"做一个动作",而是"发起一个有状态的流程"——grab 是状态机的入口。'
+        }
+    ];
+
+    const genList = document.getElementById('genList');
+
+    function esc(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function renderCode(text) {
+        return esc(text)
+            .replace(/^[ \t]*#.*$/gm, '<span class="cmt">$&</span>')
+            .replace(/(⚠.*)$/gm, '<span class="warn">$1</span>');
+    }
+
+    function renderGenerations() {
+        genList.innerHTML = generations.map(gen => `
+            <article class="gen-card ${gen.featured ? 'featured' : ''}" id="gen-${gen.id}" data-phase="${gen.phase}">
+                <div class="gen-head">
+                    <div class="gen-title">
+                        <div class="gen-badge">${gen.code}</div>
+                        <div>
+                            <h3>${gen.name} <span class="badge ${gen.tagClass}">${gen.tag}</span></h3>
+                            <div class="gen-sub"><code>${esc(gen.endpoint)}</code> <span class="file-ref">· ${esc(gen.file)}</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="sample-grid">
+                    <div class="sample">
+                        <div class="sample-label req">请求样例</div>
+                        <pre class="code-box">${renderCode(gen.request)}</pre>
+                    </div>
+                    <div class="sample">
+                        <div class="sample-label res">响应样例</div>
+                        <pre class="code-box">${renderCode(gen.response)}</pre>
+                    </div>
+                </div>
+                <div class="meta-grid">
+                    <div class="meta-cell">
+                        <span class="meta-label ok">解决了什么</span>
+                        <p>${gen.solved}</p>
+                    </div>
+                    <div class="meta-cell">
+                        <span class="meta-label bad">引入了什么</span>
+                        <p>${gen.introduced}</p>
+                    </div>
+                </div>
+                <p class="gen-note">${gen.note}</p>
+            </article>
+        `).join('');
+    }
+
+    function renderJumpBar() {
+        const bar = document.getElementById('jumpBar');
+        bar.innerHTML = generations.map(gen =>
+            `<button class="chip" data-jump="${gen.id}">${gen.code}</button>`
+        ).join('');
+        bar.addEventListener('click', event => {
+            const button = event.target.closest('[data-jump]');
+            if (!button) return;
+            const card = document.getElementById('gen-' + button.dataset.jump);
+            if (card && !card.classList.contains('hidden')) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+
+    function bindFilter() {
+        document.querySelectorAll('[data-filter]').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('[data-filter]').forEach(item => item.classList.remove('active'));
+                button.classList.add('active');
+                const filter = button.dataset.filter;
+                document.querySelectorAll('.gen-card').forEach(card => {
+                    const match = filter === 'all' || card.dataset.phase === filter;
+                    card.classList.toggle('hidden', !match);
+                });
+            });
+        });
+    }
+
+    renderGenerations();
+    renderJumpBar();
+    bindFilter();
+
+    /* ================= SeckillController 实时模拟实验室 ================= */
+    (function () {
+        const API_BASE = location.protocol === 'file:' ? 'http://localhost:8081' : '';
+        const sidEl = document.getElementById('labSid');
+        const userEl = document.getElementById('labUser');
+        const connEl = document.getElementById('labConn');
+        const stockEl = document.getElementById('labStock');
+        const gridEl = document.getElementById('labGrid');
+        const refreshBtn = document.getElementById('labRefresh');
+
+        const sid = () => parseInt(sidEl.value, 10) || 1;
+        const uid = () => parseInt(userEl.value, 10) || 1;
+        const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        const labCards = [
+            {
+                id: 'lab-s0', stage: '阶段 0', name: '无锁下单', tag: '反面教材', tagClass: 'badge-low',
+                desc: '查库存 → 扣库存 → 建订单三步无原子性；并发下扣减互相覆盖（丢失更新）。',
+                endpointHint: 'GET /seckill/stage0/wrong-order/{sid}',
+                endpoint: () => `/seckill/stage0/wrong-order/${sid()}`,
+                buttons: [
+                    { label: '模拟一次', kind: 'single' },
+                    { label: '并发 ×50（看账实差异）', kind: 'concurrent', n: 50 }
+                ]
+            },
+            {
+                id: 'lab-s1', stage: '阶段 1', name: '乐观锁（version CAS）', tag: '防超卖', tagClass: 'badge-high',
+                desc: 'UPDATE ... WHERE version=? 防住超卖；高争用下 CAS 冲突率高（实测业务成功率仅 1%~2%）。',
+                endpointHint: 'GET /seckill/stage1/optimistic-order/{sid}',
+                endpoint: () => `/seckill/stage1/optimistic-order/${sid()}`,
+                buttons: [
+                    { label: '模拟一次', kind: 'single' },
+                    { label: '并发 ×50（看冲突率）', kind: 'concurrent', n: 50 }
+                ]
+            },
+            {
+                id: 'lab-s2a', stage: '阶段 2', name: 'Guava 令牌桶限流', tag: '削峰', tagClass: 'badge-blue',
+                desc: '每秒放行 10 个令牌（等待超 1 秒直接失败）——对比无锁卡片的毫秒级完成，可见明显的削峰排队：总耗时被拉长到数秒，但账实一致。',
+                endpointHint: 'GET /seckill/stage2/optimistic-order-limited/{sid}',
+                endpoint: () => `/seckill/stage2/optimistic-order-limited/${sid()}`,
+                buttons: [
+                    { label: '模拟一次', kind: 'single' },
+                    { label: '并发 ×50（看削峰排队）', kind: 'concurrent', n: 50 }
+                ]
+            },
+            {
+                id: 'lab-s2b', stage: '阶段 2', name: '悲观锁（FOR UPDATE）', tag: '最稳卖完', tagClass: 'badge-high',
+                desc: '事务内 SELECT ... FOR UPDATE 串行化扣减；稳定但吞吐受限（实测 QPS ~300）。',
+                endpointHint: 'GET /seckill/stage2/pessimistic-order/{sid}',
+                endpoint: () => `/seckill/stage2/pessimistic-order/${sid()}`,
+                buttons: [
+                    { label: '模拟一次', kind: 'single' },
+                    { label: '并发 ×50', kind: 'concurrent', n: 50 }
+                ]
+            },
+            {
+                id: 'lab-s3', stage: '阶段 3', name: '接口隐藏 + 单用户限频', tag: '防刷', tagClass: 'badge-mid',
+                desc: '先取一次性验签 hash 再下单；叠加用户 60 秒窗口限频（>3 次即禁）。仅 9:00–23:00 可用。',
+                endpointHint: 'GET /seckill/stage3/verify-hash → verified-order(-limited)',
+                endpoint: () => `/seckill/stage3/verify-hash?sid=${sid()}&userId=${uid()}`,
+                buttons: [
+                    { label: '完整流程（取 hash → 下单）', kind: 'flow3', primary: true },
+                    { label: '连发 ×5（观察限频拦截）', kind: 'flow3limit', warn: true }
+                ]
+            },
+            {
+                id: 'lab-s4', stage: '阶段 4', name: '缓存双写 V1~V4', tag: '一致性问题', tagClass: 'badge-mid',
+                desc: 'V1 先删缓存→扣库；V2 先扣库→删缓存；V3 延迟双删；V4 再挂 MQ 兜底。一致性提升、吞吐不变。',
+                endpointHint: 'GET /seckill/stage4/cache-v1 ~ v4/{sid}',
+                endpoint: () => `/seckill/stage4/cache-v1/${sid()}`,
+                buttons: [
+                    { label: 'V1 先删缓存→扣库', kind: 'single', path: () => `/seckill/stage4/cache-v1/${sid()}` },
+                    { label: 'V2 先扣库→删缓存', kind: 'single', path: () => `/seckill/stage4/cache-v2/${sid()}` },
+                    { label: 'V3 延迟双删', kind: 'single', path: () => `/seckill/stage4/cache-v3/${sid()}` },
+                    { label: 'V4 MQ 兜底', kind: 'single', path: () => `/seckill/stage4/cache-v4/${sid()}` }
+                ]
+            },
+            {
+                id: 'lab-s4v5', stage: '阶段 4', name: 'V5「全都要」', tag: '反面教材', tagClass: 'badge-low',
+                desc: '乐观锁+缓存+MQ+双删全堆砌。原版因死代码/模拟延迟性能崩塌（QPS 7~37）；教学版已清理缺陷代码。',
+                endpointHint: 'GET /seckill/stage4/cache-v5?sid=&userId=',
+                endpoint: () => `/seckill/stage4/cache-v5?sid=${sid()}&userId=${uid()}`,
+                buttons: [
+                    { label: '模拟一次', kind: 'single' }
+                ]
+            },
+            {
+                id: 'lab-s5', stage: '阶段 5', name: 'MQ 异步削峰', tag: '吞吐之王', tagClass: 'badge-best',
+                desc: '接口只查缓存 + 入队（不碰 DB），消费者异步扣减落库；提交后自动轮询结果。每个 userId 限购一次。',
+                endpointHint: 'GET /seckill/stage5/order-with-mq → purchase-result 轮询',
+                endpoint: () => `/seckill/stage5/order-with-mq?sid=${sid()}&userId=${uid()}`,
+                buttons: [
+                    { label: '模拟异步抢购（自动轮询）', kind: 'flow5', primary: true }
+                ]
+            },
+            {
+                id: 'lab-s6a', stage: '阶段 6', name: 'Redisson 分布式锁', tag: '工程化', tagClass: 'badge-blue',
+                desc: '以商品维度加可重入锁（等待 3s / 持有 10s + 看门狗续期），把高争用削成低争用。',
+                endpointHint: 'GET /seckill/stage6/locked-order/{sid}',
+                endpoint: () => `/seckill/stage6/locked-order/${sid()}`,
+                buttons: [
+                    { label: '模拟一次', kind: 'single' },
+                    { label: '并发 ×50', kind: 'concurrent', n: 50 }
+                ]
+            },
+            {
+                id: 'lab-s6b', stage: '阶段 6', name: '幂等下单', tag: '防重', tagClass: 'badge-blue',
+                desc: 'requestId 经 Redis SETNX 原子标记：同一请求重复提交被直接拦截。',
+                endpointHint: 'GET /seckill/stage6/idempotent-order?...&requestId=（自动生成）',
+                endpoint: () => '/seckill/stage6/idempotent-order',
+                buttons: [
+                    { label: '演示：同一 requestId 连发 2 次', kind: 'idem', primary: true }
+                ]
+            },
+            {
+                id: 'lab-s6c', stage: '阶段 6', name: '分布式令牌桶', tag: '集群限流', tagClass: 'badge-blue',
+                desc: 'Redis + Lua 原子令牌桶（容量 10 / 速率 10），多实例共享同一配额（拿不到直接失败）。',
+                endpointHint: 'GET /seckill/stage6/token-bucket-order/{sid}',
+                endpoint: () => `/seckill/stage6/token-bucket-order/${sid()}`,
+                buttons: [
+                    { label: '模拟一次', kind: 'single' },
+                    { label: '连发 ×20（观察限流节奏）', kind: 'burst', n: 20, interval: 60 }
+                ]
+            },
+            {
+                id: 'lab-s6d', stage: '阶段 6', name: '熔断降级', tag: '稳定性', tagClass: 'badge-blue',
+                desc: '下单经 Resilience4j DB 熔断器保护；熔断打开时直接返回降级文案，防止故障扩散。',
+                endpointHint: 'GET /seckill/stage6/order-with-circuit-breaker/{sid}',
+                endpoint: () => `/seckill/stage6/order-with-circuit-breaker/${sid()}`,
+                buttons: [
+                    { label: '下单（熔断保护）', kind: 'single' },
+                    { label: '查询熔断状态', kind: 'json', path: () => '/seckill/stage6/circuit-breaker-status' }
+                ]
+            }
+        ];
+
+        function nowText() {
+            return new Date().toTimeString().slice(0, 8);
+        }
+
+        async function call(path) {
+            const started = performance.now();
+            try {
+                const res = await fetch(API_BASE + path, { cache: 'no-store' });
+                const body = (await res.text()).trim();
+                return { status: res.status, body, ms: Math.round(performance.now() - started) };
+            } catch (e) {
+                return { status: 0, body: '请求失败（应用未启动？）：' + e.message, ms: Math.round(performance.now() - started) };
+            }
+        }
+
+        function classify(body) {
+            if (body.includes('购买成功') || body.includes('创建订单id') || body.includes('抢购成功')) return 'ok';
+            if (body.includes('限流')) return 'limited';
+            if (body.includes('获取分布式锁失败')) return 'lockfail';
+            if (body.includes('重复请求') || body.includes('已经抢购过')) return 'dup';
+            if (body.includes('提交成功') || body.includes('排队')) return 'queued';
+            return 'fail';
+        }
+
+        function log(cardId, text, cls) {
+            const box = document.querySelector('#' + cardId + ' .lab-result');
+            if (!box) return;
+            const line = document.createElement('div');
+            if (cls) line.className = cls;
+            line.textContent = '[' + nowText() + '] ' + text;
+            box.appendChild(line);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function clearLog(cardId) {
+            const box = document.querySelector('#' + cardId + ' .lab-result');
+            if (box) box.innerHTML = '';
+        }
+
+        function setBusy(cardId, busy) {
+            document.querySelectorAll('#' + cardId + ' .lab-btn').forEach(btn => { btn.disabled = busy; });
+        }
+
+        function setConn(ok) {
+            connEl.className = 'lab-status ' + (ok ? 'online' : 'offline');
+            connEl.innerHTML = '<span class="dot"></span>' + (ok ? '后端在线（8081）' : '后端离线');
+        }
+
+        async function fetchStock() {
+            const r = await call('/seckill/stage4/stock-by-db/' + sid());
+            const m = r.body.match(/库存为：(\d+)/);
+            if (m) {
+                stockEl.textContent = '当前库存：' + m[1];
+                setConn(true);
+                return parseInt(m[1], 10);
+            }
+            setConn(false);
+            return null;
+        }
+
+        function lineClassFor(body) {
+            const c = classify(body);
+            if (c === 'ok') return 'ok';
+            if (c === 'limited' || c === 'dup' || c === 'queued' || c === 'lockfail') return 'warn';
+            return 'fail';
+        }
+
+        async function runSingle(cardId, path) {
+            setBusy(cardId, true);
+            clearLog(cardId);
+            log(cardId, 'GET ' + path, 'cmt');
+            const r = await call(path);
+            log(cardId, '← ' + r.status + ' · ' + r.ms + 'ms · ' + r.body, lineClassFor(r.body));
+            setBusy(cardId, false);
+            fetchStock();
+        }
+
+        async function runConcurrent(cardId, path, n) {
+            setBusy(cardId, true);
+            clearLog(cardId);
+            log(cardId, '并发模拟：同时发起 ' + n + ' 个请求…', 'cmt');
+            const before = await fetchStock();
+            const started = performance.now();
+            const results = await Promise.all(Array.from({ length: n }, () => call(path)));
+            const wallMs = Math.round(performance.now() - started);
+            const stats = { ok: 0, limited: 0, lockfail: 0, dup: 0, queued: 0, fail: 0 };
+            let sumMs = 0, maxMs = 0;
+            results.forEach(r => { stats[classify(r.body)]++; sumMs += r.ms; maxMs = Math.max(maxMs, r.ms); });
+            const after = await fetchStock();
+            log(cardId, '完成：总耗时 ' + wallMs + 'ms · 平均 ' + Math.round(sumMs / n) + 'ms · 最大 ' + maxMs + 'ms', 'cmt');
+            log(cardId, '结果分布：成功 ' + stats.ok + ' · 失败 ' + stats.fail + ' · 限流 ' + stats.limited +
+                ' · 锁失败 ' + stats.lockfail + ' · 重复/排队 ' + (stats.dup + stats.queued));
+            if (before !== null && after !== null) {
+                const delta = before - after;
+                const same = delta === stats.ok;
+                log(cardId, '账实核对：成功响应 ' + stats.ok + ' 次，DB 实际扣减 ' + delta + ' 件' +
+                    (same ? '（账实一致 ✓）' : '（差异 ' + (stats.ok - delta) + ' 次：并发下丢失更新/超卖迹象！）'),
+                    same ? 'ok' : 'fail');
+            }
+            results.slice(0, 5).forEach((r, i) =>
+                log(cardId, '样例#' + (i + 1) + ' · ' + r.status + ' · ' + r.ms + 'ms · ' + r.body, lineClassFor(r.body)));
+            setBusy(cardId, false);
+        }
+
+        async function runBurst(cardId, path, n, interval) {
+            setBusy(cardId, true);
+            clearLog(cardId);
+            log(cardId, '串行连发 ' + n + ' 次（间隔 ' + interval + 'ms，观察限流节奏）…', 'cmt');
+            let ok = 0, limited = 0, other = 0;
+            for (let i = 1; i <= n; i++) {
+                const r = await call(path);
+                const c = classify(r.body);
+                if (c === 'ok') ok++; else if (c === 'limited') limited++; else other++;
+                log(cardId, '#' + String(i).padStart(2, '0') + ' → ' + r.status + ' · ' + r.ms + 'ms · ' + r.body, lineClassFor(r.body));
+                if (i < n) await sleep(interval);
+            }
+            log(cardId, '汇总：成功 ' + ok + ' · 被限流 ' + limited + ' · 其他 ' + other, 'cmt');
+            setBusy(cardId, false);
+            fetchStock();
+        }
+
+        async function runFlow3(cardId) {
+            setBusy(cardId, true);
+            clearLog(cardId);
+            const s = sid(), u = uid();
+            log(cardId, '① GET /seckill/stage3/verify-hash?sid=' + s + '&userId=' + u, 'cmt');
+            const hr = await call('/seckill/stage3/verify-hash?sid=' + s + '&userId=' + u);
+            log(cardId, '← ' + hr.status + ' · ' + hr.ms + 'ms · ' + hr.body, lineClassFor(hr.body));
+            const m = hr.body.match(/hash值为：([0-9a-f]+)/);
+            if (!m) { setBusy(cardId, false); return; }
+            const hash = m[1];
+            await sleep(200);
+            log(cardId, '② 携带 verifyHash 下单：GET /seckill/stage3/verified-order?...&verifyHash=' + hash, 'cmt');
+            const or = await call('/seckill/stage3/verified-order?sid=' + s + '&userId=' + u + '&verifyHash=' + hash);
+            log(cardId, '← ' + or.status + ' · ' + or.ms + 'ms · ' + or.body, lineClassFor(or.body));
+            setBusy(cardId, false);
+            fetchStock();
+        }
+
+        async function runFlow3Limit(cardId) {
+            setBusy(cardId, true);
+            clearLog(cardId);
+            const s = sid(), u = uid();
+            log(cardId, '先取验签 hash，再对同一 userId 连发 5 次验签下单（60 秒窗口 >3 次将被禁）…', 'cmt');
+            const hr = await call('/seckill/stage3/verify-hash?sid=' + s + '&userId=' + u);
+            const m = hr.body.match(/hash值为：([0-9a-f]+)/);
+            if (!m) {
+                log(cardId, '获取 hash 失败：' + hr.body, 'fail');
+                setBusy(cardId, false);
+                return;
+            }
+            const hash = m[1];
+            let banned = false;
+            for (let i = 1; i <= 5; i++) {
+                const r = await call('/seckill/stage3/verified-order-limited?sid=' + s + '&userId=' + u + '&verifyHash=' + hash);
+                if (r.body.includes('超过频率限制')) banned = true;
+                log(cardId, '#' + i + ' → ' + r.status + ' · ' + r.ms + 'ms · ' + r.body, lineClassFor(r.body));
+                await sleep(120);
+            }
+            log(cardId, banned
+                ? '效果：第 4 次起被单用户限频拦截（60 秒后自动解禁，或换 userId 继续演示）。'
+                : '提示：本次未触发限频（该用户计数可能尚未达到阈值）。', 'cmt');
+            setBusy(cardId, false);
+            fetchStock();
+        }
+
+        async function runFlow5(cardId) {
+            setBusy(cardId, true);
+            clearLog(cardId);
+            const s = sid(), u = uid();
+            log(cardId, '① 提交异步下单：GET /seckill/stage5/order-with-mq?sid=' + s + '&userId=' + u, 'cmt');
+            const r = await call('/seckill/stage5/order-with-mq?sid=' + s + '&userId=' + u);
+            log(cardId, '← ' + r.status + ' · ' + r.ms + 'ms · ' + r.body, lineClassFor(r.body));
+            if (!r.body.includes('提交成功')) { setBusy(cardId, false); return; }
+            log(cardId, '② 开始轮询 purchase-result（每 1 秒，最多 15 次）…', 'cmt');
+            for (let i = 1; i <= 15; i++) {
+                await sleep(1000);
+                const pr = await call('/seckill/stage5/purchase-result?sid=' + s + '&userId=' + u);
+                const hit = pr.body.includes('抢购成功');
+                log(cardId, '第 ' + i + ' 次轮询 → ' + pr.body, hit ? 'ok' : 'warn');
+                if (hit) break;
+            }
+            setBusy(cardId, false);
+            fetchStock();
+        }
+
+        async function runIdem(cardId) {
+            setBusy(cardId, true);
+            clearLog(cardId);
+            const s = sid(), u = uid();
+            const rid = 'web-' + Date.now() + '-' + Math.random().toString(16).slice(2, 8);
+            log(cardId, '同一 requestId（' + rid + '）连发 2 次…', 'cmt');
+            const r1 = await call('/seckill/stage6/idempotent-order?sid=' + s + '&userId=' + u + '&requestId=' + rid);
+            log(cardId, '① 第 1 次 → ' + r1.status + ' · ' + r1.ms + 'ms · ' + r1.body, lineClassFor(r1.body));
+            await sleep(150);
+            const r2 = await call('/seckill/stage6/idempotent-order?sid=' + s + '&userId=' + u + '&requestId=' + rid);
+            log(cardId, '② 第 2 次 → ' + r2.status + ' · ' + r2.ms + 'ms · ' + r2.body, lineClassFor(r2.body));
+            if (r2.body.includes('重复请求')) {
+                log(cardId, '效果：第 2 次被幂等拦截，未重复下单 ✓', 'ok');
+            }
+            setBusy(cardId, false);
+            fetchStock();
+        }
+
+        async function runJson(cardId, path) {
+            setBusy(cardId, true);
+            log(cardId, 'GET ' + path, 'cmt');
+            const r = await call(path);
+            log(cardId, '← ' + r.status + ' · ' + r.ms + 'ms · ' + r.body, r.status === 200 ? 'ok' : 'fail');
+            setBusy(cardId, false);
+        }
+
+        function dispatch(card, btn) {
+            if (btn.kind === 'single') {
+                return runSingle(card.id, btn.path ? btn.path() : card.endpoint());
+            }
+            if (btn.kind === 'concurrent') {
+                return runConcurrent(card.id, card.endpoint(), btn.n);
+            }
+            if (btn.kind === 'burst') {
+                return runBurst(card.id, card.endpoint(), btn.n, btn.interval || 80);
+            }
+            if (btn.kind === 'flow3') {
+                return runFlow3(card.id);
+            }
+            if (btn.kind === 'flow3limit') {
+                return runFlow3Limit(card.id);
+            }
+            if (btn.kind === 'flow5') {
+                return runFlow5(card.id);
+            }
+            if (btn.kind === 'idem') {
+                return runIdem(card.id);
+            }
+            if (btn.kind === 'json') {
+                return runJson(card.id, btn.path());
+            }
+        }
+
+        function renderLab() {
+            gridEl.innerHTML = labCards.map(card => `
+                <article class="lab-card" id="${card.id}">
+                    <div class="lab-head">
+                        <span class="lab-stage">${card.stage}</span>
+                        <h3>${card.name} <span class="badge ${card.tagClass}">${card.tag}</span></h3>
+                    </div>
+                    <p class="lab-desc">${card.desc}</p>
+                    <div class="lab-endpoint">${esc(card.endpointHint)}</div>
+                    <div class="lab-actions">
+                        ${card.buttons.map((b, i) =>
+                            `<button class="lab-btn ${b.primary ? 'primary' : ''} ${b.warn ? 'warn' : ''}" data-card="${card.id}" data-bit="${i}">${b.label}</button>`
+                        ).join('')}
+                    </div>
+                    <div class="lab-result"></div>
+                </article>
+            `).join('');
+
+            gridEl.querySelectorAll('.lab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const card = labCards.find(c => c.id === btn.dataset.card);
+                    const bit = card.buttons[parseInt(btn.dataset.bit, 10)];
+                    dispatch(card, bit);
+                });
+            });
+        }
+
+        refreshBtn.addEventListener('click', fetchStock);
+        renderLab();
+        fetchStock();
+    })();
+</script>
+</body>
+</html>
