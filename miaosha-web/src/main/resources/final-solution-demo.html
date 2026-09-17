@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最终方案交互模拟 · grab → status 状态机入口</title>
+    <style>
+        :root {
+            --bg: #f6f8fb;
+            --panel: #ffffff;
+            --text: #172033;
+            --muted: #667085;
+            --line: #e6ebf2;
+            --primary: #2563eb;
+            --primary-soft: #dbeafe;
+            --green: #10b981;
+            --green-soft: #d1fae5;
+            --amber: #f59e0b;
+            --amber-soft: #fef3c7;
+            --purple: #7c3aed;
+            --purple-soft: #ede9fe;
+            --red: #ef4444;
+            --red-soft: #fee2e2;
+            --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 34rem),
+                radial-gradient(circle at top right, rgba(124, 58, 237, 0.10), transparent 30rem),
+                var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            line-height: 1.6;
+        }
+        a { color: inherit; text-decoration: none; }
+        button, input { font: inherit; }
+        .page { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 56px; }
+
+        .hero { padding: 34px; margin-bottom: 24px; position: relative; overflow: hidden;
+            background: rgba(255, 255, 255, 0.88); border: 1px solid rgba(230, 235, 242, 0.86);
+            border-radius: 28px; box-shadow: var(--shadow); backdrop-filter: blur(16px); }
+        .hero::after { content: ""; position: absolute; right: -80px; top: -80px; width: 240px; height: 240px;
+            border-radius: 50%; background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(37, 99, 235, 0.14)); }
+        .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+            background: var(--purple-soft); color: #5b21b6; font-size: 13px; font-weight: 700; margin-bottom: 18px; }
+        h1 { margin: 0 0 14px; max-width: 780px; font-size: clamp(28px, 4.2vw, 42px); line-height: 1.15; letter-spacing: -0.03em; }
+        .hero-desc { max-width: 820px; margin: 0 0 24px; color: var(--muted); font-size: 15px; }
+        .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+        .btn { border: 0; border-radius: 14px; padding: 12px 16px; cursor: pointer; font-weight: 800;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease; }
+        .btn:hover { transform: translateY(-1px); }
+        .btn:focus-visible, input:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.25); outline-offset: 2px; }
+        .btn-primary { background: linear-gradient(135deg, #7c3aed, #5b21b6); color: #fff; box-shadow: 0 12px 24px rgba(124, 58, 237, 0.24); }
+        .btn-secondary { background: #eef4ff; color: #1d4ed8; }
+        .btn-danger { background: var(--red-soft); color: #b91c1c; }
+        .btn:disabled { opacity: 0.55; cursor: wait; transform: none; }
+
+        .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 64px; padding: 6px 10px;
+            border-radius: 999px; font-size: 12px; font-weight: 900; }
+        .badge-low { background: var(--red-soft); color: #b91c1c; }
+        .badge-mid { background: var(--amber-soft); color: #92400e; }
+        .badge-high { background: var(--green-soft); color: #047857; }
+        .badge-best { background: var(--purple-soft); color: #5b21b6; }
+        .badge-blue { background: var(--primary-soft); color: #1d4ed8; }
+
+        .grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+        .col { display: grid; gap: 20px; }
+        .panel { padding: 22px; border: 1px solid var(--line); border-radius: 24px; background: var(--panel);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05); }
+        .panel h2 { margin: 0 0 4px; font-size: 17px; letter-spacing: -0.01em; }
+        .panel-tip { margin: 0 0 16px; color: var(--muted); font-size: 12.5px; }
+
+        .field-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 14px; }
+        .field { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: #344054; }
+        .field input[type="number"] { width: 92px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-weight: 700; }
+        .jwt-box { margin-bottom: 14px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 12px;
+            background: #f8fafc; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 11px; color: #475467; word-break: break-all; }
+        .jwt-box b { color: #1d4ed8; }
+
+        .date-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        .chip { border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; background: #fff; color: #344054;
+            cursor: pointer; font-size: 13px; font-weight: 800; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+        .chip:hover { border-color: rgba(124, 58, 237, 0.4); }
+        .chip.active { background: var(--purple); border-color: var(--purple); color: #fff; }
+        .chip .left { margin-left: 6px; font-size: 11px; opacity: 0.75; }
+        .chip.active .left { opacity: 1; }
+        .chip.soldout { opacity: 0.45; text-decoration: line-through; }
+
+        .sample-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+        .sample-label { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 13px; font-weight: 900; }
+        .sample-label.req { color: #1d4ed8; }
+        .sample-label.res { color: #047857; }
+        .code-box { margin: 0; min-height: 150px; max-height: 300px; overflow: auto; border-radius: 18px;
+            background: #0f172a; color: #dbeafe; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
+        .code-box .cmt { color: #7c8db5; }
+
+        .order-card { border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-top: 12px; background: #fbfcfe; }
+        .order-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .order-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: #475467; word-break: break-all; }
+        .order-meta { color: var(--muted); font-size: 12px; font-weight: 700; }
+
+        .sm { display: flex; align-items: center; gap: 6px; margin: 10px 0; }
+        .sm-node { padding: 6px 11px; border-radius: 10px; font-size: 11.5px; font-weight: 900; background: #eef2f7; color: #667085; }
+        .sm-node.on { background: var(--primary-soft); color: #1d4ed8; }
+        .sm-node.done { background: var(--green-soft); color: #047857; }
+        .sm-node.refunding { background: var(--amber-soft); color: #92400e; }
+        .sm-node.refunded { background: var(--red-soft); color: #b91c1c; }
+        .sm-arrow { color: #98a2b3; font-weight: 900; font-size: 11px; }
+
+        .order-log { margin: 0; max-height: 120px; overflow: auto; padding: 10px 12px; border-radius: 12px;
+            background: #0f172a; color: #94a3b8; font-size: 11px; line-height: 1.8; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+        .order-log .ok { color: #6ee7b7; }
+        .order-log .warn { color: #fcd34d; }
+        .order-log .fail { color: #fca5a5; }
+
+        .status-json { margin-top: 8px; font-size: 11px; color: #7c8db5; }
+        .ticket-box { margin-top: 10px; padding: 12px 14px; border-radius: 14px; background: var(--green-soft);
+            color: #047857; font-size: 13px; font-weight: 800; }
+        .ticket-box code { background: rgba(255, 255, 255, 0.8); padding: 2px 7px; border-radius: 7px; }
+
+        .seg-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .seg { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfe; }
+        .seg-name { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; color: #344054; margin-bottom: 6px; }
+        .seg-track { height: 8px; border-radius: 999px; background: #eef2f7; overflow: hidden; }
+        .seg-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #2563eb, #7c3aed); transition: width 0.3s ease; }
+        .seg.zero .seg-fill { background: var(--red); }
+        .seg-num { font-size: 11px; color: var(--muted); font-weight: 700; margin-top: 4px; }
+
+        .outbox-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 12px;
+            border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; background: #fbfcfe; font-size: 12px; }
+        .outbox-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: #475467; word-break: break-all; }
+
+        .recon-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; border-radius: 14px;
+            border: 1px solid var(--line); background: #fbfcfe; margin-bottom: 8px; font-size: 13px; font-weight: 800; }
+        .recon-row .num { font-variant-numeric: tabular-nums; color: #1d4ed8; font-size: 15px; }
+        .recon-verdict { padding: 10px 14px; border-radius: 14px; font-size: 12.5px; font-weight: 800; }
+
+        .decision-list { display: grid; gap: 10px; }
+        .decision { padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fbfcfe; font-size: 12.5px; }
+        .decision b { color: #5b21b6; }
+        .decision p { margin: 4px 0 0; color: var(--muted); }
+
+        .mode-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 15px; border-radius: 999px;
+            font-size: 13px; font-weight: 900; background: var(--green-soft); color: #047857; }
+        .mode-pill.degraded { background: var(--red-soft); color: #b91c1c; }
+        .mode-pill .dot { width: 9px; height: 9px; border-radius: 50%; background: #10b981; }
+        .mode-pill.degraded .dot { background: #ef4444; }
+
+        .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%); z-index: 99; padding: 12px 20px;
+            border-radius: 14px; background: #111827; color: #fff; font-size: 13px; font-weight: 800; box-shadow: var(--shadow);
+            opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+        .toast.show { opacity: 1; }
+
+        .footer-note { margin-top: 26px; color: #98a2b3; font-size: 12px; text-align: center; }
+
+        @media (max-width: 980px) {
+            .grid { grid-template-columns: 1fr; }
+            .sample-grid { grid-template-columns: 1fr; }
+            .seg-list { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <section class="hero">
+        <div class="eyebrow">目标形态 G9 · openspec 收口版（后端待实施，本页为交互模拟）</div>
+        <h1>最终方案交互模拟：grab → status 状态机入口</h1>
+        <p class="hero-desc">
+            接口不再是「做一个动作」，而是「发起一个有状态的流程」：
+            <code>POST /api/v1/tickets/grab</code> 只做 JWT 本地验签 + 分段库存 Lua 原子扣减 + Redis Stream 可靠入队，
+            毫秒级返回 messageId 单凭据；<code>GET /api/v1/tickets/status</code> 轮询订单状态机
+            （RESERVING → SUCCESS / REFUNDING → REFUNDED）。下方可切换全局降级态（NORMAL / DEGRADED）观察退款策略变化。
+        </p>
+        <div class="hero-actions">
+            <span id="modePill" class="mode-pill"><span class="dot"></span><span id="modeText">全局状态：NORMAL</span></span>
+            <button id="modeToggle" class="btn btn-secondary">切换 DEGRADED（模拟访客系统熔断）</button>
+            <button id="resetBtn" class="btn btn-danger">一键清除数据</button>
+            <a class="btn btn-secondary" href="api-evolution-board.html">返回接口演进看板</a>
+        </div>
+    </section>
+
+    <div class="grid">
+        <div class="col">
+            <section class="panel">
+                <h2>抢票台 · 访客视角</h2>
+                <p class="panel-tip">模拟访客系统签发 RS256 JWT，主链路本地验签（0 远程调用）；日期窗口 = 今天+1 .. 今天+7（OPEN_DAYS=7，放票与校验共用同一常量）。</p>
+                <div class="field-row">
+                    <label class="field">访客 userId <input id="userId" type="number" min="1" value="1001"></label>
+                    <button id="grabBtn" class="btn btn-primary">发起预约 grab</button>
+                </div>
+                <div class="jwt-box"><b>Authorization: Bearer</b> <span id="jwtText">--</span></div>
+                <div id="dateChips" class="date-chips"></div>
+                <div class="sample-grid">
+                    <div class="sample">
+                        <div class="sample-label req">请求 · POST /api/v1/tickets/grab</div>
+                        <pre class="code-box" id="reqBox"></pre>
+                    </div>
+                    <div class="sample">
+                        <div class="sample-label res">响应（毫秒级返回）</div>
+                        <pre class="code-box" id="resBox"></pre>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>我的订单 · 状态机（自动轮询 status）</h2>
+                <p class="panel-tip">页面每 600ms 自动模拟 GET /api/v1/tickets/status 轮询；DEGRADED 下订单恒定 RESERVING、只重发不退款。</p>
+                <div id="orderList"></div>
+            </section>
+        </div>
+
+        <div class="col">
+            <section class="panel">
+                <h2>分段库存 · museum:stock:{date}:seg{n}</h2>
+                <p class="panel-tip">每日 2000 张拆 8 段（每段 250），userId % 8 映射段扣减，段空顺时针探测；回补精确回原段。</p>
+                <div id="segList" class="seg-list"></div>
+            </section>
+
+            <section class="panel">
+                <h2>Outbox 消息表 · 可靠投递</h2>
+                <p class="panel-tip">订单与 Outbox 同事务落库；发送任务扫 PENDING → 发 visitor.reserve.* → 标记 SENT，回执到达标 REPLIED。</p>
+                <div id="outboxList"></div>
+            </section>
+
+            <section class="panel">
+                <h2>三源对账（模拟）</h2>
+                <p class="panel-tip">Redis 分段扣减量 == DB 订单数 == 访客预约成功数；退款中短暂不一致属正常。</p>
+                <div id="reconBox"></div>
+            </section>
+
+            <section class="panel">
+                <h2>六项设计决策速览</h2>
+                <div class="decision-list">
+                    <div class="decision"><b>D1 分段库存</b><p>单日库存拆 N 段打散热点 key，限购标记与扣减在同一 Lua 脚本原子完成。</p></div>
+                    <div class="decision"><b>D2 本地 JWT 验签</b><p>缓存访客系统 JWKS 公钥，抢票期纯本地验签，主链路 0 远程调用。</p></div>
+                    <div class="decision"><b>D3 接口 Outbox 化</b><p>扣减成功写 Redis Stream pending，消费者单事务 INSERT 订单 + Outbox。</p></div>
+                    <div class="decision"><b>D4 退款熔断降级</b><p>NORMAL/DEGRADED 全局态：降级期不退款、只重发、文案「预约确认中」。</p></div>
+                    <div class="decision"><b>D5 统一开放窗口</b><p>放票与校验共用 OPEN_DAYS，从 now() 起算，根治 off-by-one。</p></div>
+                    <div class="decision"><b>D6 幂等契约</b><p>messageId + externalOrderNo 双幂等键，回执侧非 RESERVING 直接忽略。</p></div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <p class="footer-note">
+        G9 方案来源：openspec/changes/museum-ticket-reservation（设计收口、待实施）·
+        相关页面：<a href="api-evolution-board.html">接口演进看板</a> ·
+        <a href="museum-ticket-purchase.html">当前线上版抢票页（G8）</a>
+    </p>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+(function () {
+    'use strict';
+    var KEY = 'g9-final-demo-v1';
+    var OPEN_DAYS = 7;
+    var SEG_COUNT = 8;
+    var QUOTA_PER_DAY = 2000;
+
+    // ---------- 工具 ----------
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function fmtDate(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+    function today() { return fmtDate(new Date()); }
+    function nowText() { return new Date().toTimeString().slice(0, 8); }
+    function t(s) { return '[' + nowText() + '] ' + s; }
+    function esc(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function dateWindow(base) {
+        var out = [];
+        for (var i = 1; i <= OPEN_DAYS; i++) {
+            var d = new Date(base + 'T00:00:00');
+            d.setDate(d.getDate() + i);
+            out.push(fmtDate(d));
+        }
+        return out;
+    }
+    function msgId() {
+        return 'b7' + Math.random().toString(16).slice(2, 8) + '-' +
+            Math.random().toString(16).slice(2, 6) + '-' +
+            Math.random().toString(16).slice(2, 10);
+    }
+    function b64(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/=+$/, ''); }
+    function mockJwt(userId) {
+        var header = b64({ alg: 'RS256', typ: 'JWT' });
+        var payload = b64({ sub: 'visitor:' + userId, name: '访客' + userId, iss: 'visitor-system',
+            iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600 });
+        return header + '.' + payload + '.SIMULATED_SIGNATURE';
+    }
+    function shortId(id) { return id.slice(0, 16) + '…'; }
+
+    // ---------- 状态 ----------
+    function freshState() {
+        var stocks = {};
+        dateWindow(today()).forEach(function (dt) {
+            stocks[dt] = [];
+            for (var i = 0; i < SEG_COUNT; i++) stocks[dt].push(Math.floor(QUOTA_PER_DAY / SEG_COUNT));
+        });
+        return {
+            base: today(), mode: 'NORMAL', stocks: stocks, grabbed: {},
+            orders: {}, outbox: [], seq: { ticket: 1, visitor: 1 }
+        };
+    }
+    var state = load();
+    function load() {
+        try {
+            var raw = localStorage.getItem(KEY);
+            if (raw) {
+                var s = JSON.parse(raw);
+                if (s.base === today() && s.stocks && s.orders) return s;
+            }
+        } catch (e) { /* 数据损坏则重建 */ }
+        return freshState();
+    }
+    function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+
+    // ---------- 核心：grab 模拟 ----------
+    function grab(userId, date) {
+        var resp = { code: 200, message: 'success', data: null };
+        if (!state.stocks[date]) {
+            resp = { code: 400, message: '非法日期（超出放票窗口）', data: null };
+            return resp;
+        }
+        var g = state.grabbed[date] || [];
+        if (g.indexOf(userId) >= 0) {
+            resp.data = { status: 'DUPLICATE', message: '您已预约过该日期，请勿重复提交' };
+            return resp;
+        }
+        var segs = state.stocks[date];
+        var start = userId % SEG_COUNT;
+        var hit = -1;
+        for (var k = 0; k < SEG_COUNT; k++) {
+            var idx = (start + k) % SEG_COUNT;
+            if (segs[idx] > 0) { hit = idx; break; }
+        }
+        if (hit < 0) {
+            resp.data = { status: 'SOLD_OUT', message: '当日票券已售罄' };
+            return resp;
+        }
+        segs[hit]--;
+        state.grabbed[date] = g.concat(userId);
+        var id = msgId();
+        state.orders[id] = {
+            messageId: id, userId: userId, visitDate: date, segId: hit,
+            status: 'RESERVING', retryCount: 0, ticketCode: null, visitorId: null,
+            createdAt: Date.now(), log: [t('Redis 分段扣减成功（第 ' + hit + ' 段），订单已创建，进入处理中')]
+        };
+        state.outbox.push({ messageId: id, status: 'PENDING', ts: Date.now() });
+        save();
+        scheduleFlow(id);
+        resp.data = { messageId: id, status: '处理中' };
+        return resp;
+    }
+
+    // ---------- 核心：状态机流转（模拟 Outbox + 访客回执 + 补偿） ----------
+    var timers = {};
+    function scheduleFlow(id) {
+        var order = state.orders[id];
+        if (!order || order.status !== 'RESERVING') return;
+        if (timers[id]) return;
+        timers[id] = setTimeout(function () {
+            var order2 = state.orders[id];
+            if (!order2 || order2.status !== 'RESERVING') { timers[id] = null; return; }
+            var ob = state.outbox.filter(function (o) { return o.messageId === id; })[0];
+            if (ob) { ob.status = 'SENT'; ob.ts = Date.now(); }
+            order2.log.push(t('Outbox 已发送 visitor.reserve.* 预约请求（访客系统）'));
+            save();
+            setTimeout(function () { receiveReply(id); }, 1300);
+        }, 900);
+    }
+    function receiveReply(id) {
+        var order = state.orders[id];
+        if (!order || order.status !== 'RESERVING') { timers[id] = null; return; }
+        var ob = state.outbox.filter(function (o) { return o.messageId === id; })[0];
+        var ok = Math.random() < 0.85;
+        if (ok) {
+            order.status = 'SUCCESS';
+            order.ticketCode = 'TK' + order.visitDate.replace(/-/g, '') + String(state.seq.ticket++).padStart(5, '0');
+            order.visitorId = 'V' + order.visitDate.replace(/-/g, '') + String(state.seq.visitor++).padStart(3, '0');
+            if (ob) ob.status = 'REPLIED';
+            order.log.push(t('访客系统回执成功：预约完成，票据已生成'));
+        } else if (state.mode === 'DEGRADED') {
+            order.retryCount++;
+            if (ob) ob.status = 'PENDING';
+            order.log.push(t('回执失败，但当前为降级期：只重发、不退款，订单保持 RESERVING（文案「预约确认中」）'));
+            save();
+            timers[id] = setTimeout(function () {
+                var o3 = state.orders[id];
+                if (o3 && o3.status === 'RESERVING') {
+                    var ob2 = state.outbox.filter(function (o) { return o.messageId === id; })[0];
+                    if (ob2) ob2.status = 'SENT';
+                    setTimeout(function () { receiveReply(id); }, 1200);
+                }
+            }, 2400);
+            return;
+        } else {
+            order.retryCount++;
+            order.log.push(t('回执失败，第 ' + order.retryCount + ' 次重发（补偿任务）'));
+            if (order.retryCount >= 3) {
+                order.status = 'REFUNDING';
+                order.log.push(t('重试 3 次仍失败：进入退款流程（释放票 + 回补库存 + 移除限购标记）'));
+                save();
+                timers[id] = setTimeout(function () {
+                    var o4 = state.orders[id];
+                    if (!o4) return;
+                    o4.status = 'REFUNDED';
+                    state.stocks[o4.visitDate][o4.segId]++;
+                    var g4 = state.grabbed[o4.visitDate] || [];
+                    state.grabbed[o4.visitDate] = g4.filter(function (u) { return u !== o4.userId; });
+                    var ob4 = state.outbox.filter(function (o) { return o.messageId === id; })[0];
+                    if (ob4) ob4.status = 'FAILED';
+                    o4.log.push(t('退款完成：库存精确回补至第 ' + o4.segId + ' 段，用户可重新抢票'));
+                    save();
+                    timers[id] = null;
+                }, 1600);
+                return;
+            }
+            if (ob) ob.status = 'PENDING';
+            save();
+            timers[id] = setTimeout(function () {
+                var o5 = state.orders[id];
+                if (o5 && o5.status === 'RESERVING') {
+                    var ob5 = state.outbox.filter(function (o) { return o.messageId === id; })[0];
+                    if (ob5) ob5.status = 'SENT';
+                    setTimeout(function () { receiveReply(id); }, 1000);
+                }
+            }, 1400);
+            return;
+        }
+        save();
+        timers[id] = null;
+    }
+
+    // ---------- 渲染 ----------
+    var curDate = null;
+    function selectedDate() {
+        if (curDate && state.stocks[curDate]) return curDate;
+        var dates = dateWindow(state.base);
+        return dates[0];
+    }
+    function totalStock(date) {
+        var s = state.stocks[date];
+        return s ? s.reduce(function (a, b) { return a + b; }, 0) : 0;
+    }
+
+    function renderMode() {
+        var pill = document.getElementById('modePill');
+        var text = document.getElementById('modeText');
+        var btn = document.getElementById('modeToggle');
+        if (state.mode === 'DEGRADED') {
+            pill.className = 'mode-pill degraded';
+            text.textContent = '全局状态：DEGRADED（熔断降级）';
+            btn.textContent = '切回 NORMAL（模拟访客系统恢复）';
+        } else {
+            pill.className = 'mode-pill';
+            text.textContent = '全局状态：NORMAL';
+            btn.textContent = '切换 DEGRADED（模拟访客系统熔断）';
+        }
+    }
+
+    function renderDates() {
+        var box = document.getElementById('dateChips');
+        box.innerHTML = dateWindow(state.base).map(function (dt) {
+            var left = totalStock(dt);
+            var soldout = left === 0;
+            var active = dt === selectedDate() ? ' active' : '';
+            var cls = 'chip' + active + (soldout ? ' soldout' : '');
+            return '<button class="' + cls + '" data-date="' + dt + '">' + dt +
+                '<span class="left">余 ' + left + '</span></button>';
+        }).join('');
+        box.querySelectorAll('.chip').forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                curDate = chip.dataset.date;
+                renderDates();
+                renderReq();
+            });
+        });
+    }
+
+    function renderReq() {
+        var uid = parseInt(document.getElementById('userId').value, 10) || 1001;
+        var jwt = mockJwt(uid);
+        document.getElementById('jwtText').textContent = jwt;
+        var dt = selectedDate();
+        document.getElementById('reqBox').innerHTML =
+            esc('POST /api/v1/tickets/grab\nAuthorization: Bearer ' + jwt + '\nContent-Type: application/json\n\n{\n  "visitDate": "' + dt + '"\n}');
+    }
+
+    function renderSegs() {
+        var dt = selectedDate();
+        var segs = state.stocks[dt] || [];
+        var box = document.getElementById('segList');
+        box.innerHTML = segs.map(function (left, i) {
+            var pct = Math.round(left / (QUOTA_PER_DAY / SEG_COUNT) * 100);
+            var zero = left === 0 ? ' zero' : '';
+            return '<div class="seg' + zero + '">' +
+                '<div class="seg-name"><span>段 ' + i + '</span><span>' + left + ' / ' + (QUOTA_PER_DAY / SEG_COUNT) + '</span></div>' +
+                '<div class="seg-track"><div class="seg-fill" style="width:' + pct + '%"></div></div>' +
+                '<div class="seg-num">' + dt + ' · 已扣 ' + (QUOTA_PER_DAY / SEG_COUNT - left) + '</div></div>';
+        }).join('');
+    }
+
+    var STATUS_META = {
+        RESERVING: { cls: 'badge-blue', text: 'RESERVING · 处理中' },
+        SUCCESS: { cls: 'badge-high', text: 'SUCCESS · 预约成功' },
+        REFUNDING: { cls: 'badge-mid', text: 'REFUNDING · 退款中' },
+        REFUNDED: { cls: 'badge-low', text: 'REFUNDED · 已退款' }
+    };
+    function renderOrders() {
+        var box = document.getElementById('orderList');
+        var ids = Object.keys(state.orders).sort(function (a, b) { return state.orders[b].createdAt - state.orders[a].createdAt; });
+        if (!ids.length) {
+            box.innerHTML = '<p class="panel-tip" style="margin:8px 0 0">暂无订单，去抢票台发起第一笔 grab 吧。</p>';
+            return;
+        }
+        box.innerHTML = ids.map(function (id) {
+            var o = state.orders[id];
+            var meta = STATUS_META[o.status];
+            var nodes = '';
+            if (o.status === 'RESERVING') {
+                nodes = '<span class="sm-node on">RESERVING</span><span class="sm-arrow">→</span>' +
+                    '<span class="sm-node">SUCCESS</span><span class="sm-arrow">/</span>' +
+                    '<span class="sm-node">REFUNDING</span><span class="sm-arrow">→</span><span class="sm-node">REFUNDED</span>';
+            } else if (o.status === 'SUCCESS') {
+                nodes = '<span class="sm-node done">RESERVING</span><span class="sm-arrow">→</span>' +
+                    '<span class="sm-node on">SUCCESS</span>';
+            } else if (o.status === 'REFUNDING') {
+                nodes = '<span class="sm-node done">RESERVING</span><span class="sm-arrow">→</span>' +
+                    '<span class="sm-node refunding">REFUNDING</span><span class="sm-arrow">→</span>' +
+                    '<span class="sm-node">REFUNDED</span>';
+            } else {
+                nodes = '<span class="sm-node done">RESERVING</span><span class="sm-arrow">→</span>' +
+                    '<span class="sm-node done">REFUNDING</span><span class="sm-arrow">→</span>' +
+                    '<span class="sm-node refunded">REFUNDED</span>';
+            }
+            var ticket = '';
+            if (o.status === 'SUCCESS') {
+                ticket = '<div class="ticket-box">票据 <code>' + o.ticketCode + '</code> · 访客号 <code>' + o.visitorId + '</code>（status 接口返回）</div>';
+            }
+            var statusJson = JSON.stringify({ code: 200, data: {
+                status: o.status, messageId: o.messageId, visitorId: o.visitorId, ticketCode: o.ticketCode
+            } }, null, 2);
+            var logHtml = o.log.map(function (line) {
+                var cls = '';
+                if (line.indexOf('成功') >= 0) cls = 'ok';
+                else if (line.indexOf('失败') >= 0 || line.indexOf('退款') >= 0) cls = line.indexOf('退款完成') >= 0 ? 'fail' : 'warn';
+                return '<span class="' + cls + '">' + esc(line) + '</span>';
+            }).join('<br>');
+            return '<div class="order-card">' +
+                '<div class="order-head"><span class="badge ' + meta.cls + '">' + meta.text + '</span>' +
+                '<span class="order-meta">userId ' + o.userId + ' · ' + o.visitDate + ' · 重试 ' + o.retryCount + '</span></div>' +
+                '<div class="order-id">messageId: ' + esc(o.messageId) + '</div>' +
+                '<div class="sm">' + nodes + '</div>' +
+                ticket +
+                '<pre class="order-log">' + logHtml + '</pre>' +
+                '<div class="status-json">GET /api/v1/tickets/status?messageId=' + shortId(o.messageId) + ' → ' +
+                esc(JSON.stringify(statusJson).replace(/\n/g, ' ')) + '</div>' +
+                '</div>';
+        }).join('');
+    }
+
+    function renderOutbox() {
+        var box = document.getElementById('outboxList');
+        if (!state.outbox.length) {
+            box.innerHTML = '<p class="panel-tip" style="margin:8px 0 0">暂无消息。</p>';
+            return;
+        }
+        var meta = { PENDING: 'badge-mid', SENT: 'badge-blue', REPLIED: 'badge-high', FAILED: 'badge-low' };
+        box.innerHTML = state.outbox.slice().reverse().map(function (o) {
+            return '<div class="outbox-item"><span class="outbox-id">' + esc(shortId(o.messageId)) + '</span>' +
+                '<span class="badge ' + meta[o.status] + '">' + o.status + '</span></div>';
+        }).join('');
+    }
+
+    function renderRecon() {
+        var box = document.getElementById('reconBox');
+        var dt = selectedDate();
+        var redisDeduct = QUOTA_PER_DAY - totalStock(dt);
+        var dbOrders = 0, visitorOk = 0;
+        Object.keys(state.orders).forEach(function (id) {
+            var o = state.orders[id];
+            if (o.visitDate !== dt) return;
+            if (o.status === 'SUCCESS' || o.status === 'RESERVING' || o.status === 'REFUNDING') dbOrders++;
+            if (o.status === 'SUCCESS') visitorOk++;
+        });
+        var consistent = redisDeduct === dbOrders && dbOrders >= visitorOk;
+        var verdict = consistent
+            ? '<div class="recon-verdict" style="background:var(--green-soft);color:#047857">对账一致 ✓（Redis 扣减 == DB 订单 ≥ 访客成功）</div>'
+            : '<div class="recon-verdict" style="background:var(--amber-soft);color:#92400e">短暂不一致（退款/流转中，补偿任务最终追平）</div>';
+        box.innerHTML =
+            '<div class="recon-row"><span>Redis 分段扣减量（' + dt + '）</span><span class="num">' + redisDeduct + '</span></div>' +
+            '<div class="recon-row"><span>DB ticket_order 订单数</span><span class="num">' + dbOrders + '</span></div>' +
+            '<div class="recon-row"><span>访客系统预约成功数</span><span class="num">' + visitorOk + '</span></div>' +
+            verdict;
+    }
+
+    function renderAll() {
+        renderMode();
+        renderDates();
+        renderSegs();
+        renderOrders();
+        renderOutbox();
+        renderRecon();
+    }
+
+    // ---------- 交互 ----------
+    document.getElementById('userId').addEventListener('input', renderReq);
+    document.getElementById('grabBtn').addEventListener('click', function () {
+        var uid = parseInt(document.getElementById('userId').value, 10) || 1001;
+        var dt = selectedDate();
+        renderReq();
+        var resp = grab(uid, dt);
+        document.getElementById('resBox').innerHTML = esc(JSON.stringify(resp, null, 2));
+        if (resp.data && resp.data.messageId) {
+            toast('grab 成功，messageId：' + shortId(resp.data.messageId) + '，正在流转状态机…');
+        } else if (resp.data && resp.data.status === 'DUPLICATE') {
+            toast('限购拦截：该用户已预约过该日期');
+        } else if (resp.data && resp.data.status === 'SOLD_OUT') {
+            toast('售罄：全部分段无余票');
+        }
+        renderAll();
+    });
+    document.getElementById('modeToggle').addEventListener('click', function () {
+        state.mode = state.mode === 'NORMAL' ? 'DEGRADED' : 'NORMAL';
+        save();
+        renderAll();
+        toast(state.mode === 'DEGRADED'
+            ? '已进入 DEGRADED：退款暂停，RESERVING 订单只重发不退款（文案「预约确认中」）'
+            : '已恢复 NORMAL：补偿任务追平，未完成订单恢复正常流转');
+    });
+    document.getElementById('resetBtn').addEventListener('click', function () {
+        if (!confirm('确认一键清除全部模拟数据？（订单 / 分段库存 / 限购标记 / Outbox 全部重置）')) return;
+        Object.keys(timers).forEach(function (id) { clearTimeout(timers[id]); });
+        timers = {};
+        localStorage.removeItem(KEY);
+        state = freshState();
+        curDate = null;
+        document.getElementById('resBox').innerHTML = '';
+        renderAll();
+        toast('已清除全部模拟数据，状态机与库存已重置');
+    });
+
+    var toastTimer = null;
+    function toast(msg) {
+        var el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.add('show');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2600);
+    }
+
+    // ---------- 启动 ----------
+    renderReq();
+    renderAll();
+    setInterval(renderAll, 600);
+})();
+</script>
+</body>
+</html>
