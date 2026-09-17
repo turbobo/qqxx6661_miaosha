@@ -754,6 +754,70 @@
 
         .lab-tip code { background: rgba(255, 255, 255, 0.75); }
 
+        /* ===== 右侧随滚动的实时库存浮标 ===== */
+        .lab-float {
+            display: none;
+            position: fixed;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 60;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 140px;
+            padding: 20px 14px;
+            border: 1px solid rgba(230, 235, 242, 0.9);
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.94);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(14px);
+            text-align: center;
+        }
+
+        .lab-float .float-title {
+            font-size: 12px;
+            font-weight: 900;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        .lab-float .float-stock {
+            font-size: 34px;
+            font-weight: 1000;
+            color: #1d4ed8;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .lab-float .float-unit {
+            font-size: 11px;
+            color: var(--muted);
+            font-weight: 700;
+            margin-top: -4px;
+        }
+
+        .lab-float .lab-status {
+            padding: 5px 10px;
+            font-size: 11px;
+        }
+
+        .lab-float .lab-btn {
+            width: 100%;
+        }
+
+        /* 宽屏（内容区 1180px + 两侧留白足够）显示右侧浮标，窄屏退回控制条内展示 */
+        @media (min-width: 1501px) {
+            .lab-float {
+                display: flex;
+            }
+
+            .lab-console .lab-stock {
+                display: none;
+            }
+        }
+
         @media (max-width: 980px) {
             .hero {
                 grid-template-columns: 1fr;
@@ -789,6 +853,13 @@
     </style>
 </head>
 <body>
+<div id="labFloat" class="lab-float" role="complementary" aria-label="实时库存浮标">
+    <span class="float-title">实时库存 · 商品 <span id="labFloatSid">1</span></span>
+    <span id="labStockFloat" class="float-stock">--</span>
+    <span class="float-unit">件剩余</span>
+    <span id="labConnFloat" class="lab-status"><span class="dot"></span>检测中…</span>
+    <button id="labRefreshFloat" class="lab-btn">刷新</button>
+</div>
 <div class="page">
     <section class="hero">
         <div class="hero-main">
@@ -903,7 +974,8 @@
             若用 file:// 直接打开，请求会自动指向 8081；
             ② 「账实核对」在并发模拟后自动执行：无锁方案会出现“成功响应数 &gt; 实际扣减数”（丢失更新）；加锁/限流方案两者一致；
             ③ 重置库存：<code>docker exec miaosha-mysql mysql -uroot -proot -e "use m4a_miaosha; update stock set sale=0, version=0 where id=1;"</code>；
-            ④ 阶段 3 验签仅在每天 9:00–23:00 可用；单用户限频 60 秒后自动解禁。
+            ④ 阶段 3 验签仅在每天 9:00–23:00 可用；单用户限频 60 秒后自动解禁；
+            ⑤ 并发/连发结果含 QPS（每秒完成请求数）：无锁 QPS 高但账实不符，限流方案 QPS 会被削到令牌速率附近。
         </p>
     </section>
 
@@ -1274,8 +1346,12 @@
         const userEl = document.getElementById('labUser');
         const connEl = document.getElementById('labConn');
         const stockEl = document.getElementById('labStock');
+        const stockFloatEl = document.getElementById('labStockFloat');
+        const connFloatEl = document.getElementById('labConnFloat');
+        const sidFloatEl = document.getElementById('labFloatSid');
         const gridEl = document.getElementById('labGrid');
         const refreshBtn = document.getElementById('labRefresh');
+        const refreshFloatBtn = document.getElementById('labRefreshFloat');
 
         const sid = () => parseInt(sidEl.value, 10) || 1;
         const uid = () => parseInt(userEl.value, 10) || 1;
@@ -1447,8 +1523,12 @@
         }
 
         function setConn(ok) {
-            connEl.className = 'lab-status ' + (ok ? 'online' : 'offline');
-            connEl.innerHTML = '<span class="dot"></span>' + (ok ? '后端在线（8081）' : '后端离线');
+            const cls = 'lab-status ' + (ok ? 'online' : 'offline');
+            const html = '<span class="dot"></span>' + (ok ? '后端在线（8081）' : '后端离线');
+            connEl.className = cls;
+            connEl.innerHTML = html;
+            connFloatEl.className = cls;
+            connFloatEl.innerHTML = html;
         }
 
         async function fetchStock() {
@@ -1456,6 +1536,8 @@
             const m = r.body.match(/库存为：(\d+)/);
             if (m) {
                 stockEl.textContent = '当前库存：' + m[1];
+                stockFloatEl.textContent = m[1];
+                sidFloatEl.textContent = String(sid());
                 setConn(true);
                 return parseInt(m[1], 10);
             }
@@ -1492,7 +1574,8 @@
             let sumMs = 0, maxMs = 0;
             results.forEach(r => { stats[classify(r.body)]++; sumMs += r.ms; maxMs = Math.max(maxMs, r.ms); });
             const after = await fetchStock();
-            log(cardId, '完成：总耗时 ' + wallMs + 'ms · 平均 ' + Math.round(sumMs / n) + 'ms · 最大 ' + maxMs + 'ms', 'cmt');
+            log(cardId, '完成：总耗时 ' + wallMs + 'ms · QPS ≈ ' + (n * 1000 / wallMs).toFixed(1) + '/s · 平均 ' +
+                Math.round(sumMs / n) + 'ms · 最大 ' + maxMs + 'ms', 'cmt');
             log(cardId, '结果分布：成功 ' + stats.ok + ' · 失败 ' + stats.fail + ' · 限流 ' + stats.limited +
                 ' · 锁失败 ' + stats.lockfail + ' · 重复/排队 ' + (stats.dup + stats.queued));
             if (before !== null && after !== null) {
@@ -1511,6 +1594,7 @@
             setBusy(cardId, true);
             clearLog(cardId);
             log(cardId, '串行连发 ' + n + ' 次（间隔 ' + interval + 'ms，观察限流节奏）…', 'cmt');
+            const started = performance.now();
             let ok = 0, limited = 0, other = 0;
             for (let i = 1; i <= n; i++) {
                 const r = await call(path);
@@ -1519,7 +1603,9 @@
                 log(cardId, '#' + String(i).padStart(2, '0') + ' → ' + r.status + ' · ' + r.ms + 'ms · ' + r.body, lineClassFor(r.body));
                 if (i < n) await sleep(interval);
             }
-            log(cardId, '汇总：成功 ' + ok + ' · 被限流 ' + limited + ' · 其他 ' + other, 'cmt');
+            const wallMs = Math.round(performance.now() - started);
+            log(cardId, '汇总：成功 ' + ok + ' · 被限流 ' + limited + ' · 其他 ' + other +
+                ' · QPS ≈ ' + (n * 1000 / wallMs).toFixed(1) + '/s', 'cmt');
             setBusy(cardId, false);
             fetchStock();
         }
@@ -1670,6 +1756,7 @@
         }
 
         refreshBtn.addEventListener('click', fetchStock);
+        refreshFloatBtn.addEventListener('click', fetchStock);
         renderLab();
         fetchStock();
     })();
