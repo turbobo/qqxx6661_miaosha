@@ -82,6 +82,7 @@ services:
     ports:
       - "8081:8081"
     environment:
+      TZ: Asia/Shanghai
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/m4a_miaosha?characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
@@ -93,7 +94,7 @@ services:
       SPRING_RABBITMQ_PASSWORD: guest
       # JVM 内存设置（JAVA_TOOL_OPTIONS 由 JVM 自动读取；
       # 注意原 JAVA_OPTS 在 exec 形式 ENTRYPOINT 下不会生效）
-      JAVA_TOOL_OPTIONS: "-Xms1g -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof"
+      JAVA_TOOL_OPTIONS: "-Xms1g -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof -Duser.timezone=Asia/Shanghai"
     depends_on:
       mysql:
         condition: service_healthy

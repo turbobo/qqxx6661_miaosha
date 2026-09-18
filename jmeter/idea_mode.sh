@@ -78,8 +78,8 @@ declare -a SCENARIOS_SECKILL=(
   "s2_pessimistic|/seckill/stage2/pessimistic-order/13|templates/simple_get.jmx|13"
   "s2_limited|/seckill/stage2/optimistic-order-limited/14|templates/simple_get.jmx|14"
   "s3_hash|/seckill/stage3/verified-order|templates/seckill_stage3.jmx|15"
-  's4_cache_v5|/seckill/stage4/cache-v5?sid=16&userId=${__threadNum}|templates/simple_get.jmx|16'
-  's5_mq|/seckill/stage5/order-with-mq?sid=17&userId=${__threadNum}|templates/simple_get.jmx|17'
+  "s4_cache_v5|/seckill/stage4/cache-v5|templates/seckill_stage4_cache_v5.jmx|16"
+  "s5_mq|/seckill/stage5/order-with-mq|templates/seckill_stage5_mq.jmx|17"
   "s6_locked|/seckill/stage6/locked-order/18|templates/simple_get.jmx|18"
   's6_idempotent|/seckill/stage6/idempotent-order?sid=19&userId=${__threadNum}|templates/seckill_stage6_idempotent.jmx|19'
   "s6_token_bucket|/seckill/stage6/token-bucket-order/20|templates/simple_get.jmx|20"
