@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阶段 0 · 无锁商城（反面教材）</title>
+    <style>
+        :root {
+            --bg: #f6f8fb; --panel: #ffffff; --text: #172033; --muted: #667085; --line: #e6ebf2;
+            --primary: #2563eb; --red: #ef4444; --red-soft: #fee2e2; --green: #10b981; --green-soft: #d1fae5;
+            --amber: #f59e0b; --amber-soft: #fef3c7; --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+        .nav {
+            background: #0f172a; color: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+            position: sticky; top: 0; z-index: 10;
+        }
+        .nav a { color: #93c5fd; text-decoration: none; font-size: 14px; }
+        .nav a:hover { text-decoration: underline; }
+        .nav .badge { background: var(--red); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+        .nav .title { font-size: 15px; font-weight: 700; flex: 1; }
+        .wrap { max-width: 900px; margin: 28px auto 60px; padding: 0 20px; display: grid; gap: 20px; }
+        .card { background: var(--panel); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); border: 1px solid rgba(230,235,242,.9); }
+        .product { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .product .pic { width: 120px; height: 120px; border-radius: 16px; background: linear-gradient(135deg,#fee2e2,#fecaca);
+            display: flex; align-items: center; justify-content: center; font-size: 56px; }
+        .product .info { flex: 1; min-width: 240px; }
+        .product .info h1 { font-size: 24px; margin-bottom: 4px; }
+        .product .info .sub { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+        .price { display: flex; align-items: baseline; gap: 10px; }
+        .price .now { color: var(--red); font-size: 30px; font-weight: 800; }
+        .price .old { color: #98a2b3; text-decoration: line-through; font-size: 14px; }
+        .stock-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+        .stock-bar { flex: 1; height: 10px; border-radius: 999px; background: #eef2f7; overflow: hidden; }
+        .stock-bar .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg,#f87171,#ef4444); transition: width .4s ease; }
+        .stock-num { font-size: 13px; color: var(--muted); white-space: nowrap; }
+        .stock-num b { color: var(--text); font-size: 16px; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+        .btn {
+            border: 0; cursor: pointer; border-radius: 14px; padding: 14px 26px; font-size: 16px; font-weight: 700;
+            letter-spacing: .03em; transition: transform .1s ease, filter .15s ease; font-family: inherit;
+        }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .55; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg,#f87171,#dc2626); color: #fff; box-shadow: 0 8px 20px rgba(220,38,38,.35); }
+        .btn-secondary { background: #f1f5f9; color: #334155; }
+        .btn-danger-outline { background: #fff; color: #b91c1c; border: 2px dashed #f87171; }
+        .result-box { margin-top: 16px; background: #0f172a; border-radius: 14px; padding: 16px 18px; color: #e2e8f0;
+            font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; max-height: 300px; overflow-y: auto; }
+        .result-box .line { margin-bottom: 6px; word-break: break-all; }
+        .line.ok { color: #6ee7b7; } .line.fail { color: #fca5a5; } .line.cmt { color: #94a3b8; } .line.warn { color: #fcd34d; }
+        .theory h2 { font-size: 17px; margin-bottom: 10px; }
+        .theory p { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+        .theory .steps { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+        .theory .step { flex: 1; min-width: 150px; background: #f8fafc; border: 1px solid var(--line); border-radius: 12px;
+            padding: 12px; font-size: 13px; }
+        .theory .step b { display: block; color: var(--red); margin-bottom: 4px; }
+        .banner { padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+        .banner.red { background: var(--red-soft); color: #b91c1c; }
+        .banner.green { background: var(--green-soft); color: #047857; }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="seckill-shop.html">← 返回商城</a>
+        <span class="badge">阶段 0</span>
+        <span class="title">无锁商城 · 反面教材</span>
+        <a href="shop-stage1.html">下一方案：乐观锁 →</a>
+    </nav>
+    <main class="wrap">
+        <section class="card">
+            <div class="product">
+                <div class="pic">🎫</div>
+                <div class="info">
+                    <h1>特展联票 · 无锁版</h1>
+                    <div class="sub">sid=11 · 接口 /seckill/stage0/wrong-order/11 · 查库存→sale+1→插订单 三步无原子性</div>
+                    <div class="price"><span class="now">¥99</span><span class="old">¥199</span><span class="banner red" style="padding:2px 10px;font-size:12px">反面教材</span></div>
+                    <div class="stock-row">
+                        <div class="stock-bar"><div id="stockFill" class="fill" style="width:100%"></div></div>
+                        <span class="stock-num">剩余 <b id="stockNum">--</b> 件</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="card">
+            <h2 style="margin-bottom:6px">下单操作台</h2>
+            <p style="color:var(--muted);font-size:13px;margin-bottom:14px">真实调用后端接口，每次点击都会真实扣减 MySQL 库存并创建订单。</p>
+            <div class="actions">
+                <button id="buyBtn" class="btn btn-primary">⚡ 立即抢购（1 次）</button>
+                <button id="burstBtn" class="btn btn-secondary">疯狂连点 ×20</button>
+                <button id="refreshBtn" class="btn btn-danger-outline">刷新库存</button>
+            </div>
+            <div id="resBox" class="result-box"></div>
+        </section>
+        <section class="card theory">
+            <h2>这个方案为什么是反面教材？</h2>
+            <div class="steps">
+                <div class="step"><b>① 查库存</b>SELECT count-sale 读取剩余量，此时并发线程读到同一个值</div>
+                <div class="step"><b>② sale+1</b>基于读到的旧值计算 sale=sale+1，再 UPDATE 写回</div>
+                <div class="step"><b>③ 插订单</b>INSERT 订单记录，与扣减不在同一事务</div>
+            </div>
+            <p>高并发下线程 A、B 同时读到 sale=100，各自 +1 后都写回 sale=101：一次「丢失更新」。订单插了 2 条，库存只扣了 1 件——超卖与账实不符由此而来。</p>
+            <p>实测：50 VUs 压测下 HTTP 成功率 100%，但业务成功率仅 3.8%（15354 次请求只落库 583 单）。试试上面的「疯狂连点 ×20」，看订单数和库存扣减是否对得上。</p>
+        </section>
+    </main>
+    <script>
+        var API_BASE = location.protocol === 'file:' ? 'http://localhost:8081' : '';
+        var SID = 11;
+        var $ = function (id) { return document.getElementById(id); };
+        function log(cls, text) {
+            var box = $('resBox');
+            var div = document.createElement('div');
+            div.className = 'line ' + cls;
+            div.textContent = text;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+        function clearLog() { $('resBox').innerHTML = ''; }
+        function call(path) {
+            var started = performance.now();
+            return fetch(API_BASE + path).then(function (r) { return r.text(); }).then(function (t) {
+                return { body: t, ms: Math.round(performance.now() - started) };
+            }).catch(function (e) { return { body: '请求异常：' + e.message, ms: 0 }; });
+        }
+        function parseStock(text) {
+            var m = text.match(/剩余库存为：(\d+)/);
+            return m ? parseInt(m[1], 10) : null;
+        }
+        function refreshStock() {
+            call('/seckill/stage4/stock-by-db/' + SID).then(function (r) {
+                var left = parseStock(r.body);
+                if (left !== null) {
+                    $('stockNum').textContent = left;
+                    $('stockFill').style.width = Math.max(1, left / 100) + '%';
+                }
+            });
+        }
+        function buyOnce() {
+            clearLog();
+            log('cmt', 'GET /seckill/stage0/wrong-order/' + SID);
+            $('buyBtn').disabled = true;
+            call('/seckill/stage0/wrong-order/' + SID).then(function (r) {
+                log(r.body.indexOf('创建订单id') === 0 ? 'ok' : 'fail', r.ms + 'ms · ' + r.body);
+                log('cmt', '订单已写入，但库存扣减用的是「读-改-写」无原子操作，高并发下会被覆盖');
+                $('buyBtn').disabled = false;
+                refreshStock();
+            });
+        }
+        function buyBurst() {
+            clearLog();
+            var n = 20;
+            log('cmt', '并发发起 ' + n + ' 个请求（Promise.all 同时发出）…');
+            var started = performance.now();
+            var tasks = [];
+            for (var i = 0; i < n; i++) {
+                tasks.push(call('/seckill/stage0/wrong-order/' + SID));
+            }
+            Promise.all(tasks).then(function (results) {
+                var wall = Math.round(performance.now() - started);
+                var okCount = results.filter(function (r) { return r.body.indexOf('创建订单id') === 0; }).length;
+                var failCount = results.length - okCount;
+                log('cmt', '总耗时 ' + wall + 'ms · QPS ≈ ' + (n * 1000 / wall).toFixed(1) + '/s');
+                log('warn', '接口成功 ' + okCount + ' 个（创建订单 id），失败 ' + failCount + ' 个');
+                log('cmt', '关键问题：' + okCount + ' 条订单都写进去了，但库存 sale 的「读-改-写」相互覆盖——订单数 vs 实际扣减数对不上');
+                refreshStock();
+            });
+        }
+        $('buyBtn').addEventListener('click', buyOnce);
+        $('burstBtn').addEventListener('click', buyBurst);
+        $('refreshBtn').addEventListener('click', function () { refreshStock(); });
+        refreshStock();
+    </script>
+</body>
+</html>

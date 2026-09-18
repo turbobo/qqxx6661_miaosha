@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIAOSHA 真实抢购商城 · 方案入口</title>
+    <style>
+        :root {
+            --bg: #f6f8fb; --panel: #ffffff; --text: #172033; --muted: #667085; --line: #e6ebf2;
+            --primary: #2563eb; --primary-soft: #dbeafe; --red: #ef4444; --red-soft: #fee2e2;
+            --green: #10b981; --green-soft: #d1fae5; --amber: #f59e0b; --amber-soft: #fef3c7;
+            --purple: #7c3aed; --purple-soft: #ede9fe; --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh;
+        }
+        .hero {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%);
+            color: #fff; padding: 56px 24px 64px; text-align: center;
+        }
+        .hero h1 { font-size: 40px; letter-spacing: 0.02em; margin-bottom: 10px; }
+        .hero h1 .accent { color: #93c5fd; }
+        .hero p { color: #cbd5e1; font-size: 16px; max-width: 640px; margin: 0 auto; }
+        .hero .env { display: inline-block; margin-top: 18px; padding: 6px 16px; border-radius: 999px;
+            background: rgba(255,255,255,0.12); font-size: 13px; color: #e2e8f0; }
+        .wrap { max-width: 1180px; margin: -34px auto 60px; padding: 0 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 22px; }
+        .card {
+            background: var(--panel); border-radius: 20px; padding: 26px; box-shadow: var(--shadow);
+            border: 1px solid rgba(230, 235, 242, 0.9); display: flex; flex-direction: column;
+            transition: transform .18s ease, box-shadow .18s ease; text-decoration: none; color: inherit;
+        }
+        .card:hover { transform: translateY(-4px); box-shadow: 0 24px 55px rgba(15, 23, 42, 0.14); }
+        .card .stage-badge {
+            display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+            font-size: 13px; font-weight: 700; padding: 5px 14px; border-radius: 999px; margin-bottom: 14px;
+        }
+        .b-red { background: var(--red-soft); color: #b91c1c; }
+        .b-blue { background: var(--primary-soft); color: #1d4ed8; }
+        .b-green { background: var(--green-soft); color: #047857; }
+        .b-purple { background: var(--purple-soft); color: #6d28d9; }
+        .b-amber { background: var(--amber-soft); color: #92400e; }
+        .card h2 { font-size: 21px; margin-bottom: 6px; }
+        .card .desc { color: var(--muted); font-size: 14px; margin-bottom: 14px; flex: 1; }
+        .metrics { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        .metric {
+            font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 8px;
+            background: #f1f5f9; color: #475569;
+        }
+        .metric.hot { background: var(--red-soft); color: #b91c1c; }
+        .metric.ok { background: var(--green-soft); color: #047857; }
+        .card .enter {
+            display: inline-block; text-align: center; padding: 10px 0; border-radius: 12px;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; font-weight: 700;
+            font-size: 15px; letter-spacing: 0.04em;
+        }
+        .card .enter:hover { filter: brightness(1.08); }
+        .foot-note { margin-top: 34px; padding: 18px 22px; background: var(--panel); border-radius: 16px;
+            border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+        .foot-note b { color: var(--text); }
+    </style>
+</head>
+<body>
+    <header class="hero">
+        <h1>MIAOSHA <span class="accent">真实抢购商城</span></h1>
+        <p>同一个商品、同一个后端，用 7 个不同方案的页面真实下单——每个页面背后都是真实接口调用，点「立即抢购」就会真实扣减库存、写入订单。</p>
+        <div class="env">后端：http://localhost:8081 · 库存与订单数据真实落库 MySQL / Redis / RabbitMQ</div>
+    </header>
+    <main class="wrap">
+        <div class="grid">
+            <a class="card" href="shop-stage0.html">
+                <span class="stage-badge b-red">阶段 0 · 反面教材</span>
+                <h2>无锁下单</h2>
+                <p class="desc">查库存 → sale+1 → 插订单，三步没有任何原子性。高并发下扣减互相覆盖，超卖、丢单全占齐。</p>
+                <div class="metrics">
+                    <span class="metric hot">QPS 1024</span><span class="metric hot">业务成功率 3.8%</span>
+                    <span class="metric hot">超卖风险</span>
+                </div>
+                <span class="enter">进入无锁商城 →</span>
+            </a>
+            <a class="card" href="shop-stage1.html">
+                <span class="stage-badge b-blue">阶段 1 · V1</span>
+                <h2>乐观锁 CAS</h2>
+                <p class="desc">UPDATE … WHERE id=? AND version=? 防住超卖，但高争用下 CAS 冲突率超 97%，多数请求白跑。</p>
+                <div class="metrics">
+                    <span class="metric">接口 QPS 3943</span><span class="metric hot">业务成功率 1.7%</span>
+                    <span class="metric ok">不超卖</span>
+                </div>
+                <span class="enter">进入乐观锁商城 →</span>
+            </a>
+            <a class="card" href="shop-stage2.html">
+                <span class="stage-badge b-blue">阶段 2 · V1</span>
+                <h2>令牌桶限流 + 悲观锁</h2>
+                <p class="desc">Guava 令牌桶把突发削成均匀流量；SELECT FOR UPDATE 串行化扣减，卖得完、不超卖，代价是排队。</p>
+                <div class="metrics">
+                    <span class="metric ok">QPS 576 · 业务成功率 100%</span>
+                    <span class="metric">限流拦截 ~85%</span>
+                </div>
+                <span class="enter">进入限流商城 →</span>
+            </a>
+            <a class="card" href="shop-stage3.html">
+                <span class="stage-badge b-purple">阶段 3 · V2</span>
+                <h2>验签接口隐藏 + 限频</h2>
+                <p class="desc">先领「验签通行证」再下单，抢购接口变成一次性凭证；叠加单用户限频，脚本直连刷单失效。</p>
+                <div class="metrics">
+                    <span class="metric ok">防脚本直连</span>
+                    <span class="metric">60 秒窗口限 3 次</span>
+                </div>
+                <span class="enter">进入验签商城 →</span>
+            </a>
+            <a class="card" href="shop-stage4.html">
+                <span class="stage-badge b-amber">阶段 4 · V2~V5</span>
+                <h2>Redis 缓存 + 双写一致性</h2>
+                <p class="desc">缓存库存读吞吐 3 倍于 DB；V1~V5 五种双写策略逐个对比，看「删缓存时机」如何影响数据正确性。</p>
+                <div class="metrics">
+                    <span class="metric">DB 668 QPS</span><span class="metric ok">缓存 2177 QPS</span>
+                    <span class="metric">延迟双删 + MQ 兜底</span>
+                </div>
+                <span class="enter">进入缓存商城 →</span>
+            </a>
+            <a class="card" href="shop-stage5.html">
+                <span class="stage-badge b-green">阶段 5 · V-MQ</span>
+                <h2>MQ 异步削峰 + 排队轮询</h2>
+                <p class="desc">接口只查缓存 + 入队，毫秒级返回 orderId；扣库落单交给消费者，前端轮询「排队中 → 抢购成功」。</p>
+                <div class="metrics">
+                    <span class="metric ok">接口 QPS 3944</span><span class="metric ok">RT 43ms</span>
+                    <span class="metric">单用户限购 1 件</span>
+                </div>
+                <span class="enter">进入异步商城 →</span>
+            </a>
+            <a class="card" href="shop-stage6.html">
+                <span class="stage-badge b-purple">阶段 6 · 工程化</span>
+                <h2>分布式锁 / 幂等 / 分布式限流 / 熔断</h2>
+                <p class="desc">Redisson 分布式锁、requestId 幂等、Redis+Lua 分布式令牌桶、Resilience4j 熔断降级——集群视角的工程化四件套。</p>
+                <div class="metrics">
+                    <span class="metric ok">Watchdog 续期</span><span class="metric ok">SETNX 幂等</span>
+                    <span class="metric ok">Lua 原子限流</span><span class="metric">熔断 60s</span>
+                </div>
+                <span class="enter">进入工程化商城 →</span>
+            </a>
+        </div>
+        <div class="foot-note">
+            <b>说明：</b>7 个页面共用同一后端 <b>SeckillController</b>（阶段 0~6 真实接口）与同一商品库存表（每方案独立 sid 11~21 隔离，互不干扰）；
+            页面会真实扣减 MySQL 库存、写入订单、操作 Redis 缓存与 RabbitMQ 队列。<br>
+            环境要求：后端运行于 <b>http://localhost:8081</b>（Docker 全套或 IDEA local profile 均可）；验签方案（阶段 3）仅每天 9:00–23:00 开放。
+        </div>
+    </main>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阶段 5 · MQ 异步商城</title>
+    <style>
+        :root {
+            --bg: #f6f8fb; --panel: #ffffff; --text: #172033; --muted: #667085; --line: #e6ebf2;
+            --primary: #2563eb; --primary-soft: #dbeafe; --red: #ef4444; --red-soft: #fee2e2;
+            --green: #10b981; --green-soft: #d1fae5; --amber: #f59e0b; --amber-soft: #fef3c7;
+            --teal: #0d9488; --teal-soft: #ccfbf1; --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+        .nav { background: #0f172a; color: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+            position: sticky; top: 0; z-index: 10; }
+        .nav a { color: #93c5fd; text-decoration: none; font-size: 14px; }
+        .nav a:hover { text-decoration: underline; }
+        .nav .badge { background: var(--teal); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+        .nav .title { font-size: 15px; font-weight: 700; flex: 1; }
+        .wrap { max-width: 900px; margin: 28px auto 60px; padding: 0 20px; display: grid; gap: 20px; }
+        .card { background: var(--panel); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); border: 1px solid rgba(230,235,242,.9); }
+        .product { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .product .pic { width: 120px; height: 120px; border-radius: 16px; background: linear-gradient(135deg,#ccfbf1,#99f6e4);
+            display: flex; align-items: center; justify-content: center; font-size: 56px; }
+        .product .info { flex: 1; min-width: 240px; }
+        .product .info h1 { font-size: 24px; margin-bottom: 4px; }
+        .product .info .sub { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+        .price { display: flex; align-items: baseline; gap: 10px; }
+        .price .now { color: var(--red); font-size: 30px; font-weight: 800; }
+        .price .old { color: #98a2b3; text-decoration: line-through; font-size: 14px; }
+        .stock-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+        .stock-bar { flex: 1; height: 10px; border-radius: 999px; background: #eef2f7; overflow: hidden; }
+        .stock-bar .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg,#2dd4bf,#0d9488); transition: width .4s ease; }
+        .stock-num { font-size: 13px; color: var(--muted); white-space: nowrap; }
+        .stock-num b { color: var(--text); font-size: 16px; }
+        .field-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+        .field-row label { font-size: 14px; color: var(--muted); }
+        .field-row input { border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; font-size: 14px;
+            width: 130px; font-family: inherit; outline: none; }
+        .field-row input:focus { border-color: var(--teal); }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+        .btn { border: 0; cursor: pointer; border-radius: 12px; padding: 12px 22px; font-size: 15px; font-weight: 700;
+            letter-spacing: .02em; transition: transform .1s ease, filter .15s ease; font-family: inherit; }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .55; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg,#14b8a6,#0d9488); color: #fff; box-shadow: 0 8px 20px rgba(13,148,136,.35); }
+        .btn-secondary { background: #f1f5f9; color: #334155; }
+        .btn-burst { background: linear-gradient(135deg,#f43f5e,#e11d48); color: #fff; }
+        .result-box { margin-top: 16px; background: #0f172a; border-radius: 14px; padding: 16px 18px; color: #e2e8f0;
+            font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; max-height: 300px; overflow-y: auto; }
+        .result-box .line { margin-bottom: 6px; word-break: break-all; }
+        .line.ok { color: #6ee7b7; } .line.fail { color: #fca5a5; } .line.cmt { color: #94a3b8; } .line.warn { color: #fcd34d; }
+        .queue-status { display: flex; align-items: center; gap: 10px; margin: 14px 0; padding: 14px 18px;
+            background: var(--teal-soft); border-radius: 12px; font-size: 14px; font-weight: 600; color: #115e59; }
+        .spinner { width: 18px; height: 18px; border: 3px solid rgba(13,148,136,.25); border-top-color: #0d9488;
+            border-radius: 50%; animation: spin .8s linear infinite; display: none; }
+        .queue-status.polling .spinner { display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .theory h2 { font-size: 17px; margin-bottom: 10px; }
+        .theory p { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+        .banner { padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+        .banner.teal { background: var(--teal-soft); color: #115e59; }
+        .banner.amber { background: var(--amber-soft); color: #92400e; }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="seckill-shop.html">← 返回商城</a>
+        <span class="badge">阶段 5</span>
+        <span class="title">MQ 异步商城 · 削峰填谷</span>
+        <a href="shop-stage6.html">下一方案：工程化 →</a>
+    </nav>
+    <main class="wrap">
+        <section class="card">
+            <div class="product">
+                <div class="pic">🎫</div>
+                <div class="info">
+                    <h1>特展联票 · MQ 异步版</h1>
+                    <div class="sub">sid=17 · 点击后立刻返回，订单由 RabbitMQ 消费者在后台慢慢处理 · 单用户限购一张</div>
+                    <div class="price"><span class="now">¥99</span><span class="old">¥199</span><span class="banner teal" style="padding:2px 10px;font-size:12px">秒级响应</span></div>
+                    <div class="stock-row">
+                        <div class="stock-bar"><div id="stockFill" class="fill" style="width:100%"></div></div>
+                        <span class="stock-num">剩余 <b id="stockNum">--</b> 件</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="card">
+            <div class="field-row">
+                <label>我的 userId（试试换号下单）</label>
+                <input id="uidInput" type="number" min="1" value="1001">
+                <button id="refreshBtn" class="btn btn-secondary">刷新库存</button>
+            </div>
+            <div class="actions">
+                <button id="submitBtn" class="btn btn-primary">提交订单（MQ 异步）</button>
+                <button id="pollBtn" class="btn btn-secondary">查询我的订单结果</button>
+                <button id="burstBtn" class="btn btn-burst">疯狂连点 ×20</button>
+            </div>
+            <div id="queueStatus" class="queue-status"><span class="spinner"></span><span id="queueText">等待提交订单…</span></div>
+            <div id="resBox" class="result-box"></div>
+        </section>
+        <section class="card theory">
+            <h2>核心思路：接口「秒回」，把重活丢给消息队列</h2>
+            <p>之前的方案里，扣库存 + 建订单全部同步完成，接口 RT 直接暴露给用户。本方案把链路拆成两半：① 前台只把请求写进 RabbitMQ（同时用 Redis Set 记录「该用户已提交」，同一用户重复提交直接拦下），毫秒级返回「提交成功」；② 消费者线程在后台慢慢消费队列、扣库存、建订单。</p>
+            <p>你看到的「排队」其实是前端在轮询 purchase-result 接口：消费者处理完成后会把订单写入 USER_HAS_ORDER 缓存，轮询查到即宣告「抢购成功」。</p>
+            <div class="banner teal">实测：200 VUs 下 QPS 3944（悲观锁的 11.6 倍）、平均 RT 43ms（同步方案的 1/11）——瓶颈从接口转移到了消费速率。</div>
+            <div class="banner amber">体验一下：换一个 userId 点「提交订单」，接口几乎立刻返回；连续点「疯狂连点」，同一个 userId 只会成功一单，其余被「你已经抢购过了」拦下。</div>
+        </section>
+    </main>
+    <script>
+        var API_BASE = location.protocol === 'file:' ? 'http://localhost:8081' : '';
+        var SID = 17;
+        var pollTimer = null;
+        var $ = function (id) { return document.getElementById(id); };
+        function uid() { return parseInt($('uidInput').value, 10) || 1001; }
+        function log(cls, text) {
+            var box = $('resBox');
+            var div = document.createElement('div');
+            div.className = 'line ' + cls;
+            div.textContent = text;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+        function clearLog() { $('resBox').innerHTML = ''; }
+        function call(path) {
+            var started = performance.now();
+            return fetch(API_BASE + path).then(function (r) { return r.text(); }).then(function (t) {
+                return { body: t, ms: Math.round(performance.now() - started) };
+            }).catch(function (e) { return { body: '请求异常：' + e.message, ms: 0 }; });
+        }
+        function parseStock(text) {
+            var m = text.match(/剩余库存为：(\d+)/);
+            return m ? parseInt(m[1], 10) : null;
+        }
+        function refreshStock() {
+            call('/seckill/stage4/stock-by-db/' + SID).then(function (r) {
+                var left = parseStock(r.body);
+                if (left !== null) {
+                    $('stockNum').textContent = left;
+                    $('stockFill').style.width = Math.max(1, left / 100) + '%';
+                }
+            });
+        }
+        function setQueue(cls, text) {
+            var el = $('queueStatus');
+            el.className = 'queue-status' + (cls ? ' ' + cls : '');
+            $('queueText').textContent = text;
+        }
+        function stopPolling() {
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        }
+        function pollResult() {
+            var who = uid();
+            stopPolling();
+            setQueue('polling', '订单已提交，轮询查询结果中…（userId=' + who + '）');
+            var tries = 0;
+            pollTimer = setInterval(function () {
+                tries++;
+                call('/seckill/stage5/purchase-result?sid=' + SID + '&userId=' + who).then(function (r) {
+                    if (r.body.indexOf('恭喜您') === 0) {
+                        log('ok', r.ms + 'ms · 第 ' + tries + ' 次轮询 · ' + r.body);
+                        setQueue('', '抢购成功！订单已写入 USER_HAS_ORDER 缓存');
+                        stopPolling();
+                        refreshStock();
+                    } else if (tries >= 20) {
+                        log('warn', '已轮询 20 次仍未见订单，可能消费者积压；可稍后手动再查');
+                        setQueue('', '轮询超时（20 次），点击「查询我的订单结果」继续');
+                        stopPolling();
+                    } else {
+                        log('cmt', r.ms + 'ms · 第 ' + tries + ' 次轮询 · ' + r.body);
+                    }
+                });
+            }, 600);
+        }
+        $('submitBtn').addEventListener('click', function () {
+            clearLog();
+            var who = uid();
+            log('cmt', 'GET /seckill/stage5/order-with-mq?sid=' + SID + '&userId=' + who);
+            setQueue('polling', '请求写入 RabbitMQ 队列…');
+            call('/seckill/stage5/order-with-mq?sid=' + SID + '&userId=' + who).then(function (r) {
+                if (r.body.indexOf('秒杀请求提交成功') === 0) {
+                    var m = r.body.match(/orderId=(\S+)/);
+                    log('ok', r.ms + 'ms · ' + r.body);
+                    log('cmt', '接口只做入队 + 用户去重，不碰 DB——所以响应飞快');
+                    pollResult();
+                } else {
+                    log('warn', r.ms + 'ms · ' + r.body);
+                    setQueue('', '该 userId 已经提交过订单，换一个 userId 再试');
+                }
+            });
+        });
+        $('pollBtn').addEventListener('click', function () {
+            clearLog();
+            var who = uid();
+            log('cmt', 'GET /seckill/stage5/purchase-result?sid=' + SID + '&userId=' + who);
+            call('/seckill/stage5/purchase-result?sid=' + SID + '&userId=' + who).then(function (r) {
+                if (r.body.indexOf('恭喜您') === 0) {
+                    log('ok', r.ms + 'ms · ' + r.body);
+                    setQueue('', '抢购成功！');
+                } else {
+                    log('cmt', r.ms + 'ms · ' + r.body);
+                    setQueue('polling', '尚未生成订单，点击「查询我的订单结果」随时来查');
+                }
+            });
+        });
+        $('burstBtn').addEventListener('click', function () {
+            clearLog();
+            var who = uid(), n = 20;
+            log('cmt', '20 个并发请求冲向 MQ 接口（同一 userId）…');
+            setQueue('polling', '并发入队中…');
+            var started = performance.now();
+            var tasks = [];
+            for (var i = 0; i < n; i++) {
+                tasks.push(call('/seckill/stage5/order-with-mq?sid=' + SID + '&userId=' + who));
+            }
+            Promise.all(tasks).then(function (rs) {
+                var wall = Math.round(performance.now() - started);
+                var ok = rs.filter(function (r) { return r.body.indexOf('秒杀请求提交成功') === 0; }).length;
+                var dup = n - ok;
+                log('cmt', '总耗时 ' + wall + 'ms · 接口 QPS ≈ ' + (n * 1000 / wall).toFixed(1) + '/s（所有请求都毫秒级返回）');
+                log('ok', '入队成功 ' + ok + ' 个');
+                if (dup > 0) {
+                    log('warn', '被「你已经抢购过了」拦下 ' + dup + ' 个（同一用户只能提交一次）');
+                }
+                log('cmt', '前端不阻塞：消费者在后台逐个扣库存建订单，结果由轮询得知');
+                pollResult();
+            });
+        });
+        refreshStock();
+    </script>
+</body>
+</html>

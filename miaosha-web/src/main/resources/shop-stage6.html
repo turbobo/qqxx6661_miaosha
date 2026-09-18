@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阶段 6 · 工程化四件套商城</title>
+    <style>
+        :root {
+            --bg: #f6f8fb; --panel: #ffffff; --text: #172033; --muted: #667085; --line: #e6ebf2;
+            --primary: #2563eb; --primary-soft: #dbeafe; --red: #ef4444; --red-soft: #fee2e2;
+            --green: #10b981; --green-soft: #d1fae5; --amber: #f59e0b; --amber-soft: #fef3c7;
+            --slate: #475569; --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+        .nav { background: #0f172a; color: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+            position: sticky; top: 0; z-index: 10; }
+        .nav a { color: #93c5fd; text-decoration: none; font-size: 14px; }
+        .nav a:hover { text-decoration: underline; }
+        .nav .badge { background: var(--slate); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+        .nav .title { font-size: 15px; font-weight: 700; flex: 1; }
+        .wrap { max-width: 960px; margin: 28px auto 60px; padding: 0 20px; display: grid; gap: 20px; }
+        .card { background: var(--panel); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); border: 1px solid rgba(230,235,242,.9); }
+        .product { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .product .pic { width: 120px; height: 120px; border-radius: 16px; background: linear-gradient(135deg,#e2e8f0,#cbd5e1);
+            display: flex; align-items: center; justify-content: center; font-size: 56px; }
+        .product .info { flex: 1; min-width: 240px; }
+        .product .info h1 { font-size: 24px; margin-bottom: 4px; }
+        .product .info .sub { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+        .price { display: flex; align-items: baseline; gap: 10px; }
+        .price .now { color: var(--red); font-size: 30px; font-weight: 800; }
+        .price .old { color: #98a2b3; text-decoration: line-through; font-size: 14px; }
+        .stock-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+        .stock-bar { flex: 1; height: 10px; border-radius: 999px; background: #eef2f7; overflow: hidden; }
+        .stock-bar .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg,#94a3b8,#475569); transition: width .4s ease; }
+        .stock-num { font-size: 13px; color: var(--muted); white-space: nowrap; }
+        .stock-num b { color: var(--text); font-size: 16px; }
+        .panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 760px) { .panel-grid { grid-template-columns: 1fr; } }
+        .sub-panel { border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; }
+        .sub-panel h3 { font-size: 15px; margin-bottom: 4px; }
+        .sub-panel .tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--primary-soft); color: #1d4ed8; margin-left: 6px; }
+        .sub-panel .hint { font-size: 12px; color: var(--muted); margin-bottom: 12px; min-height: 34px; }
+        .sub-panel .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+        .btn { border: 0; cursor: pointer; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700;
+            transition: transform .1s ease, filter .15s ease; font-family: inherit; }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .55; cursor: not-allowed; }
+        .btn-lock { background: var(--primary-soft); color: #1d4ed8; }
+        .btn-idem { background: #e0f2fe; color: #0369a1; }
+        .btn-bucket { background: var(--amber-soft); color: #92400e; }
+        .btn-breaker { background: var(--green-soft); color: #047857; }
+        .btn-secondary { background: #f1f5f9; color: #334155; }
+        .btn-danger { background: var(--red-soft); color: #b91c1c; }
+        .result-box { margin-top: 12px; background: #0f172a; border-radius: 12px; padding: 12px 14px; color: #e2e8f0;
+            font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; max-height: 190px; overflow-y: auto; flex: 1; }
+        .result-box .line { margin-bottom: 5px; word-break: break-all; }
+        .line.ok { color: #6ee7b7; } .line.fail { color: #fca5a5; } .line.cmt { color: #94a3b8; } .line.warn { color: #fcd34d; }
+        .field-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+        .field-row label { font-size: 14px; color: var(--muted); }
+        .field-row input { border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; font-size: 14px;
+            width: 130px; font-family: inherit; outline: none; }
+        .request-box { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; color: #0369a1;
+            background: #f0f9ff; border: 1px dashed #7dd3fc; border-radius: 10px; padding: 8px 12px; word-break: break-all; margin-bottom: 10px; }
+        .theory h2 { font-size: 17px; margin-bottom: 10px; }
+        .theory p { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+        .banner { padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+        .banner.slate { background: #e2e8f0; color: #334155; }
+        .banner.amber { background: var(--amber-soft); color: #92400e; }
+        .breaker-status { margin-top: 12px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px;
+            background: #f8fafc; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; color: #475569; white-space: pre-wrap; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="seckill-shop.html">← 返回商城</a>
+        <span class="badge">阶段 6</span>
+        <span class="title">工程化商城 · 分布式四件套</span>
+        <a href="shop-stage0.html">回到起点：无锁版 →</a>
+    </nav>
+    <main class="wrap">
+        <section class="card">
+            <div class="product">
+                <div class="pic">🎫</div>
+                <div class="info">
+                    <h1>特展联票 · 工程化版</h1>
+                    <div class="sub">四个柜台对应四种工程化武器：分布式锁 sid=18 · 幂等 sid=19 · 分布式令牌桶 sid=20 · 熔断降级 sid=21</div>
+                    <div class="price"><span class="now">¥99</span><span class="old">¥199</span><span class="banner slate" style="padding:2px 10px;font-size:12px">生产级防护</span></div>
+                    <div class="stock-row">
+                        <div class="stock-bar"><div id="stockFill" class="fill" style="width:100%"></div></div>
+                        <span class="stock-num">分布式锁柜台剩余 <b id="stockNum">--</b> 件</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="card">
+            <div class="field-row">
+                <label>userId（幂等柜台需要）</label>
+                <input id="uidInput" type="number" min="1" value="1001">
+                <button id="refreshBtn" class="btn btn-secondary">刷新库存</button>
+            </div>
+            <div class="panel-grid">
+                <div class="sub-panel">
+                    <h3>① Redisson 分布式锁<span class="tag">sid=18</span></h3>
+                    <p class="hint">锁在 Redis，多实例共享；Watchdog 自动续期，finally 安全释放。锁内再走乐观锁 CAS。</p>
+                    <div class="actions">
+                        <button id="lockBtn" class="btn btn-lock">锁内下单</button>
+                        <button id="lockBurstBtn" class="btn btn-secondary">并发 ×20</button>
+                    </div>
+                    <div id="resLock" class="result-box"></div>
+                </div>
+                <div class="sub-panel">
+                    <h3>② 幂等下单<span class="tag">sid=19 · SETNX</span></h3>
+                    <p class="hint">requestId 经 Redis SETNX 原子标记（5 分钟），防重复提交 / MQ 重投；失败自动移除标记允许重试。</p>
+                    <div class="request-box" id="reqBox">requestId：尚未生成</div>
+                    <div class="actions">
+                        <button id="idemNewBtn" class="btn btn-idem">新请求下单</button>
+                        <button id="idemDupBtn" class="btn btn-danger" disabled>重复提交（同一 requestId）</button>
+                    </div>
+                    <div id="resIdem" class="result-box"></div>
+                </div>
+                <div class="sub-panel">
+                    <h3>③ 分布式令牌桶<span class="tag">sid=20 · Lua</span></h3>
+                    <p class="hint">桶状态存 Redis，Lua 脚本原子填充+消费，多实例共享 10 令牌/秒——集群下限流不失效。</p>
+                    <div class="actions">
+                        <button id="bucketBtn" class="btn btn-bucket">令牌下单</button>
+                        <button id="bucketBurstBtn" class="btn btn-secondary">疯狂连点 ×20</button>
+                    </div>
+                    <div id="resBucket" class="result-box"></div>
+                </div>
+                <div class="sub-panel">
+                    <h3>④ 熔断降级<span class="tag">sid=21 · Resilience4j</span></h3>
+                    <p class="hint">下单被 DB 熔断器包装：慢调用率 60% 或错误率过高时熔断 60 秒，直接走降级逻辑。</p>
+                    <div class="actions">
+                        <button id="breakerBtn" class="btn btn-breaker">熔断保护下单</button>
+                        <button id="breakerStatusBtn" class="btn btn-secondary">查熔断器状态</button>
+                    </div>
+                    <div id="resBreaker" class="result-box"></div>
+                    <div id="breakerStatus" class="breaker-status">熔断器状态：未查询</div>
+                </div>
+            </div>
+        </section>
+        <section class="card theory">
+            <h2>从「能卖」到「卖得稳」：工程化四件套</h2>
+            <p>前面的方案解决了超卖、限流、缓存一致性问题；真正上线还要补齐工程化能力：① 分布式锁保证多实例部署时互斥依然成立；② 幂等保证用户连点、网络重试、MQ 重投都不会重复扣库存；③ 分布式令牌桶让限流配额跨实例共享（Guava 单机桶在集群下每台各放 10 个）；④ 熔断器在 DB 抖动时快速失败降级，防止故障扩散。</p>
+            <div class="banner slate">对比实验：② 号柜台点「新请求下单」后，立刻点「重复提交」——同一 requestId 被 SETNX 拦下；③ 号柜台 ×20 连点约一半拿到令牌（桶容量 10），其余被限流拦截；④ 号柜台可随时查熔断器当前状态（正常为 CLOSED）。</div>
+            <div class="banner amber">教学提示：下单会校验 userId 存在于 user 表（本环境已预置 id 1~2001 共 2001 个测试用户，换号下单可随意取用）——这正是真实世界的业务约束。</div>
+        </section>
+    </main>
+    <script>
+        var API_BASE = location.protocol === 'file:' ? 'http://localhost:8081' : '';
+        var SID_LOCK = 18, SID_IDEM = 19, SID_BUCKET = 20, SID_BREAKER = 21;
+        var currentRequestId = null;
+        var $ = function (id) { return document.getElementById(id); };
+        function uid() { return parseInt($('uidInput').value, 10) || 1001; }
+        function log(box, cls, text) {
+            var div = document.createElement('div');
+            div.className = 'line ' + cls;
+            div.textContent = text;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+        function clearLog(box) { box.innerHTML = ''; }
+        function call(path) {
+            var started = performance.now();
+            return fetch(API_BASE + path).then(function (r) { return r.text(); }).then(function (t) {
+                return { body: t, ms: Math.round(performance.now() - started) };
+            }).catch(function (e) { return { body: '请求异常：' + e.message, ms: 0 }; });
+        }
+        function callJson(path) {
+            var started = performance.now();
+            return fetch(API_BASE + path).then(function (r) { return r.json(); }).then(function (j) {
+                return { body: j, ms: Math.round(performance.now() - started) };
+            }).catch(function (e) { return { body: { message: '请求异常：' + e.message }, ms: 0 }; });
+        }
+        function parseStock(text) {
+            var m = text.match(/剩余库存为：(\d+)/);
+            return m ? parseInt(m[1], 10) : null;
+        }
+        function classify(body) {
+            if (body.indexOf('购买成功') === 0) return 'ok';
+            if (body.indexOf('你被限流了') === 0) return 'limited';
+            if (body.indexOf('重复请求') === 0) return 'dup';
+            if (body.indexOf('你已经抢购过了') === 0) return 'bought';
+            if (body.indexOf('熔断降级') >= 0) return 'breaker';
+            return 'fail';
+        }
+        function refreshStock() {
+            call('/seckill/stage4/stock-by-db/' + SID_LOCK).then(function (r) {
+                var left = parseStock(r.body);
+                if (left !== null) {
+                    $('stockNum').textContent = left;
+                    $('stockFill').style.width = Math.max(1, left / 100) + '%';
+                }
+            });
+        }
+        function genUuid() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                var r = Math.random() * 16 | 0;
+                var v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+        function paintResult(box, r, extra) {
+            var cls = classify(r.body);
+            var map = { ok: 'ok', limited: 'warn', dup: 'warn', bought: 'warn', breaker: 'warn' };
+            log(box, map[cls] || 'fail', r.ms + 'ms · ' + r.body);
+            if (extra) log(box, 'cmt', extra);
+            refreshStock();
+        }
+        $('lockBtn').addEventListener('click', function () {
+            var box = $('resLock');
+            clearLog(box);
+            log(box, 'cmt', 'GET /seckill/stage6/locked-order/' + SID_LOCK + '（Redisson tryLock + 锁内乐观锁）');
+            call('/seckill/stage6/locked-order/' + SID_LOCK).then(function (r) {
+                paintResult(box, r, '解锁在 finally 中执行，Watchdog 会在持锁期间自动续期');
+            });
+        });
+        $('lockBurstBtn').addEventListener('click', function () {
+            var box = $('resLock'), n = 20;
+            clearLog(box);
+            log(box, 'cmt', '20 个并发请求抢同一把分布式锁（等待 5 秒超时）…');
+            var started = performance.now();
+            var tasks = [];
+            for (var i = 0; i < n; i++) tasks.push(call('/seckill/stage6/locked-order/' + SID_LOCK));
+            Promise.all(tasks).then(function (rs) {
+                var wall = Math.round(performance.now() - started);
+                var ok = rs.filter(function (r) { return classify(r.body) === 'ok'; }).length;
+                var locked = rs.filter(function (r) { return r.body.indexOf('获取分布式锁失败') === 0; }).length;
+                log(box, 'cmt', '总耗时 ' + wall + 'ms · 接口 QPS ≈ ' + (n * 1000 / wall).toFixed(1) + '/s');
+                log(box, 'ok', '锁内下单成功 ' + ok + ' 个');
+                if (locked > 0) log(box, 'warn', locked + ' 个请求等待 5 秒后放弃（拿不到锁）');
+                log(box, 'cmt', '锁内串行化：20 个请求排队逐个进入临界区，无一超卖');
+                refreshStock();
+            });
+        });
+        $('idemNewBtn').addEventListener('click', function () {
+            var box = $('resIdem');
+            clearLog(box);
+            currentRequestId = genUuid();
+            $('reqBox').textContent = 'requestId：' + currentRequestId;
+            $('idemDupBtn').disabled = false;
+            log(box, 'cmt', 'GET /seckill/stage6/idempotent-order?sid=' + SID_IDEM + '&userId=' + uid() + '&requestId=' + currentRequestId);
+            call('/seckill/stage6/idempotent-order?sid=' + SID_IDEM + '&userId=' + uid() + '&requestId=' + currentRequestId).then(function (r) {
+                paintResult(box, r, 'SETNX 标记已写入 Redis（5 分钟有效），此时可以试「重复提交」');
+            });
+        });
+        $('idemDupBtn').addEventListener('click', function () {
+            var box = $('resIdem');
+            if (!currentRequestId) { log(box, 'warn', '请先点「新请求下单」生成 requestId'); return; }
+            log(box, 'cmt', '用同一个 requestId=' + currentRequestId + ' 再次提交…');
+            call('/seckill/stage6/idempotent-order?sid=' + SID_IDEM + '&userId=' + uid() + '&requestId=' + currentRequestId).then(function (r) {
+                paintResult(box, r, 'SETNX 原子拦截：同一 requestId 第二次请求在进入业务前就被拒绝');
+            });
+        });
+        $('bucketBtn').addEventListener('click', function () {
+            var box = $('resBucket');
+            clearLog(box);
+            log(box, 'cmt', 'GET /seckill/stage6/token-bucket-order/' + SID_BUCKET + '（Redis + Lua 令牌桶）');
+            call('/seckill/stage6/token-bucket-order/' + SID_BUCKET).then(function (r) {
+                paintResult(box, r, '令牌状态在 Redis：多实例部署时全集群共享 10 令牌/秒');
+            });
+        });
+        $('bucketBurstBtn').addEventListener('click', function () {
+            var box = $('resBucket'), n = 20;
+            clearLog(box);
+            log(box, 'cmt', '20 个并发请求抢 10 令牌/秒的分布式令牌桶…');
+            var started = performance.now();
+            var tasks = [];
+            for (var i = 0; i < n; i++) tasks.push(call('/seckill/stage6/token-bucket-order/' + SID_BUCKET));
+            Promise.all(tasks).then(function (rs) {
+                var wall = Math.round(performance.now() - started);
+                var ok = rs.filter(function (r) { return classify(r.body) === 'ok'; }).length;
+                var limited = rs.filter(function (r) { return classify(r.body) === 'limited'; }).length;
+                log(box, 'cmt', '总耗时 ' + wall + 'ms');
+                log(box, 'ok', '拿到令牌并下单成功 ' + ok + ' 个');
+                log(box, 'warn', '被限流拦截 ' + limited + ' 个（桶容量 10，速率 10/秒）');
+                log(box, 'cmt', 'Lua 脚本保证「填充+取令牌」原子执行，无并发超发');
+                refreshStock();
+            });
+        });
+        $('breakerBtn').addEventListener('click', function () {
+            var box = $('resBreaker');
+            clearLog(box);
+            log(box, 'cmt', 'GET /seckill/stage6/order-with-circuit-breaker/' + SID_BREAKER);
+            call('/seckill/stage6/order-with-circuit-breaker/' + SID_BREAKER).then(function (r) {
+                paintResult(box, r, '请求穿过 Resilience4j DB 熔断器包装（慢调用率 60% / 熔断 60 秒）');
+            });
+        });
+        $('breakerStatusBtn').addEventListener('click', function () {
+            var box = $('resBreaker');
+            log(box, 'cmt', 'GET /seckill/stage6/circuit-breaker-status');
+            callJson('/seckill/stage6/circuit-breaker-status').then(function (r) {
+                var data = (r.body && r.body.data) ? r.body.data : r.body;
+                $('breakerStatus').textContent = '熔断器状态：' + JSON.stringify(data);
+                log(box, 'ok', r.ms + 'ms · ' + JSON.stringify(r.body));
+            });
+        });
+        refreshStock();
+    </script>
+</body>
+</html>

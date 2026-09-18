@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阶段 3 · 验签商城</title>
+    <style>
+        :root {
+            --bg: #f6f8fb; --panel: #ffffff; --text: #172033; --muted: #667085; --line: #e6ebf2;
+            --primary: #2563eb; --primary-soft: #dbeafe; --red: #ef4444; --red-soft: #fee2e2;
+            --green: #10b981; --green-soft: #d1fae5; --amber: #f59e0b; --amber-soft: #fef3c7;
+            --purple: #7c3aed; --purple-soft: #ede9fe; --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+        .nav { background: #0f172a; color: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+            position: sticky; top: 0; z-index: 10; }
+        .nav a { color: #93c5fd; text-decoration: none; font-size: 14px; }
+        .nav a:hover { text-decoration: underline; }
+        .nav .badge { background: var(--purple); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+        .nav .title { font-size: 15px; font-weight: 700; flex: 1; }
+        .wrap { max-width: 900px; margin: 28px auto 60px; padding: 0 20px; display: grid; gap: 20px; }
+        .card { background: var(--panel); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); border: 1px solid rgba(230,235,242,.9); }
+        .product { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .product .pic { width: 120px; height: 120px; border-radius: 16px; background: linear-gradient(135deg,#ede9fe,#ddd6fe);
+            display: flex; align-items: center; justify-content: center; font-size: 56px; }
+        .product .info { flex: 1; min-width: 240px; }
+        .product .info h1 { font-size: 24px; margin-bottom: 4px; }
+        .product .info .sub { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+        .price { display: flex; align-items: baseline; gap: 10px; }
+        .price .now { color: var(--red); font-size: 30px; font-weight: 800; }
+        .price .old { color: #98a2b3; text-decoration: line-through; font-size: 14px; }
+        .stock-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+        .stock-bar { flex: 1; height: 10px; border-radius: 999px; background: #eef2f7; overflow: hidden; }
+        .stock-bar .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg,#a78bfa,#7c3aed); transition: width .4s ease; }
+        .stock-num { font-size: 13px; color: var(--muted); white-space: nowrap; }
+        .stock-num b { color: var(--text); font-size: 16px; }
+        .field-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+        .field-row label { font-size: 14px; color: var(--muted); }
+        .field-row input { border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; font-size: 14px;
+            width: 140px; font-family: inherit; outline: none; }
+        .field-row input:focus { border-color: var(--purple); }
+        .steps-flow { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+        .flow-step { flex: 1; min-width: 200px; border: 1px solid var(--line); border-radius: 14px; padding: 16px; background: #fbfcfe; }
+        .flow-step h3 { font-size: 14px; margin-bottom: 8px; }
+        .flow-step h3 .num { display: inline-flex; width: 22px; height: 22px; border-radius: 999px; background: var(--purple);
+            color: #fff; align-items: center; justify-content: center; font-size: 12px; margin-right: 6px; }
+        .flow-arrow { display: flex; align-items: center; color: var(--purple); font-size: 22px; font-weight: 700; }
+        .btn { border: 0; cursor: pointer; border-radius: 12px; padding: 12px 22px; font-size: 15px; font-weight: 700;
+            letter-spacing: .02em; transition: transform .1s ease, filter .15s ease; font-family: inherit; }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg,#8b5cf6,#7c3aed); color: #fff; box-shadow: 0 8px 20px rgba(124,58,237,.35); }
+        .btn-secondary { background: #f1f5f9; color: #334155; }
+        .result-box { margin-top: 16px; background: #0f172a; border-radius: 14px; padding: 16px 18px; color: #e2e8f0;
+            font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; max-height: 280px; overflow-y: auto; }
+        .result-box .line { margin-bottom: 6px; word-break: break-all; }
+        .line.ok { color: #6ee7b7; } .line.fail { color: #fca5a5; } .line.cmt { color: #94a3b8; } .line.warn { color: #fcd34d; }
+        .pass-box { margin: 12px 0; background: #f5f3ff; border: 1px dashed #a78bfa; border-radius: 12px; padding: 12px 16px;
+            font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: #6d28d9; word-break: break-all; }
+        .theory h2 { font-size: 17px; margin-bottom: 10px; }
+        .theory p { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+        .banner { padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+        .banner.purple { background: var(--purple-soft); color: #6d28d9; }
+        .banner.amber { background: var(--amber-soft); color: #92400e; }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="seckill-shop.html">← 返回商城</a>
+        <span class="badge">阶段 3</span>
+        <span class="title">验签商城 · 接口隐藏 + 限频</span>
+        <a href="shop-stage4.html">下一方案：缓存 →</a>
+    </nav>
+    <main class="wrap">
+        <section class="card">
+            <div class="product">
+                <div class="pic">🎫</div>
+                <div class="info">
+                    <h1>特展联票 · 验签版</h1>
+                    <div class="sub">sid=15 · 抢购接口需要「验签通行证」，脚本无法直连刷单 · 仅每天 9:00–23:00 开放</div>
+                    <div class="price"><span class="now">¥99</span><span class="old">¥199</span><span class="banner purple" style="padding:2px 10px;font-size:12px">一次性凭证</span></div>
+                    <div class="stock-row">
+                        <div class="stock-bar"><div id="stockFill" class="fill" style="width:100%"></div></div>
+                        <span class="stock-num">剩余 <b id="stockNum">--</b> 件</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="card">
+            <div class="field-row">
+                <label>我的 userId</label>
+                <input id="uidInput" type="number" min="1" value="1001">
+                <button id="refreshBtn" class="btn btn-secondary">刷新库存</button>
+            </div>
+            <div class="steps-flow">
+                <div class="flow-step">
+                    <h3><span class="num">1</span>领取验签通行证</h3>
+                    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">校验时段/用户/商品后签发 MD5 凭证，写入 Redis 3600 秒</p>
+                    <button id="hashBtn" class="btn btn-primary">获取通行证</button>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <h3><span class="num">2</span>持签下单</h3>
+                    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">携带 verifyHash 调用下单接口，凭证不合法直接拒绝</p>
+                    <button id="orderBtn" class="btn btn-primary" disabled>持签下单</button>
+                    <button id="orderLimitBtn" class="btn btn-secondary" disabled style="margin-left:8px">持签下单（限频版）</button>
+                </div>
+            </div>
+            <div id="passBox" class="pass-box" style="display:none"></div>
+            <div id="resBox" class="result-box"></div>
+        </section>
+        <section class="card theory">
+            <h2>原理：把抢购接口变成「一次性凭证」</h2>
+            <p>脚本刷单最怕两件事：接口地址写死可直接调用、调用频率不受限制。本方案两步破解：</p>
+            <p>① 先调 verify-hash 领凭证（服务端校验时段与用户，hash = MD5(盐 + sid + userId) 存 Redis）；② 下单接口必须携带合法 verifyHash 才放行——脚本连 hash 都拿不到，就无从刷起；③ 限频版再叠加「60 秒窗口内访问超 3 次即封禁」，即便脚本持有合法 hash 也无法高频下单。</p>
+            <div class="banner amber">试试：不领通行证直接点「持签下单」会被拒绝；连续多点几次「限频版」会触发频率限制封禁。</div>
+        </section>
+    </main>
+    <script>
+        var API_BASE = location.protocol === 'file:' ? 'http://localhost:8081' : '';
+        var SID = 15;
+        var currentHash = null;
+        var $ = function (id) { return document.getElementById(id); };
+        function uid() { return parseInt($('uidInput').value, 10) || 1001; }
+        function log(cls, text) {
+            var box = $('resBox');
+            var div = document.createElement('div');
+            div.className = 'line ' + cls;
+            div.textContent = text;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+        function clearLog() { $('resBox').innerHTML = ''; }
+        function call(path) {
+            var started = performance.now();
+            return fetch(API_BASE + path).then(function (r) { return r.text(); }).then(function (t) {
+                return { body: t, ms: Math.round(performance.now() - started) };
+            }).catch(function (e) { return { body: '请求异常：' + e.message, ms: 0 }; });
+        }
+        function parseStock(text) {
+            var m = text.match(/剩余库存为：(\d+)/);
+            return m ? parseInt(m[1], 10) : null;
+        }
+        function refreshStock() {
+            call('/seckill/stage4/stock-by-db/' + SID).then(function (r) {
+                var left = parseStock(r.body);
+                if (left !== null) {
+                    $('stockNum').textContent = left;
+                    $('stockFill').style.width = Math.max(1, left / 100) + '%';
+                }
+            });
+        }
+        $('hashBtn').addEventListener('click', function () {
+            clearLog();
+            log('cmt', 'GET /seckill/stage3/verify-hash?sid=' + SID + '&userId=' + uid());
+            this.disabled = true;
+            var self = this;
+            call('/seckill/stage3/verify-hash?sid=' + SID + '&userId=' + uid()).then(function (r) {
+                var m = r.body.match(/[a-f0-9]{32}/);
+                if (m) {
+                    currentHash = m[0];
+                    $('passBox').style.display = 'block';
+                    $('passBox').textContent = '验签通行证：' + currentHash + '（Redis 3600 秒有效）';
+                    $('orderBtn').disabled = false;
+                    $('orderLimitBtn').disabled = false;
+                    log('ok', r.ms + 'ms · ' + r.body);
+                    log('cmt', '凭证已签发，现在可以持签下单');
+                } else {
+                    currentHash = null;
+                    $('orderBtn').disabled = true;
+                    $('orderLimitBtn').disabled = true;
+                    log('fail', r.ms + 'ms · ' + r.body);
+                    log('warn', '未拿到通行证（注意：验签接口仅每天 9:00–23:00 开放）');
+                }
+                self.disabled = false;
+            });
+        });
+        function doOrder(limited) {
+            clearLog();
+            var path = '/seckill/stage3/' + (limited ? 'verified-order-limited' : 'verified-order') +
+                '?sid=' + SID + '&userId=' + uid() + '&verifyHash=' + (currentHash || 'NO_HASH');
+            log('cmt', 'GET ' + path);
+            call(path).then(function (r) {
+                var ok = r.body.indexOf('购买成功') === 0;
+                log(ok ? 'ok' : 'fail', r.ms + 'ms · ' + r.body);
+                if (r.body.indexOf('超过频率限制') >= 0) {
+                    log('warn', '限频触发：60 秒窗口内访问超 3 次，该用户已被临时封禁');
+                }
+                if (r.body.indexOf('不符合') >= 0 || r.body.indexOf('无效') >= 0) {
+                    log('warn', '凭证不合法被拒绝——这就是验签的意义：没有通行证就无法下单');
+                }
+                refreshStock();
+            });
+        }
+        $('orderBtn').addEventListener('click', function () { doOrder(false); });
+        $('orderLimitBtn').addEventListener('click', function () { doOrder(true); });
+        $('refreshBtn').addEventListener('click', function () { refreshStock(); });
+        refreshStock();
+    </script>
+</body>
+</html>

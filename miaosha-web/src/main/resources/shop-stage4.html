@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阶段 4 · 缓存商城 V1~V5</title>
+    <style>
+        :root {
+            --bg: #f6f8fb; --panel: #ffffff; --text: #172033; --muted: #667085; --line: #e6ebf2;
+            --primary: #2563eb; --primary-soft: #dbeafe; --red: #ef4444; --red-soft: #fee2e2;
+            --green: #10b981; --green-soft: #d1fae5; --amber: #f59e0b; --amber-soft: #fef3c7;
+            --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+        .nav { background: #0f172a; color: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+            position: sticky; top: 0; z-index: 10; }
+        .nav a { color: #93c5fd; text-decoration: none; font-size: 14px; }
+        .nav a:hover { text-decoration: underline; }
+        .nav .badge { background: var(--amber); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+        .nav .title { font-size: 15px; font-weight: 700; flex: 1; }
+        .wrap { max-width: 900px; margin: 28px auto 60px; padding: 0 20px; display: grid; gap: 20px; }
+        .card { background: var(--panel); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); border: 1px solid rgba(230,235,242,.9); }
+        .product { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .product .pic { width: 120px; height: 120px; border-radius: 16px; background: linear-gradient(135deg,#fef3c7,#fde68a);
+            display: flex; align-items: center; justify-content: center; font-size: 56px; }
+        .product .info { flex: 1; min-width: 240px; }
+        .product .info h1 { font-size: 24px; margin-bottom: 4px; }
+        .product .info .sub { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+        .price { display: flex; align-items: baseline; gap: 10px; }
+        .price .now { color: var(--red); font-size: 30px; font-weight: 800; }
+        .price .old { color: #98a2b3; text-decoration: line-through; font-size: 14px; }
+        .stock-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+        .stock-bar { flex: 1; height: 10px; border-radius: 999px; background: #eef2f7; overflow: hidden; }
+        .stock-bar .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg,#fbbf24,#d97706); transition: width .4s ease; }
+        .stock-num { font-size: 13px; color: var(--muted); white-space: nowrap; }
+        .stock-num b { color: var(--text); font-size: 16px; }
+        .cmp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+        @media (max-width: 640px) { .cmp-row { grid-template-columns: 1fr; } }
+        .cmp { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: #fbfcfe; }
+        .cmp h4 { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+        .cmp .val { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .cmp.db .val { color: #475569; }
+        .cmp.cache .val { color: #d97706; }
+        .v-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+        .v-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: #fbfcfe; }
+        .v-card h4 { font-size: 14px; margin-bottom: 4px; }
+        .v-card .strategy { font-size: 12px; color: var(--muted); margin-bottom: 10px; min-height: 48px; }
+        .btn { border: 0; cursor: pointer; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 700;
+            transition: transform .1s ease, filter .15s ease; font-family: inherit; width: 100%; }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-v1 { background: var(--red-soft); color: #b91c1c; }
+        .btn-v2 { background: var(--primary-soft); color: #1d4ed8; }
+        .btn-v3 { background: #e0f2fe; color: #0369a1; }
+        .btn-v4 { background: var(--green-soft); color: #047857; }
+        .btn-v5 { background: var(--amber-soft); color: #92400e; }
+        .btn-secondary { background: #f1f5f9; color: #334155; }
+        .field-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+        .field-row label { font-size: 14px; color: var(--muted); }
+        .field-row input { border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; font-size: 14px;
+            width: 130px; font-family: inherit; outline: none; }
+        .result-box { margin-top: 16px; background: #0f172a; border-radius: 14px; padding: 16px 18px; color: #e2e8f0;
+            font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; max-height: 260px; overflow-y: auto; }
+        .result-box .line { margin-bottom: 6px; word-break: break-all; }
+        .line.ok { color: #6ee7b7; } .line.fail { color: #fca5a5; } .line.cmt { color: #94a3b8; } .line.warn { color: #fcd34d; }
+        .theory h2 { font-size: 17px; margin-bottom: 10px; }
+        .theory p { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+        .banner { padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+        .banner.amber { background: var(--amber-soft); color: #92400e; }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="seckill-shop.html">← 返回商城</a>
+        <span class="badge">阶段 4</span>
+        <span class="title">缓存商城 · 双写一致性 V1~V5</span>
+        <a href="shop-stage5.html">下一方案：MQ 异步 →</a>
+    </nav>
+    <main class="wrap">
+        <section class="card">
+            <div class="product">
+                <div class="pic">🎫</div>
+                <div class="info">
+                    <h1>特展联票 · 缓存版</h1>
+                    <div class="sub">sid=16 · 库存查询走 Redis 缓存（吞吐 2177 QPS，约为查 DB 的 3 倍）</div>
+                    <div class="price"><span class="now">¥99</span><span class="old">¥199</span></div>
+                    <div class="stock-row">
+                        <div class="stock-bar"><div id="stockFill" class="fill" style="width:100%"></div></div>
+                        <span class="stock-num">DB 剩余 <b id="stockNum">--</b> 件</span>
+                    </div>
+                </div>
+            </div>
+            <div class="cmp-row">
+                <div class="cmp db"><h4>① 直查数据库（无缓存基线）</h4><div class="val" id="dbVal">--</div></div>
+                <div class="cmp cache"><h4>② 查 Redis 缓存（未命中回源回填）</h4><div class="val" id="cacheVal">--</div></div>
+            </div>
+            <div class="actions" style="display:flex;gap:10px;flex-wrap:wrap">
+                <button id="cmpBtn" class="btn btn-secondary" style="width:auto">同时查询两个来源</button>
+                <button id="refreshBtn" class="btn btn-secondary" style="width:auto">刷新库存条</button>
+            </div>
+        </section>
+        <section class="card">
+            <h2 style="margin-bottom:4px">五种双写策略 · 逐个下单对比</h2>
+            <p style="color:var(--muted);font-size:13px;margin-bottom:14px">同一个商品（sid=16），用五种「缓存与 DB 的写入顺序」策略分别下单，观察各自的一致性缺陷。</p>
+            <div class="field-row">
+                <label>userId（V5 需要）</label>
+                <input id="uidInput" type="number" min="1" value="1001">
+            </div>
+            <div class="v-grid">
+                <div class="v-card">
+                    <h4>V1 · 先删缓存再扣库</h4>
+                    <div class="strategy">删除与扣库之间有窗口：读请求会把 DB 旧值回填缓存 → 脏数据</div>
+                    <button class="btn btn-v1" data-v="1">V1 下单</button>
+                </div>
+                <div class="v-card">
+                    <h4>V2 · 先扣库再删缓存</h4>
+                    <div class="strategy">业界基础策略：删缓存失败最多残留旧缓存，脏数据窗口极小</div>
+                    <button class="btn btn-v2" data-v="2">V2 下单</button>
+                </div>
+                <div class="v-card">
+                    <h4>V3 · V1 + 延迟双删</h4>
+                    <div class="strategy">异步 1 秒后二次删除，兜底清掉窗口期回填的脏缓存</div>
+                    <button class="btn btn-v3" data-v="3">V3 下单</button>
+                </div>
+                <div class="v-card">
+                    <h4>V4 · V2 + 双删 + MQ 兜底</h4>
+                    <div class="strategy">删缓存失败还发 delCache 队列由消费者重试删除，保证最终一致</div>
+                    <button class="btn btn-v4" data-v="4">V4 下单</button>
+                </div>
+                <div class="v-card">
+                    <h4>V5 · 技术堆砌（反面）</h4>
+                    <div class="strategy">乐观锁+用户校验+MQ+缓存三件套全上：架构不是越复杂越好</div>
+                    <button class="btn btn-v5" data-v="5">V5 下单</button>
+                </div>
+            </div>
+            <div id="resBox" class="result-box"></div>
+        </section>
+        <section class="card theory">
+            <h2>核心矛盾：缓存带来 3 倍吞吐，也带来一致性问题</h2>
+            <p>下单要改 DB 库存；但用户看到的库存来自 Redis。改 DB 和改缓存的先后顺序决定了「脏数据窗口」：V1 先删缓存，读请求会在窗口期把 DB 旧值回填；V2 反过来，脏窗口几乎消失；V3 用延迟双删补上 V1 的洞；V4 再加 MQ 兜底，连删除失败都覆盖。</p>
+            <div class="banner amber">观察实验：V1 下单后立刻点「同时查询两个来源」，偶尔能看到缓存值比 DB 值旧（脏数据）；V2~V4 下单后缓存值会保持一致或短暂旧值后追平。</div>
+        </section>
+    </main>
+    <script>
+        var API_BASE = location.protocol === 'file:' ? 'http://localhost:8081' : '';
+        var SID = 16;
+        var $ = function (id) { return document.getElementById(id); };
+        function uid() { return parseInt($('uidInput').value, 10) || 1001; }
+        function log(cls, text) {
+            var box = $('resBox');
+            var div = document.createElement('div');
+            div.className = 'line ' + cls;
+            div.textContent = text;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+        function clearLog() { $('resBox').innerHTML = ''; }
+        function call(path) {
+            var started = performance.now();
+            return fetch(API_BASE + path).then(function (r) { return r.text(); }).then(function (t) {
+                return { body: t, ms: Math.round(performance.now() - started) };
+            }).catch(function (e) { return { body: '请求异常：' + e.message, ms: 0 }; });
+        }
+        function parseStock(text) {
+            var m = text.match(/剩余库存为：(\d+)/);
+            return m ? parseInt(m[1], 10) : null;
+        }
+        function compareSources() {
+            call('/seckill/stage4/stock-by-db/' + SID).then(function (r) {
+                var left = parseStock(r.body);
+                if (left !== null) {
+                    $('dbVal').textContent = left + ' 件';
+                    $('stockNum').textContent = left;
+                    $('stockFill').style.width = Math.max(1, left / 100) + '%';
+                } else {
+                    $('dbVal').textContent = '?';
+                }
+            });
+            call('/seckill/stage4/stock-by-cache/' + SID).then(function (r) {
+                var left = parseStock(r.body);
+                if (left !== null) {
+                    $('cacheVal').textContent = left + ' 件';
+                    var dbVal = parseInt($('dbVal').textContent, 10);
+                    if (!isNaN(dbVal) && dbVal !== left) {
+                        $('cacheVal').style.color = '#dc2626';
+                    } else {
+                        $('cacheVal').style.color = '';
+                    }
+                } else {
+                    $('cacheVal').textContent = '?';
+                }
+            });
+        }
+        function refreshStock() {
+            call('/seckill/stage4/stock-by-db/' + SID).then(function (r) {
+                var left = parseStock(r.body);
+                if (left !== null) {
+                    $('stockNum').textContent = left;
+                    $('stockFill').style.width = Math.max(1, left / 100) + '%';
+                }
+            });
+        }
+        var V_DESC = {
+            1: 'V1 先删缓存再扣库：注意窗口期脏数据风险',
+            2: 'V2 先扣库再删缓存：业界基础策略',
+            3: 'V3 延迟双删：1 秒后异步二次删除兜底',
+            4: 'V4 + MQ 兜底：删除失败由 delCache 消费者重试',
+            5: 'V5 技术堆砌：链路最长，架构不是越复杂越好'
+        };
+        document.querySelectorAll('.v-card .btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                clearLog();
+                var v = btn.dataset.v;
+                var path = v === '5'
+                    ? '/seckill/stage4/cache-v5?sid=' + SID + '&userId=' + uid()
+                    : '/seckill/stage4/cache-v' + v + '/' + SID;
+                log('cmt', 'GET ' + path);
+                log('cmt', V_DESC[v]);
+                btn.disabled = true;
+                call(path).then(function (r) {
+                    log(r.body.indexOf('购买成功') === 0 || r.body.indexOf('成功') >= 0 ? 'ok' : 'fail', r.ms + 'ms · ' + r.body);
+                    if (v === '1') {
+                        log('warn', 'V1 的窗口期：若此刻有读请求，可能把 DB 旧值回填缓存——点上方「同时查询两个来源」对比');
+                    }
+                    if (v === '3') log('cmt', '已提交延迟双删任务（1 秒后二次删除缓存）');
+                    if (v === '4') log('cmt', '已发 delCache 队列消息，消费者将兜底删除缓存');
+                    btn.disabled = false;
+                    setTimeout(compareSources, 600);
+                    refreshStock();
+                });
+            });
+        });
+        $('cmpBtn').addEventListener('click', function () { compareSources(); });
+        $('refreshBtn').addEventListener('click', function () { refreshStock(); });
+        compareSources();
+    </script>
+</body>
+</html>

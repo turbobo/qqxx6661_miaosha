@@ -100,10 +100,29 @@ docker compose up -d mysql redis rabbitmq
 - 查数据：`docker exec -it miaosha-mysql mysql -uroot -proot m4a_miaosha`
 
 > 本地 IDEA 连中间件时注意端口变化：MySQL `localhost:3307`、Redis `localhost:6380`、
-> RabbitMQ `localhost:5673`。若沿用 `application.properties` 默认端口（3306/6379/5672），
-> 需在 IDEA 运行配置中加环境变量覆盖，例如：
-> `SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3307/m4a_miaosha?characterEncoding=utf-8&&serverTimezone=Asia/Shanghai`、
-> `SPRING_REDIS_PORT=6380`、`SPRING_RABBITMQ_PORT=5673`。
+> RabbitMQ `localhost:5673`。已内置 `miaosha-web/src/main/resources/application-local.properties`
+> 覆盖这些端口，IDEA 运行配置里加：
+> `Program arguments: --spring.profiles.active=local`
+> （等价于手动加环境变量 `SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3307/m4a_miaosha?...`、
+> `SPRING_REDIS_PORT=6380`、`SPRING_RABBITMQ_PORT=5673`）。
+
+**IDEA 模式压测（Docker 只起中间件，应用跑本地，测每个方案 QPS）**：
+
+```bash
+cd jmeter
+# minimal：v2 基线 3 方案 @ 50 VUs 15s（冒烟验证环境）
+./idea_mode.sh minimal
+# full：OrderControllerV2 全 10 方案 @ 50/200/500/1000 VUs（约 40 分钟）
+./idea_mode.sh full
+# seckill：SeckillController 阶段 0~6（11 场景，sid 11~21 隔离）@ 50/200/500 VUs（约 30 分钟）
+./idea_mode.sh seckill
+```
+
+- 前置：中间件 healthy + IDEA 应用监听 8081（脚本自动检查，容器 app 运行时会告警）
+- IDEA 运行配置建议 `VM options: -Xms1g -Xmx1g -XX:+UseG1GC`（与容器模式对齐，保证可比）
+- 每轮自动重置库存/Redis，MQ 场景压后记录队列积压；报告输出到 `jmeter/reports/REPORT_IDEA_MODE.md`
+- 阶段 3 验签两步与阶段 6 幂等（requestId 每请求唯一）有专用 jmx：
+  `jmeter/templates/seckill_stage3.jmx`、`seckill_stage6_idempotent.jmx`
 
 **收工时**：
 ```bash

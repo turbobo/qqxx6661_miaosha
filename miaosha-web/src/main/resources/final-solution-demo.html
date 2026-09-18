@@ -3,50 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>最终方案交互模拟 · grab → status 状态机入口</title>
+    <title>最终方案全流程交互模拟 · grab → status 状态机入口</title>
     <style>
         :root {
-            --bg: #f6f8fb;
-            --panel: #ffffff;
-            --text: #172033;
-            --muted: #667085;
-            --line: #e6ebf2;
-            --primary: #2563eb;
-            --primary-soft: #dbeafe;
-            --green: #10b981;
-            --green-soft: #d1fae5;
-            --amber: #f59e0b;
-            --amber-soft: #fef3c7;
-            --purple: #7c3aed;
-            --purple-soft: #ede9fe;
-            --red: #ef4444;
-            --red-soft: #fee2e2;
-            --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+            --bg: #f6f8fb; --panel: #ffffff; --text: #172033; --muted: #667085; --line: #e6ebf2;
+            --primary: #2563eb; --primary-soft: #dbeafe; --green: #10b981; --green-soft: #d1fae5;
+            --amber: #f59e0b; --amber-soft: #fef3c7; --purple: #7c3aed; --purple-soft: #ede9fe;
+            --red: #ef4444; --red-soft: #fee2e2; --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
         }
         * { box-sizing: border-box; }
         body {
-            margin: 0;
-            background:
-                radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 34rem),
-                radial-gradient(circle at top right, rgba(124, 58, 237, 0.10), transparent 30rem),
-                var(--bg);
-            color: var(--text);
+            margin: 0; color: var(--text); line-height: 1.6;
+            background: radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 34rem),
+                radial-gradient(circle at top right, rgba(124, 58, 237, 0.10), transparent 30rem), var(--bg);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-            line-height: 1.6;
         }
         a { color: inherit; text-decoration: none; }
         button, input { font: inherit; }
         .page { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 56px; }
 
-        .hero { padding: 34px; margin-bottom: 24px; position: relative; overflow: hidden;
+        .hero { padding: 30px 34px; margin-bottom: 20px; position: relative; overflow: hidden;
             background: rgba(255, 255, 255, 0.88); border: 1px solid rgba(230, 235, 242, 0.86);
             border-radius: 28px; box-shadow: var(--shadow); backdrop-filter: blur(16px); }
         .hero::after { content: ""; position: absolute; right: -80px; top: -80px; width: 240px; height: 240px;
             border-radius: 50%; background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(37, 99, 235, 0.14)); }
         .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
-            background: var(--purple-soft); color: #5b21b6; font-size: 13px; font-weight: 700; margin-bottom: 18px; }
-        h1 { margin: 0 0 14px; max-width: 780px; font-size: clamp(28px, 4.2vw, 42px); line-height: 1.15; letter-spacing: -0.03em; }
-        .hero-desc { max-width: 820px; margin: 0 0 24px; color: var(--muted); font-size: 15px; }
+            background: var(--purple-soft); color: #5b21b6; font-size: 13px; font-weight: 700; margin-bottom: 16px; }
+        h1 { margin: 0 0 12px; max-width: 820px; font-size: clamp(26px, 4vw, 40px); line-height: 1.15; letter-spacing: -0.03em; }
+        .hero-desc { max-width: 880px; margin: 0 0 22px; color: var(--muted); font-size: 14.5px; }
         .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 
         .btn { border: 0; border-radius: 14px; padding: 12px 16px; cursor: pointer; font-weight: 800;
@@ -65,6 +49,21 @@
         .badge-high { background: var(--green-soft); color: #047857; }
         .badge-best { background: var(--purple-soft); color: #5b21b6; }
         .badge-blue { background: var(--primary-soft); color: #1d4ed8; }
+
+        /* ===== 6 步流程条 ===== */
+        .stepper { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 20px; }
+        .stepper-node { position: relative; padding: 12px 8px 10px; border: 1px solid var(--line); border-radius: 16px;
+            background: var(--panel); text-align: center; cursor: pointer; transition: border-color 0.2s ease, background 0.2s ease; }
+        .stepper-node:hover { border-color: rgba(124, 58, 237, 0.4); }
+        .stepper-node .num { width: 26px; height: 26px; margin: 0 auto 6px; display: grid; place-items: center;
+            border-radius: 50%; background: #eef2f7; color: #667085; font-size: 12px; font-weight: 900; }
+        .stepper-node .name { font-size: 12px; font-weight: 800; color: #667085; }
+        .stepper-node.active { border-color: var(--purple); background: linear-gradient(180deg, #fff, #faf8ff); }
+        .stepper-node.active .num { background: var(--purple); color: #fff; }
+        .stepper-node.active .name { color: #5b21b6; }
+        .stepper-node.done { border-color: rgba(16, 185, 129, 0.5); background: #f5fdf9; }
+        .stepper-node.done .num { background: var(--green); color: #fff; }
+        .stepper-node.done .name { color: #047857; }
 
         .grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 20px; align-items: start; }
         .col { display: grid; gap: 20px; }
@@ -87,24 +86,27 @@
         .chip:hover { border-color: rgba(124, 58, 237, 0.4); }
         .chip.active { background: var(--purple); border-color: var(--purple); color: #fff; }
         .chip .left { margin-left: 6px; font-size: 11px; opacity: 0.75; }
-        .chip.active .left { opacity: 1; }
         .chip.soldout { opacity: 0.45; text-decoration: line-through; }
 
         .sample-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
         .sample-label { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 13px; font-weight: 900; }
         .sample-label.req { color: #1d4ed8; }
         .sample-label.res { color: #047857; }
-        .code-box { margin: 0; min-height: 150px; max-height: 300px; overflow: auto; border-radius: 18px;
+        .code-box { margin: 0; min-height: 130px; max-height: 300px; overflow: auto; border-radius: 18px;
             background: #0f172a; color: #dbeafe; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             font-size: 12px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
         .code-box .cmt { color: #7c8db5; }
 
-        .order-card { border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-top: 12px; background: #fbfcfe; }
-        .order-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
-        .order-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: #475467; word-break: break-all; }
-        .order-meta { color: var(--muted); font-size: 12px; font-weight: 700; }
+        /* ===== 加载中动画 ===== */
+        .loading-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 34px 16px; }
+        .spinner { width: 46px; height: 46px; border-radius: 50%; border: 5px solid var(--purple-soft);
+            border-top-color: var(--purple); animation: spin 0.9s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { font-size: 14px; font-weight: 900; color: #5b21b6; }
+        .loading-sub { font-size: 12px; color: var(--muted); font-weight: 700; }
 
-        .sm { display: flex; align-items: center; gap: 6px; margin: 10px 0; }
+        /* ===== 状态机 ===== */
+        .sm { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
         .sm-node { padding: 6px 11px; border-radius: 10px; font-size: 11.5px; font-weight: 900; background: #eef2f7; color: #667085; }
         .sm-node.on { background: var(--primary-soft); color: #1d4ed8; }
         .sm-node.done { background: var(--green-soft); color: #047857; }
@@ -112,17 +114,41 @@
         .sm-node.refunded { background: var(--red-soft); color: #b91c1c; }
         .sm-arrow { color: #98a2b3; font-weight: 900; font-size: 11px; }
 
-        .order-log { margin: 0; max-height: 120px; overflow: auto; padding: 10px 12px; border-radius: 12px;
-            background: #0f172a; color: #94a3b8; font-size: 11px; line-height: 1.8; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-        .order-log .ok { color: #6ee7b7; }
-        .order-log .warn { color: #fcd34d; }
-        .order-log .fail { color: #fca5a5; }
+        /* ===== 详情时间线 ===== */
+        .timeline { margin: 14px 0 0; padding-left: 4px; list-style: none; }
+        .timeline li { position: relative; padding: 0 0 16px 26px; font-size: 13px; color: #344054; }
+        .timeline li::before { content: ""; position: absolute; left: 5px; top: 6px; width: 10px; height: 10px;
+            border-radius: 50%; background: #cbd5e1; }
+        .timeline li::after { content: ""; position: absolute; left: 9px; top: 20px; bottom: 0; width: 2px; background: var(--line); }
+        .timeline li:last-child::after { display: none; }
+        .timeline li.ok::before { background: var(--green); }
+        .timeline li.fail::before { background: var(--red); }
+        .timeline li.warn::before { background: var(--amber); }
+        .timeline li .time { margin-left: 8px; color: #98a2b3; font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-        .status-json { margin-top: 8px; font-size: 11px; color: #7c8db5; }
-        .ticket-box { margin-top: 10px; padding: 12px 14px; border-radius: 14px; background: var(--green-soft);
+        .kv { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 12px; }
+        .kv-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px; border: 1px solid var(--line);
+            border-radius: 12px; background: #fbfcfe; font-size: 12.5px; }
+        .kv-row .k { color: var(--muted); font-weight: 700; flex: none; }
+        .kv-row .v { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; text-align: right; }
+
+        .ticket-box { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--green-soft);
             color: #047857; font-size: 13px; font-weight: 800; }
         .ticket-box code { background: rgba(255, 255, 255, 0.8); padding: 2px 7px; border-radius: 7px; }
 
+        .order-card { border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-top: 12px;
+            background: #fbfcfe; cursor: pointer; transition: border-color 0.18s ease; }
+        .order-card:hover { border-color: rgba(124, 58, 237, 0.45); }
+        .order-card.sel { border-color: var(--purple); background: #faf8ff; }
+        .order-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .order-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: #475467; word-break: break-all; }
+        .order-meta { color: var(--muted); font-size: 12px; font-weight: 700; }
+        .order-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .mini-btn { border: 0; border-radius: 10px; padding: 7px 12px; background: #eef4ff; color: #1d4ed8;
+            font-size: 12px; font-weight: 800; cursor: pointer; }
+        .mini-btn:hover { transform: translateY(-1px); }
+
+        /* ===== 右侧数据面板 ===== */
         .seg-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
         .seg { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfe; }
         .seg-name { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; color: #344054; margin-bottom: 6px; }
@@ -155,13 +181,13 @@
             border-radius: 14px; background: #111827; color: #fff; font-size: 13px; font-weight: 800; box-shadow: var(--shadow);
             opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
         .toast.show { opacity: 1; }
-
         .footer-note { margin-top: 26px; color: #98a2b3; font-size: 12px; text-align: center; }
 
         @media (max-width: 980px) {
             .grid { grid-template-columns: 1fr; }
             .sample-grid { grid-template-columns: 1fr; }
             .seg-list { grid-template-columns: 1fr; }
+            .stepper { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         }
     </style>
 </head>
@@ -169,12 +195,12 @@
 <div class="page">
     <section class="hero">
         <div class="eyebrow">目标形态 G9 · openspec 收口版（后端待实施，本页为交互模拟）</div>
-        <h1>最终方案交互模拟：grab → status 状态机入口</h1>
+        <h1>最终方案全流程交互模拟：grab → status 状态机入口</h1>
         <p class="hero-desc">
-            接口不再是「做一个动作」，而是「发起一个有状态的流程」：
-            <code>POST /api/v1/tickets/grab</code> 只做 JWT 本地验签 + 分段库存 Lua 原子扣减 + Redis Stream 可靠入队，
-            毫秒级返回 messageId 单凭据；<code>GET /api/v1/tickets/status</code> 轮询订单状态机
-            （RESERVING → SUCCESS / REFUNDING → REFUNDED）。下方可切换全局降级态（NORMAL / DEGRADED）观察退款策略变化。
+            完整走一遍最终方案的六个环节：<b>① 抢购</b>（JWT 本地验签 + 分段库存 Lua 原子扣减 + 可靠入队，毫秒级返回 messageId）
+            → <b>② 处理中</b>（RESERVING 自动轮询）→ <b>③ 查询购票结果</b>（GET /api/v1/tickets/status）
+            → <b>④ 返回购票结果</b>（状态机响应）→ <b>⑤ 查看购票详情</b>（订单时间线）
+            → <b>⑥ 查看访客预约结果</b>（访客系统回执契约）。可随时切换全局降级态（NORMAL / DEGRADED）观察退款策略变化。
         </p>
         <div class="hero-actions">
             <span id="modePill" class="mode-pill"><span class="dot"></span><span id="modeText">全局状态：NORMAL</span></span>
@@ -184,32 +210,19 @@
         </div>
     </section>
 
+    <div id="stepper" class="stepper"></div>
+
     <div class="grid">
         <div class="col">
-            <section class="panel">
-                <h2>抢票台 · 访客视角</h2>
-                <p class="panel-tip">模拟访客系统签发 RS256 JWT，主链路本地验签（0 远程调用）；日期窗口 = 今天+1 .. 今天+7（OPEN_DAYS=7，放票与校验共用同一常量）。</p>
-                <div class="field-row">
-                    <label class="field">访客 userId <input id="userId" type="number" min="1" value="1001"></label>
-                    <button id="grabBtn" class="btn btn-primary">发起预约 grab</button>
-                </div>
-                <div class="jwt-box"><b>Authorization: Bearer</b> <span id="jwtText">--</span></div>
-                <div id="dateChips" class="date-chips"></div>
-                <div class="sample-grid">
-                    <div class="sample">
-                        <div class="sample-label req">请求 · POST /api/v1/tickets/grab</div>
-                        <pre class="code-box" id="reqBox"></pre>
-                    </div>
-                    <div class="sample">
-                        <div class="sample-label res">响应（毫秒级返回）</div>
-                        <pre class="code-box" id="resBox"></pre>
-                    </div>
-                </div>
+            <section class="panel" id="flowPanel">
+                <h2 id="flowTitle">流程面板</h2>
+                <p class="panel-tip" id="flowTip"></p>
+                <div id="flowBody"></div>
             </section>
 
             <section class="panel">
-                <h2>我的订单 · 状态机（自动轮询 status）</h2>
-                <p class="panel-tip">页面每 600ms 自动模拟 GET /api/v1/tickets/status 轮询；DEGRADED 下订单恒定 RESERVING、只重发不退款。</p>
+                <h2>我的订单（点击卡片切换查看各环节）</h2>
+                <p class="panel-tip">点订单卡片下方按钮可直接跳到：返回结果 / 购票详情 / 访客预约结果。</p>
                 <div id="orderList"></div>
             </section>
         </div>
@@ -220,19 +233,16 @@
                 <p class="panel-tip">每日 2000 张拆 8 段（每段 250），userId % 8 映射段扣减，段空顺时针探测；回补精确回原段。</p>
                 <div id="segList" class="seg-list"></div>
             </section>
-
             <section class="panel">
                 <h2>Outbox 消息表 · 可靠投递</h2>
-                <p class="panel-tip">订单与 Outbox 同事务落库；发送任务扫 PENDING → 发 visitor.reserve.* → 标记 SENT，回执到达标 REPLIED。</p>
+                <p class="panel-tip">订单与 Outbox 同事务落库；PENDING → SENT（发 visitor.reserve.*）→ REPLIED / FAILED。</p>
                 <div id="outboxList"></div>
             </section>
-
             <section class="panel">
                 <h2>三源对账（模拟）</h2>
                 <p class="panel-tip">Redis 分段扣减量 == DB 订单数 == 访客预约成功数；退款中短暂不一致属正常。</p>
                 <div id="reconBox"></div>
             </section>
-
             <section class="panel">
                 <h2>六项设计决策速览</h2>
                 <div class="decision-list">
@@ -258,10 +268,19 @@
 <script>
 (function () {
     'use strict';
-    var KEY = 'g9-final-demo-v1';
+    var KEY = 'g9-final-demo-v2';
     var OPEN_DAYS = 7;
     var SEG_COUNT = 8;
     var QUOTA_PER_DAY = 2000;
+
+    var STEPS = [
+        { id: 'grab', name: '抢购' },
+        { id: 'loading', name: '处理中' },
+        { id: 'query', name: '查询购票结果' },
+        { id: 'result', name: '返回购票结果' },
+        { id: 'detail', name: '查看购票详情' },
+        { id: 'visitor', name: '查看访客预约结果' }
+    ];
 
     // ---------- 工具 ----------
     function pad(n) { return String(n).padStart(2, '0'); }
@@ -269,9 +288,7 @@
     function today() { return fmtDate(new Date()); }
     function nowText() { return new Date().toTimeString().slice(0, 8); }
     function t(s) { return '[' + nowText() + '] ' + s; }
-    function esc(s) {
-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
+    function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     function dateWindow(base) {
         var out = [];
         for (var i = 1; i <= OPEN_DAYS; i++) {
@@ -283,8 +300,7 @@
     }
     function msgId() {
         return 'b7' + Math.random().toString(16).slice(2, 8) + '-' +
-            Math.random().toString(16).slice(2, 6) + '-' +
-            Math.random().toString(16).slice(2, 10);
+            Math.random().toString(16).slice(2, 6) + '-' + Math.random().toString(16).slice(2, 10);
     }
     function b64(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/=+$/, ''); }
     function mockJwt(userId) {
@@ -302,10 +318,8 @@
             stocks[dt] = [];
             for (var i = 0; i < SEG_COUNT; i++) stocks[dt].push(Math.floor(QUOTA_PER_DAY / SEG_COUNT));
         });
-        return {
-            base: today(), mode: 'NORMAL', stocks: stocks, grabbed: {},
-            orders: {}, outbox: [], seq: { ticket: 1, visitor: 1 }
-        };
+        return { base: today(), mode: 'NORMAL', stocks: stocks, grabbed: {}, orders: {},
+            outbox: [], seq: { ticket: 1, visitor: 1 } };
     }
     var state = load();
     function load() {
@@ -320,13 +334,16 @@
     }
     function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
 
+    var currentStep = 0;
+    var activeOrderId = null;
+    var autoFollow = false;
+    // 当前访客 userId 缓存（#userId 输入框仅在步骤①渲染，其余步骤用它回填）
+    var lastUid = 1001;
+
     // ---------- 核心：grab 模拟 ----------
     function grab(userId, date) {
         var resp = { code: 200, message: 'success', data: null };
-        if (!state.stocks[date]) {
-            resp = { code: 400, message: '非法日期（超出放票窗口）', data: null };
-            return resp;
-        }
+        if (!state.stocks[date]) return { code: 400, message: '非法日期（超出放票窗口）', data: null };
         var g = state.grabbed[date] || [];
         if (g.indexOf(userId) >= 0) {
             resp.data = { status: 'DUPLICATE', message: '您已预约过该日期，请勿重复提交' };
@@ -349,27 +366,35 @@
         state.orders[id] = {
             messageId: id, userId: userId, visitDate: date, segId: hit,
             status: 'RESERVING', retryCount: 0, ticketCode: null, visitorId: null,
-            createdAt: Date.now(), log: [t('Redis 分段扣减成功（第 ' + hit + ' 段），订单已创建，进入处理中')]
+            createdAt: Date.now(), timeline: [], reply: null
         };
+        addTimeline(id, 'created', 'ok', 'Redis 分段扣减成功（第 ' + hit + ' 段），订单已创建');
         state.outbox.push({ messageId: id, status: 'PENDING', ts: Date.now() });
+        addTimeline(id, 'outbox', 'ok', 'Outbox 消息已落库（PENDING，与订单同事务）');
         save();
         scheduleFlow(id);
         resp.data = { messageId: id, status: '处理中' };
         return resp;
     }
 
-    // ---------- 核心：状态机流转（模拟 Outbox + 访客回执 + 补偿） ----------
+    function addTimeline(id, evt, cls, text) {
+        var order = state.orders[id];
+        if (!order) return;
+        order.timeline.push({ evt: evt, cls: cls, time: Date.now(), text: text });
+    }
+
+    // ---------- 核心：状态机流转 ----------
     var timers = {};
     function scheduleFlow(id) {
         var order = state.orders[id];
         if (!order || order.status !== 'RESERVING') return;
         if (timers[id]) return;
         timers[id] = setTimeout(function () {
-            var order2 = state.orders[id];
-            if (!order2 || order2.status !== 'RESERVING') { timers[id] = null; return; }
+            var o2 = state.orders[id];
+            if (!o2 || o2.status !== 'RESERVING') { timers[id] = null; return; }
             var ob = state.outbox.filter(function (o) { return o.messageId === id; })[0];
             if (ob) { ob.status = 'SENT'; ob.ts = Date.now(); }
-            order2.log.push(t('Outbox 已发送 visitor.reserve.* 预约请求（访客系统）'));
+            addTimeline(id, 'sent', 'ok', 'Outbox 已发送 visitor.reserve.* 预约请求（访客系统）');
             save();
             setTimeout(function () { receiveReply(id); }, 1300);
         }, 900);
@@ -383,28 +408,35 @@
             order.status = 'SUCCESS';
             order.ticketCode = 'TK' + order.visitDate.replace(/-/g, '') + String(state.seq.ticket++).padStart(5, '0');
             order.visitorId = 'V' + order.visitDate.replace(/-/g, '') + String(state.seq.visitor++).padStart(3, '0');
+            order.reply = {
+                replyMsgId: msgId(), externalOrderNo: 'EXT-' + order.messageId.slice(3, 11).toUpperCase(),
+                reserveNo: 'RSV' + order.visitDate.replace(/-/g, '') + String(state.seq.visitor).padStart(4, '0'),
+                repliedAt: Date.now()
+            };
             if (ob) ob.status = 'REPLIED';
-            order.log.push(t('访客系统回执成功：预约完成，票据已生成'));
+            addTimeline(id, 'reply_ok', 'ok', '访客系统回执成功：预约完成');
+            addTimeline(id, 'success', 'ok', '订单状态流转为 SUCCESS，票据已生成');
         } else if (state.mode === 'DEGRADED') {
             order.retryCount++;
             if (ob) ob.status = 'PENDING';
-            order.log.push(t('回执失败，但当前为降级期：只重发、不退款，订单保持 RESERVING（文案「预约确认中」）'));
+            addTimeline(id, 'reply_fail', 'warn', '回执失败，但当前为降级期：只重发、不退款（文案「预约确认中」）');
             save();
             timers[id] = setTimeout(function () {
                 var o3 = state.orders[id];
                 if (o3 && o3.status === 'RESERVING') {
                     var ob2 = state.outbox.filter(function (o) { return o.messageId === id; })[0];
                     if (ob2) ob2.status = 'SENT';
+                    addTimeline(id, 'sent', 'ok', '降级期第 ' + o3.retryCount + ' 次重发预约请求');
                     setTimeout(function () { receiveReply(id); }, 1200);
                 }
             }, 2400);
             return;
         } else {
             order.retryCount++;
-            order.log.push(t('回执失败，第 ' + order.retryCount + ' 次重发（补偿任务）'));
+            addTimeline(id, 'reply_fail', 'warn', '回执失败，第 ' + order.retryCount + ' 次重发（补偿任务）');
             if (order.retryCount >= 3) {
                 order.status = 'REFUNDING';
-                order.log.push(t('重试 3 次仍失败：进入退款流程（释放票 + 回补库存 + 移除限购标记）'));
+                addTimeline(id, 'refunding', 'warn', '重试 3 次仍失败：进入退款流程');
                 save();
                 timers[id] = setTimeout(function () {
                     var o4 = state.orders[id];
@@ -415,7 +447,7 @@
                     state.grabbed[o4.visitDate] = g4.filter(function (u) { return u !== o4.userId; });
                     var ob4 = state.outbox.filter(function (o) { return o.messageId === id; })[0];
                     if (ob4) ob4.status = 'FAILED';
-                    o4.log.push(t('退款完成：库存精确回补至第 ' + o4.segId + ' 段，用户可重新抢票'));
+                    addTimeline(id, 'refunded', 'fail', '退款完成：库存精确回补至第 ' + o4.segId + ' 段，用户可重新抢票');
                     save();
                     timers[id] = null;
                 }, 1600);
@@ -437,12 +469,22 @@
         timers[id] = null;
     }
 
+    // ---------- 步骤管理 ----------
+    function setStep(i) { currentStep = i; autoFollow = false; renderAll(); }
+    function stepDone(i) {
+        // 当前订单已走过的环节数：RESERVING 走完 0-1；终态走完 0-4；SUCCESS 走完 0-5
+        var o = activeOrderId ? state.orders[activeOrderId] : null;
+        if (!o) return 0;
+        if (o.status === 'RESERVING' || o.status === 'REFUNDING') return 1;
+        if (o.status === 'REFUNDED') return 3;
+        return 5; // SUCCESS
+    }
+
     // ---------- 渲染 ----------
     var curDate = null;
     function selectedDate() {
         if (curDate && state.stocks[curDate]) return curDate;
-        var dates = dateWindow(state.base);
-        return dates[0];
+        return dateWindow(state.base)[0];
     }
     function totalStock(date) {
         var s = state.stocks[date];
@@ -464,6 +506,21 @@
         }
     }
 
+    function renderStepper() {
+        var doneUpTo = stepDone();
+        document.getElementById('stepper').innerHTML = STEPS.map(function (s, i) {
+            var cls = 'stepper-node';
+            if (i === currentStep) cls += ' active';
+            else if (i <= doneUpTo) cls += ' done';
+            var num = i <= doneUpTo ? '✓' : (i + 1);
+            return '<div class="' + cls + '" data-step="' + i + '">' +
+                '<div class="num">' + num + '</div><div class="name">' + (i + 1) + '. ' + s.name + '</div></div>';
+        }).join('');
+        document.querySelectorAll('.stepper-node').forEach(function (node) {
+            node.addEventListener('click', function () { setStep(parseInt(node.dataset.step, 10)); });
+        });
+    }
+
     function renderDates() {
         var box = document.getElementById('dateChips');
         box.innerHTML = dateWindow(state.base).map(function (dt) {
@@ -478,90 +535,248 @@
             chip.addEventListener('click', function () {
                 curDate = chip.dataset.date;
                 renderDates();
-                renderReq();
             });
         });
     }
 
-    function renderReq() {
-        var uid = parseInt(document.getElementById('userId').value, 10) || 1001;
-        var jwt = mockJwt(uid);
-        document.getElementById('jwtText').textContent = jwt;
+    function renderFlow() {
+        var titleEl = document.getElementById('flowTitle');
+        var tipEl = document.getElementById('flowTip');
+        var body = document.getElementById('flowBody');
+        var step = STEPS[currentStep];
+        var o = activeOrderId ? state.orders[activeOrderId] : null;
+        var uidEl = document.getElementById('userId');
+        var uid = uidEl ? (parseInt(uidEl.value, 10) || 1001) : lastUid;
         var dt = selectedDate();
-        document.getElementById('reqBox').innerHTML =
-            esc('POST /api/v1/tickets/grab\nAuthorization: Bearer ' + jwt + '\nContent-Type: application/json\n\n{\n  "visitDate": "' + dt + '"\n}');
+        var jwt = mockJwt(uid);
+
+        if (currentStep === 0) {
+            titleEl.textContent = '① 抢购 · POST /api/v1/tickets/grab';
+            tipEl.textContent = 'JWT 本地验签 → 分段库存 Lua 原子扣减 → Redis Stream 可靠入队，毫秒级返回 messageId 单凭据。';
+            var reqText = 'POST /api/v1/tickets/grab\nAuthorization: Bearer ' + jwt +
+                '\nContent-Type: application/json\n\n{\n  "visitDate": "' + dt + '"\n}';
+            var resText = document.getElementById('resBoxKeep') ? document.getElementById('resBoxKeep').value : '';
+            // 内容签名守卫：setInterval 每 600ms 调 renderAll，若 uid/日期/响应未变化则跳过重建，避免输入框丢焦点
+            var sig0 = uid + '|' + dt + '|' + (resText || '');
+            if (body.dataset.sig === sig0 && document.getElementById('grabBtn')) {
+                renderDates();
+                return;
+            }
+            body.dataset.sig = sig0;
+            body.innerHTML =
+                '<div class="field-row">' +
+                '<label class="field">访客 userId <input id="userId" type="number" min="1" value="' + uid + '"></label>' +
+                '<button id="grabBtn" class="btn btn-primary">发起预约 grab</button></div>' +
+                '<div class="jwt-box"><b>Authorization: Bearer</b> <span id="jwtText">' + esc(jwt) + '</span></div>' +
+                '<div id="dateChips" class="date-chips"></div>' +
+                '<div class="sample-grid">' +
+                '<div class="sample"><div class="sample-label req">请求</div><pre class="code-box">' + esc(reqText) + '</pre></div>' +
+                '<div class="sample"><div class="sample-label res">响应</div><pre class="code-box" id="resBox">' +
+                esc(resText || '（点击 grab 后此处返回 messageId）') + '</pre></div></div>';
+            document.getElementById('grabBtn').addEventListener('click', doGrab);
+            document.getElementById('userId').addEventListener('input', function () {
+                // 只刷新 JWT 与日期（避免重建 body 导致输入框丢焦点），并同步签名阻止 setInterval 重建
+                lastUid = parseInt(this.value, 10) || 1001;
+                body.dataset.sig = lastUid + '|' + selectedDate() + '|' + (resText || '');
+                document.getElementById('jwtText').textContent = mockJwt(lastUid);
+                renderDates();
+            });
+            renderDates();
+            return;
+        }
+
+        if (!o) {
+            titleEl.textContent = (currentStep + 1) + '. ' + step.name;
+            tipEl.textContent = '';
+            body.innerHTML = '<p class="panel-tip" style="margin:8px 0 0">暂无订单，请先回到「① 抢购」发起一笔 grab。</p>';
+            return;
+        }
+
+        if (currentStep === 1) {
+            titleEl.textContent = '② 处理中 · RESERVING（自动轮询）';
+            tipEl.textContent = '接口已毫秒级返回，订单进入状态机 RESERVING：消费者落库 + Outbox 投递 + 等待访客系统回执。';
+            var spin = o.status === 'RESERVING';
+            body.innerHTML = '<div class="loading-wrap">' +
+                (spin ? '<div class="spinner"></div>' : '<div class="sm">' + smNodes(o) + '</div>') +
+                '<div class="loading-text">' + (spin ? '预约处理中，正在自动轮询…' : '处理完成，请查看结果') + '</div>' +
+                '<div class="loading-sub">messageId: ' + esc(shortId(o.messageId)) + ' · 重试 ' + o.retryCount + ' 次</div>' +
+                '<div class="loading-sub">' + (state.mode === 'DEGRADED' && o.status === 'RESERVING'
+                    ? '降级期：只重发不退款，文案「预约确认中」' : '主链路 RT < 50ms，异步环节由补偿任务保障') + '</div></div>' +
+                '<button class="mini-btn" style="margin-top:12px" onclick="void(0)">' +
+                'GET /api/v1/tickets/status?messageId=' + esc(shortId(o.messageId)) + '（每 600ms 自动刷新）</button>';
+            return;
+        }
+
+        if (currentStep === 2) {
+            titleEl.textContent = '③ 查询购票结果 · GET /api/v1/tickets/status';
+            tipEl.textContent = '前端携带 messageId 轮询（此处每 600ms 模拟一次），凭据是幂等、查询、补偿、对账的共同锚点。';
+            body.innerHTML =
+                '<div class="sample-label req">请求</div>' +
+                '<pre class="code-box">GET /api/v1/tickets/status?messageId=' + esc(o.messageId) + '\n' +
+                esc('Authorization: Bearer ' + jwt) + '</pre>' +
+                '<div class="sample-label res" style="margin-top:14px">实时响应（自动刷新）</div>' +
+                '<pre class="code-box">' + esc(JSON.stringify(statusPayload(o), null, 2)) + '</pre>';
+            return;
+        }
+
+        if (currentStep === 3) {
+            titleEl.textContent = '④ 返回购票结果';
+            tipEl.textContent = '状态机词表：RESERVING → SUCCESS / REFUNDING → REFUNDED；词表越收敛，调用方沟通成本越低。';
+            var meta = STATUS_META[o.status];
+            var extra = '';
+            if (o.status === 'SUCCESS') {
+                extra = '<div class="ticket-box">购票成功：票据 <code>' + o.ticketCode + '</code> · 访客号 <code>' +
+                    o.visitorId + '</code></div>';
+            } else if (o.status === 'REFUNDED') {
+                extra = '<div class="ticket-box" style="background:var(--red-soft);color:#b91c1c">购票失败已退款：库存已回补，可重新抢票</div>';
+            } else if (o.status === 'RESERVING') {
+                extra = '<div class="ticket-box" style="background:var(--amber-soft);color:#92400e">' +
+                    (state.mode === 'DEGRADED' ? '降级期：「预约确认中」，退款暂停' : '仍在排队处理中') + '</div>';
+            }
+            body.innerHTML = '<div class="sm">' + smNodes(o) + '</div>' +
+                '<div class="order-head" style="margin-top:12px"><span class="badge ' + meta.cls + '">' + meta.text + '</span></div>' +
+                extra +
+                '<div class="sample-label res" style="margin-top:14px">响应体</div>' +
+                '<pre class="code-box">' + esc(JSON.stringify(statusPayload(o), null, 2)) + '</pre>' +
+                '<div class="order-actions">' +
+                '<button class="mini-btn" data-goto="4">下一步：查看购票详情 →</button>' +
+                '<button class="mini-btn" data-goto="5">查看访客预约结果 →</button></div>';
+            body.querySelectorAll('[data-goto]').forEach(function (b) {
+                b.addEventListener('click', function () { setStep(parseInt(b.dataset.goto, 10)); });
+            });
+            return;
+        }
+
+        if (currentStep === 4) {
+            titleEl.textContent = '⑤ 查看购票详情 · 订单时间线';
+            tipEl.textContent = '订单从创建到终态的全部事件；每个节点可回溯到具体环节（扣减段 / Outbox / 回执 / 退款）。';
+            body.innerHTML =
+                '<div class="sm">' + smNodes(o) + '</div>' +
+                '<div class="kv">' +
+                kv('messageId', o.messageId) + kv('visitDate', o.visitDate) +
+                kv('userId', o.userId) + kv('扣减分段', 'seg ' + o.segId) +
+                kv('ticketCode', o.ticketCode || '--') + kv('visitorId', o.visitorId || '--') +
+                kv('retryCount', o.retryCount) + kv('订单状态', o.status) +
+                '</div><ul class="timeline">' + timelineHtml(o) + '</ul>';
+            return;
+        }
+
+        // currentStep === 5：访客预约结果
+        titleEl.textContent = '⑥ 查看访客预约结果 · 回执契约';
+        tipEl.textContent = '我方 → 访客系统走 Outbox 可靠消息，回执走 ticket.reserve.reply.*；messageId + externalOrderNo 双幂等键。';
+        if (o.status === 'SUCCESS' && o.reply) {
+            body.innerHTML =
+                '<div class="ticket-box">访客系统预约成功 ✓</div>' +
+                '<div class="kv">' +
+                kv('回执 messageId', o.reply.replyMsgId) + kv('externalOrderNo（业务幂等键）', o.reply.externalOrderNo) +
+                kv('visitorId', o.visitorId) + kv('预约编号 reserveNo', o.reply.reserveNo) +
+                kv('visitDate', o.visitDate) + kv('回执时间', new Date(o.reply.repliedAt).toTimeString().slice(0, 8)) +
+                '</div>' +
+                '<div class="sample-label res" style="margin-top:14px">回执消息（ticket.reserve.reply.*）</div>' +
+                '<pre class="code-box">' + esc(JSON.stringify({
+                    replyMessageId: o.reply.replyMsgId, messageId: o.messageId,
+                    externalOrderNo: o.reply.externalOrderNo, visitorId: o.visitorId,
+                    reserveNo: o.reply.reserveNo, visitDate: o.visitDate, result: 'SUCCESS'
+                }, null, 2)) + '</pre>';
+        } else if (o.status === 'RESERVING') {
+            body.innerHTML = '<div class="loading-wrap"><div class="spinner"></div>' +
+                '<div class="loading-text">' + (state.mode === 'DEGRADED'
+                    ? '降级期：访客系统异常，预约确认中（只重发不退款）' : '等待访客系统回执中…') + '</div>' +
+                '<div class="loading-sub">回执到达后此处展示预约结果</div></div>';
+        } else {
+            body.innerHTML = '<div class="ticket-box" style="background:var(--red-soft);color:#b91c1c">' +
+                '访客预约失败：重试 3 次后已退款，票已释放</div>' +
+                '<ul class="timeline">' + timelineHtml(o) + '</ul>';
+        }
     }
 
-    function renderSegs() {
-        var dt = selectedDate();
-        var segs = state.stocks[dt] || [];
-        var box = document.getElementById('segList');
-        box.innerHTML = segs.map(function (left, i) {
-            var pct = Math.round(left / (QUOTA_PER_DAY / SEG_COUNT) * 100);
-            var zero = left === 0 ? ' zero' : '';
-            return '<div class="seg' + zero + '">' +
-                '<div class="seg-name"><span>段 ' + i + '</span><span>' + left + ' / ' + (QUOTA_PER_DAY / SEG_COUNT) + '</span></div>' +
-                '<div class="seg-track"><div class="seg-fill" style="width:' + pct + '%"></div></div>' +
-                '<div class="seg-num">' + dt + ' · 已扣 ' + (QUOTA_PER_DAY / SEG_COUNT - left) + '</div></div>';
+    function kv(k, v) {
+        return '<div class="kv-row"><span class="k">' + esc(k) + '</span><span class="v">' + esc(String(v)) + '</span></div>';
+    }
+    function timelineHtml(o) {
+        return o.timeline.slice().reverse().map(function (item) {
+            return '<li class="' + item.cls + '">' + esc(item.text) +
+                '<span class="time">' + new Date(item.time).toTimeString().slice(0, 8) + '</span></li>';
         }).join('');
     }
-
+    function smNodes(o) {
+        if (o.status === 'RESERVING') {
+            return '<span class="sm-node on">RESERVING</span><span class="sm-arrow">→</span>' +
+                '<span class="sm-node">SUCCESS</span><span class="sm-arrow">/</span>' +
+                '<span class="sm-node">REFUNDING</span><span class="sm-arrow">→</span><span class="sm-node">REFUNDED</span>';
+        }
+        if (o.status === 'SUCCESS') {
+            return '<span class="sm-node done">RESERVING</span><span class="sm-arrow">→</span>' +
+                '<span class="sm-node on">SUCCESS</span>';
+        }
+        if (o.status === 'REFUNDING') {
+            return '<span class="sm-node done">RESERVING</span><span class="sm-arrow">→</span>' +
+                '<span class="sm-node refunding">REFUNDING</span><span class="sm-arrow">→</span>' +
+                '<span class="sm-node">REFUNDED</span>';
+        }
+        return '<span class="sm-node done">RESERVING</span><span class="sm-arrow">→</span>' +
+            '<span class="sm-node done">REFUNDING</span><span class="sm-arrow">→</span>' +
+            '<span class="sm-node refunded">REFUNDED</span>';
+    }
+    function statusPayload(o) {
+        var data = { messageId: o.messageId, status: o.status };
+        if (o.status === 'SUCCESS') { data.visitorId = o.visitorId; data.ticketCode = o.ticketCode; }
+        if (o.status === 'REFUNDED') { data.refunded = true; }
+        if (o.status === 'RESERVING' && state.mode === 'DEGRADED') { data.degraded = true; }
+        return { code: 200, message: 'success', data: data };
+    }
     var STATUS_META = {
         RESERVING: { cls: 'badge-blue', text: 'RESERVING · 处理中' },
         SUCCESS: { cls: 'badge-high', text: 'SUCCESS · 预约成功' },
         REFUNDING: { cls: 'badge-mid', text: 'REFUNDING · 退款中' },
         REFUNDED: { cls: 'badge-low', text: 'REFUNDED · 已退款' }
     };
+
     function renderOrders() {
         var box = document.getElementById('orderList');
         var ids = Object.keys(state.orders).sort(function (a, b) { return state.orders[b].createdAt - state.orders[a].createdAt; });
         if (!ids.length) {
-            box.innerHTML = '<p class="panel-tip" style="margin:8px 0 0">暂无订单，去抢票台发起第一笔 grab 吧。</p>';
+            box.innerHTML = '<p class="panel-tip" style="margin:8px 0 0">暂无订单，去「① 抢购」发起第一笔 grab 吧。</p>';
             return;
         }
         box.innerHTML = ids.map(function (id) {
             var o = state.orders[id];
             var meta = STATUS_META[o.status];
-            var nodes = '';
-            if (o.status === 'RESERVING') {
-                nodes = '<span class="sm-node on">RESERVING</span><span class="sm-arrow">→</span>' +
-                    '<span class="sm-node">SUCCESS</span><span class="sm-arrow">/</span>' +
-                    '<span class="sm-node">REFUNDING</span><span class="sm-arrow">→</span><span class="sm-node">REFUNDED</span>';
-            } else if (o.status === 'SUCCESS') {
-                nodes = '<span class="sm-node done">RESERVING</span><span class="sm-arrow">→</span>' +
-                    '<span class="sm-node on">SUCCESS</span>';
-            } else if (o.status === 'REFUNDING') {
-                nodes = '<span class="sm-node done">RESERVING</span><span class="sm-arrow">→</span>' +
-                    '<span class="sm-node refunding">REFUNDING</span><span class="sm-arrow">→</span>' +
-                    '<span class="sm-node">REFUNDED</span>';
-            } else {
-                nodes = '<span class="sm-node done">RESERVING</span><span class="sm-arrow">→</span>' +
-                    '<span class="sm-node done">REFUNDING</span><span class="sm-arrow">→</span>' +
-                    '<span class="sm-node refunded">REFUNDED</span>';
-            }
-            var ticket = '';
-            if (o.status === 'SUCCESS') {
-                ticket = '<div class="ticket-box">票据 <code>' + o.ticketCode + '</code> · 访客号 <code>' + o.visitorId + '</code>（status 接口返回）</div>';
-            }
-            var statusJson = JSON.stringify({ code: 200, data: {
-                status: o.status, messageId: o.messageId, visitorId: o.visitorId, ticketCode: o.ticketCode
-            } }, null, 2);
-            var logHtml = o.log.map(function (line) {
-                var cls = '';
-                if (line.indexOf('成功') >= 0) cls = 'ok';
-                else if (line.indexOf('失败') >= 0 || line.indexOf('退款') >= 0) cls = line.indexOf('退款完成') >= 0 ? 'fail' : 'warn';
-                return '<span class="' + cls + '">' + esc(line) + '</span>';
-            }).join('<br>');
-            return '<div class="order-card">' +
+            var sel = id === activeOrderId ? ' sel' : '';
+            return '<div class="order-card' + sel + '" data-oid="' + id + '">' +
                 '<div class="order-head"><span class="badge ' + meta.cls + '">' + meta.text + '</span>' +
                 '<span class="order-meta">userId ' + o.userId + ' · ' + o.visitDate + ' · 重试 ' + o.retryCount + '</span></div>' +
                 '<div class="order-id">messageId: ' + esc(o.messageId) + '</div>' +
-                '<div class="sm">' + nodes + '</div>' +
-                ticket +
-                '<pre class="order-log">' + logHtml + '</pre>' +
-                '<div class="status-json">GET /api/v1/tickets/status?messageId=' + shortId(o.messageId) + ' → ' +
-                esc(JSON.stringify(statusJson).replace(/\n/g, ' ')) + '</div>' +
-                '</div>';
+                '<div class="sm">' + smNodes(o) + '</div>' +
+                (o.status === 'SUCCESS' ? '<div class="ticket-box">票据 <code>' + o.ticketCode + '</code></div>' : '') +
+                '<div class="order-actions">' +
+                '<button class="mini-btn" data-oid="' + id + '" data-step="3">返回购票结果</button>' +
+                '<button class="mini-btn" data-oid="' + id + '" data-step="4">购票详情</button>' +
+                '<button class="mini-btn" data-oid="' + id + '" data-step="5">访客预约结果</button>' +
+                '</div></div>';
+        }).join('');
+        box.querySelectorAll('.order-card').forEach(function (card) {
+            card.addEventListener('click', function () { activeOrderId = card.dataset.oid; renderAll(); });
+        });
+        box.querySelectorAll('[data-step]').forEach(function (b) {
+            b.addEventListener('click', function (e) {
+                e.stopPropagation();
+                activeOrderId = b.dataset.oid;
+                setStep(parseInt(b.dataset.step, 10));
+            });
+        });
+    }
+
+    function renderSegs() {
+        var dt = selectedDate();
+        var segs = state.stocks[dt] || [];
+        document.getElementById('segList').innerHTML = segs.map(function (left, i) {
+            var pct = Math.round(left / (QUOTA_PER_DAY / SEG_COUNT) * 100);
+            var zero = left === 0 ? ' zero' : '';
+            return '<div class="seg' + zero + '">' +
+                '<div class="seg-name"><span>段 ' + i + '</span><span>' + left + ' / ' + (QUOTA_PER_DAY / SEG_COUNT) + '</span></div>' +
+                '<div class="seg-track"><div class="seg-fill" style="width:' + pct + '%"></div></div>' +
+                '<div class="seg-num">' + dt + ' · 已扣 ' + (QUOTA_PER_DAY / SEG_COUNT - left) + '</div></div>';
         }).join('');
     }
 
@@ -579,7 +794,6 @@
     }
 
     function renderRecon() {
-        var box = document.getElementById('reconBox');
         var dt = selectedDate();
         var redisDeduct = QUOTA_PER_DAY - totalStock(dt);
         var dbOrders = 0, visitorOk = 0;
@@ -593,39 +807,47 @@
         var verdict = consistent
             ? '<div class="recon-verdict" style="background:var(--green-soft);color:#047857">对账一致 ✓（Redis 扣减 == DB 订单 ≥ 访客成功）</div>'
             : '<div class="recon-verdict" style="background:var(--amber-soft);color:#92400e">短暂不一致（退款/流转中，补偿任务最终追平）</div>';
-        box.innerHTML =
+        document.getElementById('reconBox').innerHTML =
             '<div class="recon-row"><span>Redis 分段扣减量（' + dt + '）</span><span class="num">' + redisDeduct + '</span></div>' +
             '<div class="recon-row"><span>DB ticket_order 订单数</span><span class="num">' + dbOrders + '</span></div>' +
-            '<div class="recon-row"><span>访客系统预约成功数</span><span class="num">' + visitorOk + '</span></div>' +
-            verdict;
+            '<div class="recon-row"><span>访客系统预约成功数</span><span class="num">' + visitorOk + '</span></div>' + verdict;
     }
 
     function renderAll() {
+        // 自动推进：订单到达终态时，若处于自动跟随模式则前进到「返回结果」
+        var o = activeOrderId ? state.orders[activeOrderId] : null;
+        if (autoFollow && o && (o.status === 'SUCCESS' || o.status === 'REFUNDED') && currentStep < 3) {
+            currentStep = 3;
+        }
         renderMode();
-        renderDates();
-        renderSegs();
+        renderStepper();
+        renderFlow();
         renderOrders();
+        renderSegs();
         renderOutbox();
         renderRecon();
     }
 
     // ---------- 交互 ----------
-    document.getElementById('userId').addEventListener('input', renderReq);
-    document.getElementById('grabBtn').addEventListener('click', function () {
+    function doGrab() {
         var uid = parseInt(document.getElementById('userId').value, 10) || 1001;
         var dt = selectedDate();
-        renderReq();
         var resp = grab(uid, dt);
-        document.getElementById('resBox').innerHTML = esc(JSON.stringify(resp, null, 2));
+        var resBox = document.getElementById('resBox');
+        if (resBox) resBox.innerHTML = esc(JSON.stringify(resp, null, 2));
         if (resp.data && resp.data.messageId) {
-            toast('grab 成功，messageId：' + shortId(resp.data.messageId) + '，正在流转状态机…');
+            activeOrderId = resp.data.messageId;
+            currentStep = 1;
+            autoFollow = true;
+            toast('grab 成功：messageId ' + shortId(resp.data.messageId) + '，已进入「处理中」');
         } else if (resp.data && resp.data.status === 'DUPLICATE') {
             toast('限购拦截：该用户已预约过该日期');
         } else if (resp.data && resp.data.status === 'SOLD_OUT') {
             toast('售罄：全部分段无余票');
         }
         renderAll();
-    });
+    }
+
     document.getElementById('modeToggle').addEventListener('click', function () {
         state.mode = state.mode === 'NORMAL' ? 'DEGRADED' : 'NORMAL';
         save();
@@ -635,15 +857,17 @@
             : '已恢复 NORMAL：补偿任务追平，未完成订单恢复正常流转');
     });
     document.getElementById('resetBtn').addEventListener('click', function () {
-        if (!confirm('确认一键清除全部模拟数据？（订单 / 分段库存 / 限购标记 / Outbox 全部重置）')) return;
+        if (!confirm('确认一键清除全部模拟数据？（订单 / 时间线 / 分段库存 / 限购标记 / Outbox 全部重置）')) return;
         Object.keys(timers).forEach(function (id) { clearTimeout(timers[id]); });
         timers = {};
         localStorage.removeItem(KEY);
         state = freshState();
+        currentStep = 0;
+        activeOrderId = null;
+        autoFollow = false;
         curDate = null;
-        document.getElementById('resBox').innerHTML = '';
         renderAll();
-        toast('已清除全部模拟数据，状态机与库存已重置');
+        toast('已清除全部模拟数据，流程回到「① 抢购」');
     });
 
     var toastTimer = null;
@@ -656,7 +880,6 @@
     }
 
     // ---------- 启动 ----------
-    renderReq();
     renderAll();
     setInterval(renderAll, 600);
 })();

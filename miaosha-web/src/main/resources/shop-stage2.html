@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阶段 2 · 限流 + 悲观锁商城</title>
+    <style>
+        :root {
+            --bg: #f6f8fb; --panel: #ffffff; --text: #172033; --muted: #667085; --line: #e6ebf2;
+            --primary: #2563eb; --primary-soft: #dbeafe; --red: #ef4444; --red-soft: #fee2e2;
+            --green: #10b981; --green-soft: #d1fae5; --amber: #f59e0b; --amber-soft: #fef3c7;
+            --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+        .nav { background: #0f172a; color: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+            position: sticky; top: 0; z-index: 10; }
+        .nav a { color: #93c5fd; text-decoration: none; font-size: 14px; }
+        .nav a:hover { text-decoration: underline; }
+        .nav .badge { background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+        .nav .title { font-size: 15px; font-weight: 700; flex: 1; }
+        .wrap { max-width: 900px; margin: 28px auto 60px; padding: 0 20px; display: grid; gap: 20px; }
+        .card { background: var(--panel); border-radius: 18px; padding: 24px; box-shadow: var(--shadow); border: 1px solid rgba(230,235,242,.9); }
+        .product { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .product .pic { width: 120px; height: 120px; border-radius: 16px; background: linear-gradient(135deg,#dbeafe,#bfdbfe);
+            display: flex; align-items: center; justify-content: center; font-size: 56px; }
+        .product .info { flex: 1; min-width: 240px; }
+        .product .info h1 { font-size: 24px; margin-bottom: 4px; }
+        .product .info .sub { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+        .price { display: flex; align-items: baseline; gap: 10px; }
+        .price .now { color: var(--red); font-size: 30px; font-weight: 800; }
+        .price .old { color: #98a2b3; text-decoration: line-through; font-size: 14px; }
+        .stock-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+        .stock-bar { flex: 1; height: 10px; border-radius: 999px; background: #eef2f7; overflow: hidden; }
+        .stock-bar .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg,#60a5fa,#2563eb); transition: width .4s ease; }
+        .stock-num { font-size: 13px; color: var(--muted); white-space: nowrap; }
+        .stock-num b { color: var(--text); font-size: 16px; }
+        .panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 720px) { .panel-grid { grid-template-columns: 1fr; } }
+        .sub-panel { border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+        .sub-panel h3 { font-size: 15px; margin-bottom: 4px; }
+        .sub-panel .tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--primary-soft); color: #1d4ed8; margin-left: 6px; }
+        .sub-panel .hint { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+        .btn { border: 0; cursor: pointer; border-radius: 14px; padding: 14px 26px; font-size: 16px; font-weight: 700;
+            letter-spacing: .03em; transition: transform .1s ease, filter .15s ease; font-family: inherit; }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .55; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg,#3b82f6,#2563eb); color: #fff; box-shadow: 0 8px 20px rgba(37,99,235,.35); }
+        .btn-warn { background: linear-gradient(135deg,#f59e0b,#d97706); color: #fff; }
+        .btn-secondary { background: #f1f5f9; color: #334155; }
+        .result-box { margin-top: 16px; background: #0f172a; border-radius: 14px; padding: 16px 18px; color: #e2e8f0;
+            font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; max-height: 280px; overflow-y: auto; }
+        .result-box .line { margin-bottom: 6px; word-break: break-all; }
+        .line.ok { color: #6ee7b7; } .line.fail { color: #fca5a5; } .line.cmt { color: #94a3b8; } .line.warn { color: #fcd34d; }
+        .theory h2 { font-size: 17px; margin-bottom: 10px; }
+        .theory p { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+        .theory .sql { background: #0f172a; color: #a5f3fc; border-radius: 12px; padding: 14px 16px;
+            font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; margin: 12px 0; overflow-x: auto; }
+        .banner { padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+        .banner.blue { background: var(--primary-soft); color: #1d4ed8; }
+        .banner.green { background: var(--green-soft); color: #047857; }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="seckill-shop.html">← 返回商城</a>
+        <span class="badge">阶段 2</span>
+        <span class="title">限流 + 悲观锁商城</span>
+        <a href="shop-stage3.html">下一方案：验签 →</a>
+    </nav>
+    <main class="wrap">
+        <section class="card">
+            <div class="product">
+                <div class="pic">🎫</div>
+                <div class="info">
+                    <h1>特展联票 · 限流版</h1>
+                    <div class="sub">两个独立柜台：悲观锁 sid=13（不限流）· 令牌桶+乐观锁 sid=14（每秒 10 个令牌）</div>
+                    <div class="price"><span class="now">¥99</span><span class="old">¥199</span><span class="banner green" style="padding:2px 10px;font-size:12px">卖得完 · 不超卖</span></div>
+                    <div class="stock-row">
+                        <div class="stock-bar"><div id="stockFill" class="fill" style="width:100%"></div></div>
+                        <span class="stock-num">悲观锁柜台剩余 <b id="stockNum">--</b> 件</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="card">
+            <div class="panel-grid">
+                <div class="sub-panel">
+                    <h3>柜台 A · 悲观锁<span class="tag">SELECT FOR UPDATE</span></h3>
+                    <p class="hint">DB 行锁串行化：并发请求排队等锁，一个一个扣减，业务成功率 94%~100%。</p>
+                    <div class="actions">
+                        <button id="buyPessBtn" class="btn btn-primary">立即抢购</button>
+                        <button id="burstPessBtn" class="btn btn-secondary">并发 ×20</button>
+                    </div>
+                    <div id="resPess" class="result-box"></div>
+                </div>
+                <div class="sub-panel">
+                    <h3>柜台 B · Guava 令牌桶 + 乐观锁<span class="tag">10 令牌/秒</span></h3>
+                    <p class="hint">1 秒内拿不到令牌直接拒绝——把突发削成均匀流量，CAS 冲突大幅下降。</p>
+                    <div class="actions">
+                        <button id="buyLimitBtn" class="btn btn-warn">立即抢购</button>
+                        <button id="burstLimitBtn" class="btn btn-secondary">疯狂连点 ×20</button>
+                    </div>
+                    <div id="resLimit" class="result-box"></div>
+                </div>
+            </div>
+        </section>
+        <section class="card theory">
+            <h2>两个武器：限流削峰 + 悲观锁兜底</h2>
+            <div class="sql">-- 悲观锁：事务内锁行
+SELECT * FROM stock WHERE id = ? FOR UPDATE;  -- 其他事务在等锁
+UPDATE stock SET sale = sale + 1 WHERE id = ?; -- 轮到我了再扣
+
+-- 令牌桶：非阻塞 tryAcquire，拿不到令牌直接失败
+guavaRateLimiter.tryAcquire(1, SECONDS)</div>
+            <p>悲观锁是「卖得完」的最稳策略（50~500 VUs 下 QPS 稳定 328~340），代价是高并发排队 RT 上升；令牌桶则从入口拦截 85% 的突发请求，让乐观锁的 CAS 冲突大幅降低。</p>
+            <div class="banner blue">对比实验：同样 ×20 连点——柜台 A 全部排队成功后逐个扣减；柜台 B 突发流量被令牌桶削峰，拿不到令牌的请求被直接拒绝。</div>
+        </section>
+    </main>
+    <script>
+        var API_BASE = location.protocol === 'file:' ? 'http://localhost:8081' : '';
+        var SID_PESS = 13, SID_LIMIT = 14;
+        var $ = function (id) { return document.getElementById(id); };
+        function log(box, cls, text) {
+            var div = document.createElement('div');
+            div.className = 'line ' + cls;
+            div.textContent = text;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+        function clearLog(box) { box.innerHTML = ''; }
+        function call(path) {
+            var started = performance.now();
+            return fetch(API_BASE + path).then(function (r) { return r.text(); }).then(function (t) {
+                return { body: t, ms: Math.round(performance.now() - started) };
+            }).catch(function (e) { return { body: '请求异常：' + e.message, ms: 0 }; });
+        }
+        function parseStock(text) {
+            var m = text.match(/剩余库存为：(\d+)/);
+            return m ? parseInt(m[1], 10) : null;
+        }
+        function refreshStock() {
+            call('/seckill/stage4/stock-by-db/' + SID_PESS).then(function (r) {
+                var left = parseStock(r.body);
+                if (left !== null) {
+                    $('stockNum').textContent = left;
+                    $('stockFill').style.width = Math.max(1, left / 100) + '%';
+                }
+            });
+        }
+        function classify(body) {
+            if (body.indexOf('购买成功') === 0) return 'ok';
+            if (body.indexOf('你被限流了') === 0) return 'limited';
+            return 'fail';
+        }
+        function burstPess() {
+            var box = $('resPess'), n = 20;
+            clearLog(box);
+            log(box, 'cmt', '20 个并发请求打在同一行锁上（排队逐个扣减）…');
+            var started = performance.now();
+            var tasks = [];
+            for (var i = 0; i < n; i++) tasks.push(call('/seckill/stage2/pessimistic-order/' + SID_PESS));
+            Promise.all(tasks).then(function (rs) {
+                var wall = Math.round(performance.now() - started);
+                var ok = rs.filter(function (r) { return classify(r.body) === 'ok'; }).length;
+                var maxMs = Math.max.apply(null, rs.map(function (r) { return r.ms; }));
+                log(box, 'cmt', '总耗时 ' + wall + 'ms · 接口 QPS ≈ ' + (n * 1000 / wall).toFixed(1) + '/s · 最大等待 ' + maxMs + 'ms');
+                log(box, 'ok', '购买成功 ' + ok + ' 个，全部落库，无一超卖');
+                log(box, 'cmt', '代价：并发越大排队越久（1000 VUs 时 QPS 从 340 降到 213）');
+                refreshStock();
+            });
+        }
+        function burstLimit() {
+            var box = $('resLimit'), n = 20;
+            clearLog(box);
+            log(box, 'cmt', '20 个并发请求抢 10 个令牌/秒的桶（1 秒超时）…');
+            var started = performance.now();
+            var tasks = [];
+            for (var i = 0; i < n; i++) tasks.push(call('/seckill/stage2/optimistic-order-limited/' + SID_LIMIT));
+            Promise.all(tasks).then(function (rs) {
+                var wall = Math.round(performance.now() - started);
+                var stats = { ok: 0, limited: 0, fail: 0 };
+                rs.forEach(function (r) { stats[classify(r.body)]++; });
+                log(box, 'cmt', '总耗时 ' + wall + 'ms · 接口 QPS ≈ ' + (n * 1000 / wall).toFixed(1) + '/s');
+                log(box, 'ok', '购买成功 ' + stats.ok + ' 个');
+                log(box, 'warn', '被限流拦截 ' + stats.limited + ' 个（' + (stats.limited * 100 / n).toFixed(0) + '%）——拿不到令牌直接失败');
+                log(box, 'cmt', '限流削峰后，令牌以内的请求 CAS 冲突大幅降低');
+                refreshStock();
+            });
+        }
+        $('buyPessBtn').addEventListener('click', function () {
+            var box = $('resPess');
+            clearLog(box);
+            log(box, 'cmt', 'GET /seckill/stage2/pessimistic-order/' + SID_PESS);
+            this.disabled = true;
+            var self = this;
+            call('/seckill/stage2/pessimistic-order/' + SID_PESS).then(function (r) {
+                log(box, classify(r.body) === 'ok' ? 'ok' : 'fail', r.ms + 'ms · ' + r.body);
+                self.disabled = false;
+                refreshStock();
+            });
+        });
+        $('buyLimitBtn').addEventListener('click', function () {
+            var box = $('resLimit');
+            clearLog(box);
+            log(box, 'cmt', 'GET /seckill/stage2/optimistic-order-limited/' + SID_LIMIT);
+            this.disabled = true;
+            var self = this;
+            call('/seckill/stage2/optimistic-order-limited/' + SID_LIMIT).then(function (r) {
+                var c = classify(r.body);
+                log(box, c === 'ok' ? 'ok' : 'warn', r.ms + 'ms · ' + r.body);
+                if (c === 'limited') log(box, 'cmt', '多连点几下试试——每 100ms 才补充 1 个令牌');
+                self.disabled = false;
+                refreshStock();
+            });
+        });
+        $('burstPessBtn').addEventListener('click', burstPess);
+        $('burstLimitBtn').addEventListener('click', burstLimit);
+        refreshStock();
+    </script>
+</body>
+</html>
