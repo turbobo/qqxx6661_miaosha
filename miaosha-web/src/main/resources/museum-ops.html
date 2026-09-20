@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云上博物馆 · 履约调度台</title>
+<style>
+:root {
+    --bg: #17140f;
+    --panel: #201c15;
+    --panel-2: #2a251b;
+    --line: #3a3326;
+    --ink: #e9e0cc;
+    --ink-soft: #b3a88f;
+    --ink-faint: #7d7360;
+    --gold: #c9a45c;
+    --gold-soft: #8f753f;
+    --seal: #d25b45;
+    --seal-deep: #a13c2c;
+    --ok: #7fae8a;
+    --warn: #d9a441;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+}
+body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.06'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; position: relative; z-index: 1; }
+
+.masthead {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 0; border-bottom: 1px solid var(--line);
+    flex-wrap: wrap; gap: 12px;
+}
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand h1 {
+    font-family: "Songti SC", "STSong", "SimSun", serif;
+    font-size: 21px; letter-spacing: 6px; font-weight: 600;
+}
+.brand .tag {
+    font-size: 11px; color: var(--gold);
+    border: 1px solid var(--gold-soft);
+    padding: 2px 8px; border-radius: 3px; letter-spacing: 3px;
+}
+.masthead .links a {
+    color: var(--ink-soft); text-decoration: none; font-size: 12.5px;
+    letter-spacing: 2px; border-bottom: 1px solid var(--line);
+    padding-bottom: 2px; margin-left: 18px;
+}
+.masthead .links a:hover { color: var(--gold); border-color: var(--gold); }
+
+.sub-title { margin: 30px 0 18px; color: var(--ink-faint); font-size: 13px; letter-spacing: 3px; }
+
+/* 统计卡 */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+@media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stat-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+}
+.stat-card .label { font-size: 12px; color: var(--ink-faint); letter-spacing: 2px; }
+.stat-card .num { font-family: "Songti SC", "STSong", serif; font-size: 34px; margin-top: 8px; font-weight: 600; }
+.stat-card .num.seal { color: var(--seal); }
+.stat-card .num.warn { color: var(--warn); }
+.stat-card .num.ok { color: var(--ok); }
+
+/* 工具条 */
+.toolbar { display: flex; align-items: center; justify-content: space-between; margin-top: 30px; flex-wrap: wrap; gap: 12px; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tab {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink-soft);
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all .16s ease;
+}
+.tab:hover { border-color: var(--gold-soft); color: var(--ink); }
+.tab.on { background: var(--gold); border-color: var(--gold); color: #17140f; font-weight: 600; }
+.actions-bar { display: flex; gap: 10px; align-items: center; }
+.btn {
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: all .16s ease;
+}
+.btn:hover { border-color: var(--gold); color: var(--gold); }
+.btn.gold { background: var(--gold); border-color: var(--gold); color: #17140f; font-weight: 600; }
+.btn.gold:hover { background: #d8b36a; }
+.btn.seal { background: var(--seal-deep); border-color: var(--seal); color: #f5ead9; }
+.btn.seal:hover { background: var(--seal); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* 表格 */
+.table-box {
+    margin-top: 16px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+}
+table { width: 100%; border-collapse: collapse; }
+thead th {
+    text-align: left;
+    font-size: 12px;
+    color: var(--ink-faint);
+    letter-spacing: 2px;
+    font-weight: 500;
+    padding: 13px 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+}
+tbody td {
+    padding: 14px 18px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(58, 51, 38, .6);
+    vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: rgba(201, 164, 92, .05); }
+.mono { font-family: "SF Mono", "Menlo", monospace; font-size: 12px; color: var(--ink-soft); word-break: break-all; }
+.badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    letter-spacing: 2px;
+    border: 1px solid;
+}
+.badge.PENDING, .badge.PROCESSING { color: var(--warn); border-color: rgba(217, 164, 65, .5); }
+.badge.RETRYING { color: var(--seal); border-color: rgba(210, 91, 69, .5); }
+.badge.MANUAL_PENDING { color: var(--seal); border-color: var(--seal); background: rgba(210, 91, 69, .12); }
+.badge.VISITOR_SUCCESS { color: var(--ok); border-color: rgba(127, 174, 138, .5); }
+.err-text { color: var(--seal); font-size: 12px; max-width: 260px; line-height: 1.5; }
+.op-input {
+    width: 96px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink);
+    padding: 6px 9px;
+    font-size: 12.5px;
+    outline: none;
+    margin-right: 8px;
+}
+.op-input:focus { border-color: var(--gold); }
+.row-actions { white-space: nowrap; }
+.row-actions .btn { padding: 6px 12px; font-size: 12px; margin-right: 6px; }
+.empty { text-align: center; color: var(--ink-faint); padding: 44px 0; letter-spacing: 3px; font-size: 13px; }
+
+/* 演示说明 */
+.demo-note {
+    margin-top: 34px;
+    background: var(--panel);
+    border: 1px dashed var(--gold-soft);
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 2;
+}
+.demo-note b { color: var(--gold); }
+.demo-note code { color: var(--seal); font-family: "SF Mono", "Menlo", monospace; }
+footer { text-align: center; color: var(--ink-faint); font-size: 12px; letter-spacing: 3px; margin-top: 56px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <header class="masthead">
+        <div class="brand">
+            <h1>履约调度台</h1>
+            <span class="tag">入馆预约 · 人工保障</span>
+        </div>
+        <div class="links">
+            <a href="museum-reservation.html">返回用户预约页</a>
+        </div>
+    </header>
+
+    <div class="sub-title">访客预约履约总览 · 购票成功后，入馆预约必须办妥</div>
+
+    <div class="stats">
+        <div class="stat-card"><div class="label">待人工办理</div><div class="num seal" id="statManual">—</div></div>
+        <div class="stat-card"><div class="label">系统办理中</div><div class="num warn" id="statPending">—</div></div>
+        <div class="stat-card"><div class="label">已办妥</div><div class="num ok" id="statDone">—</div></div>
+        <div class="stat-card"><div class="label">全部任务</div><div class="num" id="statAll">—</div></div>
+    </div>
+
+    <div class="toolbar">
+        <div class="tabs">
+            <button class="tab on" data-filter="">全部</button>
+            <button class="tab" data-filter="MANUAL_PENDING">待人工</button>
+            <button class="tab" data-filter="PENDING">待办理</button>
+            <button class="tab" data-filter="RETRYING">补偿中</button>
+            <button class="tab" data-filter="VISITOR_SUCCESS">已办妥</button>
+        </div>
+        <div class="actions-bar">
+            <button class="btn gold" id="refreshBtn" type="button">刷新数据</button>
+        </div>
+    </div>
+
+    <div class="table-box">
+        <table>
+            <thead>
+                <tr>
+                    <th>购票订单号</th>
+                    <th>预约人</th>
+                    <th>场次</th>
+                    <th>状态</th>
+                    <th>尝试次数</th>
+                    <th>最近说明</th>
+                    <th>人工操作</th>
+                </tr>
+            </thead>
+            <tbody id="taskBody">
+                <tr><td colspan="7" class="empty">加载中…</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="demo-note">
+        <b>演示规则（模拟访客系统）：</b>预约人编号尾数为 <code>8</code> 时，访客系统持续无法自动通过，任务进入「待人工」，
+        需在下方人工完成；尾数为 <code>9</code> 时，前两次自动办理失败，系统自动补偿后办妥；其他编号直接办妥。
+        <b>业务保障：</b>无论访客系统如何失败，购票权益不受影响，人工兜底保证入馆预约最终完成。
+    </div>
+
+    <footer>云上博物馆 · 内部运营通道</footer>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var API = {
+        tasks: '/api/fulfillment/ops/tasks',
+        retry: '/api/fulfillment/ops/tasks/{orderNo}/retry',
+        complete: '/api/fulfillment/ops/tasks/{orderNo}/complete'
+    };
+    var SLOT_LABELS = { SAT_AM: '周六 · 上午', SAT_PM: '周六 · 下午', SUN_AM: '周日 · 上午' };
+    var STATUS_LABELS = {
+        PENDING: '待办理', PROCESSING: '办理中', RETRYING: '自动补偿中',
+        MANUAL_PENDING: '待人工办理', VISITOR_SUCCESS: '已办妥'
+    };
+
+    var currentFilter = '';
+    var allTasks = [];
+
+    var els = {
+        taskBody: document.getElementById('taskBody'),
+        tabs: document.querySelectorAll('.tab'),
+        refreshBtn: document.getElementById('refreshBtn'),
+        statManual: document.getElementById('statManual'),
+        statPending: document.getElementById('statPending'),
+        statDone: document.getElementById('statDone'),
+        statAll: document.getElementById('statAll')
+    };
+
+    function loadTasks() {
+        return fetch(API.tasks).then(function (resp) { return resp.json(); })
+            .then(function (json) {
+                if (json && json.code === 200 && Array.isArray(json.data)) {
+                    allTasks = json.data;
+                } else {
+                    allTasks = [];
+                }
+                render();
+            })
+            .catch(function () { els.taskBody.innerHTML = '<tr><td colspan="7" class="empty">加载失败，请重试</td></tr>'; });
+    }
+
+    function renderStats() {
+        var manual = 0, pending = 0, done = 0;
+        allTasks.forEach(function (task) {
+            if (task.status === 'MANUAL_PENDING') { manual += 1; }
+            if (task.status === 'PENDING' || task.status === 'PROCESSING' || task.status === 'RETRYING') { pending += 1; }
+            if (task.status === 'VISITOR_SUCCESS') { done += 1; }
+        });
+        els.statManual.textContent = manual;
+        els.statPending.textContent = pending;
+        els.statDone.textContent = done;
+        els.statAll.textContent = allTasks.length;
+    }
+
+    function escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function render() {
+        renderStats();
+        var list = currentFilter ? allTasks.filter(function (t) { return t.status === currentFilter; }) : allTasks;
+        if (!list.length) {
+            els.taskBody.innerHTML = '<tr><td colspan="7" class="empty">暂无任务</td></tr>';
+            return;
+        }
+        els.taskBody.innerHTML = list.map(function (task) {
+            var orderNo = escapeHtml(task.orderNo);
+            var status = task.status || '';
+            var retry = task.retryCount == null ? 0 : task.retryCount;
+            var error = task.lastErrorMessage ? escapeHtml(task.lastErrorMessage) : (task.lastErrorCode ? escapeHtml(task.lastErrorCode) : '—');
+            var actions = '';
+            if (status === 'MANUAL_PENDING') {
+                actions = '<input class="op-input" id="op-' + orderNo + '" placeholder="处理人" maxlength="20">'
+                    + '<button class="btn seal" data-action="complete" data-order="' + orderNo + '">人工办妥</button>'
+                    + '<button class="btn" data-action="retry" data-order="' + orderNo + '">再试一次</button>';
+            } else if (status === 'PENDING' || status === 'RETRYING') {
+                actions = '<button class="btn" data-action="retry" data-order="' + orderNo + '">立即办理</button>';
+            } else {
+                actions = '<span style="color:var(--ink-faint);font-size:12px;">—</span>';
+            }
+            return '<tr>'
+                + '<td class="mono">' + orderNo + '</td>'
+                + '<td>' + escapeHtml(task.userId) + '</td>'
+                + '<td>' + escapeHtml(SLOT_LABELS[task.visitSlot] || task.visitSlot) + '</td>'
+                + '<td><span class="badge ' + status + '">' + escapeHtml(STATUS_LABELS[status] || status) + '</span></td>'
+                + '<td>' + retry + '</td>'
+                + '<td class="err-text">' + error + '</td>'
+                + '<td class="row-actions">' + actions + '</td>'
+                + '</tr>';
+        }).join('');
+    }
+
+    function callRetry(orderNo) {
+        fetch(API.retry.replace('{orderNo}', encodeURIComponent(orderNo)), { method: 'POST' })
+            .then(function (resp) { return resp.json(); })
+            .then(function (json) {
+                if (json && json.code === 200) {
+                    loadTasks();
+                } else {
+                    alert((json && json.message) || '操作失败');
+                }
+            })
+            .catch(function () { alert('网络异常，请重试'); });
+    }
+
+    function callComplete(orderNo) {
+        var input = document.getElementById('op-' + orderNo);
+        var operator = input ? input.value.trim() : '';
+        if (!operator) { alert('请填写处理人姓名'); return; }
+        fetch(API.complete.replace('{orderNo}', encodeURIComponent(orderNo)) + '?operator=' + encodeURIComponent(operator),
+            { method: 'POST' })
+            .then(function (resp) { return resp.json(); })
+            .then(function (json) {
+                if (json && json.code === 200) {
+                    loadTasks();
+                } else {
+                    alert((json && json.message) || '操作失败');
+                }
+            })
+            .catch(function () { alert('网络异常，请重试'); });
+    }
+
+    els.taskBody.addEventListener('click', function (event) {
+        var target = event.target;
+        var action = target.getAttribute('data-action');
+        var orderNo = target.getAttribute('data-order');
+        if (!action || !orderNo) { return; }
+        if (action === 'retry') { callRetry(orderNo); }
+        if (action === 'complete') { callComplete(orderNo); }
+    });
+
+    els.tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            els.tabs.forEach(function (t) { t.classList.remove('on'); });
+            tab.classList.add('on');
+            currentFilter = tab.getAttribute('data-filter') || '';
+            render();
+        });
+    });
+
+    els.refreshBtn.addEventListener('click', loadTasks);
+    loadTasks();
+    setInterval(loadTasks, 5000);
+})();
+</script>
+</body>
+</html>

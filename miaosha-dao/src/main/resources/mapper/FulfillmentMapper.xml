@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.monitor4all.miaoshadao.mapper.FulfillmentMapper">
+    <resultMap id="OrderMap" type="cn.monitor4all.miaoshadao.entity.FulfillmentTicketOrder">
+        <id column="order_no" property="orderNo"/>
+        <result column="user_id" property="userId"/>
+        <result column="stock_id" property="stockId"/>
+        <result column="visit_slot" property="visitSlot"/>
+        <result column="ticket_status" property="ticketStatus"/>
+        <result column="fulfillment_status" property="fulfillmentStatus"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+    <resultMap id="TaskMap" type="cn.monitor4all.miaoshadao.entity.VisitorReservationTask">
+        <id column="order_no" property="orderNo"/>
+        <result column="reservation_no" property="reservationNo"/>
+        <result column="user_id" property="userId"/>
+        <result column="visit_slot" property="visitSlot"/>
+        <result column="status" property="status"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="next_retry_time" property="nextRetryTime"/>
+        <result column="last_error_code" property="lastErrorCode"/>
+        <result column="last_error_message" property="lastErrorMessage"/>
+        <result column="operator" property="operator"/>
+        <result column="complete_time" property="completeTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+    <resultMap id="OutboxMap" type="cn.monitor4all.miaoshadao.entity.FulfillmentOutboxEvent">
+        <id column="event_id" property="eventId"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="event_type" property="eventType"/>
+        <result column="payload" property="payload"/>
+        <result column="status" property="status"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="next_retry_time" property="nextRetryTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <update id="reserveStock">UPDATE stock SET sale = sale + 1, version = version + 1 WHERE id = #{stockId} AND sale &lt; count</update>
+    <select id="selectStockRemaining" resultType="java.lang.Integer">SELECT count - sale FROM stock WHERE id = #{stockId}</select>
+    <insert id="insertOrder" parameterType="cn.monitor4all.miaoshadao.entity.FulfillmentTicketOrder">INSERT INTO fulfillment_ticket_order (order_no, user_id, stock_id, visit_slot, ticket_status, fulfillment_status, create_time, update_time) VALUES (#{orderNo}, #{userId}, #{stockId}, #{visitSlot}, #{ticketStatus}, #{fulfillmentStatus}, #{createTime}, #{updateTime})</insert>
+    <insert id="insertTask" parameterType="cn.monitor4all.miaoshadao.entity.VisitorReservationTask">INSERT INTO visitor_reservation_task (order_no, reservation_no, user_id, visit_slot, status, retry_count, next_retry_time, create_time, update_time) VALUES (#{orderNo}, #{reservationNo}, #{userId}, #{visitSlot}, #{status}, #{retryCount}, #{nextRetryTime}, #{createTime}, #{updateTime})</insert>
+    <insert id="insertOutbox" parameterType="cn.monitor4all.miaoshadao.entity.FulfillmentOutboxEvent">INSERT INTO fulfillment_outbox_event (event_id, order_no, event_type, payload, status, retry_count, next_retry_time, create_time, update_time) VALUES (#{eventId}, #{orderNo}, #{eventType}, #{payload}, #{status}, #{retryCount}, #{nextRetryTime}, #{createTime}, #{updateTime})</insert>
+
+    <select id="selectOrder" resultMap="OrderMap">SELECT order_no, user_id, stock_id, visit_slot, ticket_status, fulfillment_status, create_time, update_time FROM fulfillment_ticket_order WHERE order_no = #{orderNo}</select>
+    <select id="selectOrderByUserSlot" resultMap="OrderMap">SELECT order_no, user_id, stock_id, visit_slot, ticket_status, fulfillment_status, create_time, update_time FROM fulfillment_ticket_order WHERE user_id = #{userId} AND stock_id = 22 AND visit_slot = #{visitSlot}</select>
+    <select id="selectTask" resultMap="TaskMap">SELECT order_no, reservation_no, user_id, visit_slot, status, retry_count, next_retry_time, last_error_code, last_error_message, operator, complete_time, create_time, update_time FROM visitor_reservation_task WHERE order_no = #{orderNo}</select>
+    <select id="selectTasks" resultMap="TaskMap">SELECT order_no, reservation_no, user_id, visit_slot, status, retry_count, next_retry_time, last_error_code, last_error_message, operator, complete_time, create_time, update_time FROM visitor_reservation_task <if test="status != null and status != ''">WHERE status = #{status}</if> ORDER BY update_time DESC LIMIT 100</select>
+    <select id="selectDispatchableEvents" resultMap="OutboxMap">SELECT event_id, order_no, event_type, payload, status, retry_count, next_retry_time, create_time, update_time FROM fulfillment_outbox_event WHERE status = 'PENDING' AND (next_retry_time IS NULL OR next_retry_time &lt;= #{now}) ORDER BY create_time ASC LIMIT #{limit}</select>
+
+    <update id="markEventSent">UPDATE fulfillment_outbox_event SET status = 'SENT', retry_count = retry_count + 1, update_time = #{now} WHERE event_id = #{eventId} AND status = 'PENDING'</update>
+    <update id="markEventConsumed">UPDATE fulfillment_outbox_event SET status = 'CONSUMED', update_time = #{now} WHERE event_id = #{eventId}</update>
+    <update id="requeueEvent">UPDATE fulfillment_outbox_event SET status = 'PENDING', next_retry_time = #{nextRetryTime}, update_time = #{now} WHERE event_id = #{eventId}</update>
+    <update id="markEventManual">UPDATE fulfillment_outbox_event SET status = 'MANUAL', update_time = #{now} WHERE event_id = #{eventId}</update>
+    <update id="requeueEventByOrder">UPDATE fulfillment_outbox_event SET status = 'PENDING', next_retry_time = #{nextRetryTime}, update_time = #{now} WHERE order_no = #{orderNo}</update>
+    <update id="markEventManualByOrder">UPDATE fulfillment_outbox_event SET status = 'MANUAL', update_time = #{now} WHERE order_no = #{orderNo}</update>
+    <update id="claimTask">UPDATE visitor_reservation_task SET status = 'PROCESSING', update_time = #{now} WHERE order_no = #{orderNo} AND status IN ('PENDING', 'RETRYING')</update>
+    <update id="markTaskSuccess">UPDATE visitor_reservation_task SET status = 'VISITOR_SUCCESS', operator = #{operator}, complete_time = #{now}, update_time = #{now}, last_error_code = NULL, last_error_message = NULL WHERE order_no = #{orderNo}</update>
+    <update id="markTaskRetry">UPDATE visitor_reservation_task SET status = 'RETRYING', retry_count = #{retryCount}, next_retry_time = #{nextRetryTime}, last_error_code = #{errorCode}, last_error_message = #{errorMessage}, update_time = #{now} WHERE order_no = #{orderNo}</update>
+    <update id="markTaskManual">UPDATE visitor_reservation_task SET status = 'MANUAL_PENDING', retry_count = #{retryCount}, last_error_code = #{errorCode}, last_error_message = #{errorMessage}, next_retry_time = NULL, update_time = #{now} WHERE order_no = #{orderNo}</update>
+    <update id="markOrderFulfillment">UPDATE fulfillment_ticket_order SET fulfillment_status = #{status}, update_time = #{now} WHERE order_no = #{orderNo}</update>
+</mapper>

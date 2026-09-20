@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云上博物馆 · 特展预约</title>
+<style>
+:root {
+    --paper: #f5efe3;
+    --paper-deep: #ece3d2;
+    --ink: #211d18;
+    --ink-soft: #5c554b;
+    --ink-faint: #9a9184;
+    --seal: #b23a2c;
+    --seal-deep: #8f2b20;
+    --gold: #a8873c;
+    --gold-soft: #d6c397;
+    --line: #d8cdb8;
+    --ok: #3f6b4f;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    position: relative;
+}
+/* 纸张颗粒 */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: .55;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px 96px; position: relative; z-index: 1; }
+
+/* ===== 顶栏 ===== */
+.masthead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand .seal-mark {
+    width: 40px; height: 40px;
+    background: var(--seal);
+    color: var(--paper);
+    font-family: "Songti SC", "STSong", "SimSun", serif;
+    font-size: 13px;
+    line-height: 1.15;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border-radius: 4px;
+    transform: rotate(-4deg);
+    letter-spacing: 2px;
+    box-shadow: 0 2px 6px rgba(140, 40, 25, .25);
+}
+.brand h1 {
+    font-family: "Songti SC", "STSong", "SimSun", serif;
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: 8px;
+}
+.brand .sub { color: var(--ink-faint); font-size: 12px; letter-spacing: 3px; }
+.masthead .date-tag { color: var(--ink-soft); font-size: 13px; letter-spacing: 2px; }
+
+/* ===== 主视觉 ===== */
+.hero { padding: 56px 0 40px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.hero .expo-kicker { color: var(--seal); letter-spacing: 6px; font-size: 13px; margin-bottom: 14px; }
+.hero h2 {
+    font-family: "Songti SC", "STSong", "SimSun", serif;
+    font-size: 54px;
+    font-weight: 700;
+    letter-spacing: 10px;
+    line-height: 1.2;
+}
+.hero .expo-en { color: var(--ink-faint); font-size: 14px; letter-spacing: 4px; margin-top: 10px; }
+.stamp {
+    width: 92px; height: 92px;
+    border: 2.5px solid var(--seal);
+    color: var(--seal);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: "Songti SC", "STSong", "SimSun", serif;
+    font-size: 15px; letter-spacing: 6px;
+    transform: rotate(8deg);
+    position: relative;
+    background: rgba(178, 58, 44, .04);
+}
+.stamp::after {
+    content: "";
+    position: absolute; inset: 6px;
+    border: 1px dashed rgba(178, 58, 44, .55);
+    border-radius: 50%;
+}
+
+/* ===== 双栏 ===== */
+.layout { display: grid; grid-template-columns: 1.25fr 1fr; gap: 44px; align-items: start; }
+@media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+
+/* ===== 票券卡片 ===== */
+.ticket {
+    background: #fbf7ee;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 34px 34px 30px;
+    position: relative;
+    box-shadow: 0 14px 34px rgba(60, 45, 25, .08);
+    overflow: hidden;
+}
+.ticket::before, .ticket::after {
+    content: "";
+    position: absolute;
+    width: 26px; height: 26px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    top: 118px;
+}
+.ticket::before { left: -14px; }
+.ticket::after { right: -14px; }
+.ticket .perforation {
+    position: absolute;
+    left: 0; right: 0; top: 130px;
+    border-top: 1.5px dashed var(--line);
+}
+.ticket-top { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 26px; }
+.ticket-name {
+    font-family: "Songti SC", "STSong", "SimSun", serif;
+    font-size: 24px; font-weight: 600; letter-spacing: 3px;
+}
+.ticket-name small { display: block; margin-top: 6px; font-size: 12px; color: var(--ink-faint); letter-spacing: 2px; font-family: inherit; font-weight: 400; }
+.price-box { text-align: right; }
+.price-box .now { color: var(--seal); font-size: 30px; font-weight: 700; font-family: "Songti SC", "STSong", serif; }
+.price-box .now i { font-style: normal; font-size: 15px; }
+.price-box .was { color: var(--ink-faint); text-decoration: line-through; font-size: 13px; margin-top: 2px; }
+.price-box .tag { display: inline-block; margin-top: 8px; font-size: 11px; color: var(--gold); border: 1px solid var(--gold-soft); border-radius: 3px; padding: 2px 8px; letter-spacing: 2px; }
+.ticket-mid { padding: 24px 0 4px; display: flex; justify-content: space-between; color: var(--ink-soft); font-size: 13px; letter-spacing: 1px; }
+.ticket-mid b { color: var(--ink); font-weight: 600; }
+.quota-line { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-soft); margin-top: 14px; }
+.quota-line .quota-num { color: var(--seal); font-weight: 700; font-size: 18px; font-family: "Songti SC", "STSong", serif; }
+.quota-line button.refresh-quota {
+    border: none; background: none; cursor: pointer;
+    color: var(--gold); font-size: 12px; letter-spacing: 2px;
+    border-bottom: 1px solid var(--gold-soft);
+    padding-bottom: 1px;
+}
+
+/* ===== 表单 ===== */
+.field { margin-top: 26px; }
+.field label { display: block; font-size: 13px; letter-spacing: 3px; color: var(--ink-soft); margin-bottom: 12px; }
+.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 560px) { .slots { grid-template-columns: 1fr; } }
+.slot-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #f7f1e4;
+    padding: 14px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .18s ease;
+    position: relative;
+}
+.slot-card .slot-day { font-family: "Songti SC", "STSong", serif; font-size: 16px; font-weight: 600; letter-spacing: 2px; }
+.slot-card .slot-time { display: block; margin-top: 5px; font-size: 12px; color: var(--ink-faint); letter-spacing: 1px; }
+.slot-card:hover { border-color: var(--gold); background: #faf4e6; transform: translateY(-2px); }
+.slot-card.selected {
+    border-color: var(--seal);
+    background: #fdf2ec;
+    box-shadow: 0 0 0 1px var(--seal) inset;
+}
+.slot-card.selected::after {
+    content: "已选";
+    position: absolute; top: -9px; right: 10px;
+    background: var(--seal); color: #fff;
+    font-size: 10px; padding: 2px 7px; border-radius: 3px;
+    letter-spacing: 2px;
+}
+.visitor-input {
+    margin-top: 12px;
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fbf7ee;
+    padding: 15px 16px;
+    font-size: 16px;
+    color: var(--ink);
+    letter-spacing: 1px;
+    outline: none;
+    transition: border-color .18s ease;
+}
+.visitor-input:focus { border-color: var(--gold); }
+.visitor-input::placeholder { color: var(--ink-faint); letter-spacing: 1px; }
+
+.btn-primary {
+    margin-top: 22px;
+    width: 100%;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #c14a38, #9d2f22);
+    color: #fdf6ea;
+    font-family: "Songti SC", "STSong", "SimSun", serif;
+    font-size: 17px;
+    letter-spacing: 8px;
+    padding: 16px 8px 16px 16px;
+    cursor: pointer;
+    transition: all .18s ease;
+    box-shadow: 0 8px 20px rgba(150, 45, 30, .28);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(150, 45, 30, .34); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { background: #c9c0b0; cursor: not-allowed; box-shadow: none; transform: none; }
+.btn-primary.settled { background: var(--ok); box-shadow: 0 8px 20px rgba(50, 90, 65, .25); }
+
+.notice { margin-top: 20px; font-size: 12.5px; color: var(--ink-soft); line-height: 1.9; border-left: 3px solid var(--gold-soft); padding-left: 14px; }
+.notice b { color: var(--ink); }
+
+/* ===== 进度面板 ===== */
+.progress-panel {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #f8f3e7;
+    padding: 30px 28px;
+    position: sticky;
+    top: 20px;
+}
+.progress-panel h3 {
+    font-family: "Songti SC", "STSong", "SimSun", serif;
+    font-size: 18px; letter-spacing: 4px;
+    margin-bottom: 24px;
+    display: flex; align-items: center; gap: 10px;
+}
+.progress-panel h3 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--seal); }
+.steps { list-style: none; }
+.steps li { display: flex; gap: 14px; position: relative; padding-bottom: 26px; }
+.steps li:last-child { padding-bottom: 0; }
+.steps li::before {
+    content: "";
+    position: absolute;
+    left: 13px; top: 30px; bottom: 4px;
+    width: 1px;
+    background: var(--line);
+}
+.steps li:last-child::before { display: none; }
+.steps .node {
+    width: 27px; height: 27px;
+    border-radius: 50%;
+    border: 1.5px solid var(--line);
+    background: var(--paper);
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    color: var(--ink-faint);
+    z-index: 1;
+}
+.steps li .step-body { padding-top: 2px; }
+.steps li .step-title { font-size: 14.5px; font-weight: 600; letter-spacing: 2px; color: var(--ink-soft); }
+.steps li .step-desc { font-size: 12.5px; color: var(--ink-faint); margin-top: 4px; line-height: 1.6; min-height: 16px; }
+.steps li.done::before { background: var(--gold-soft); }
+.steps li.done .node { background: var(--gold); border-color: var(--gold); color: #fff; }
+.steps li.done .step-title { color: var(--ink); }
+.steps li.active .node {
+    background: var(--seal); border-color: var(--seal); color: #fff;
+    animation: pulse 1.6s ease infinite;
+}
+.steps li.active .step-title { color: var(--seal); }
+.steps li.failed .node { background: var(--seal-deep); border-color: var(--seal-deep); color: #fff; }
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(178, 58, 44, .35); }
+    50% { box-shadow: 0 0 0 9px rgba(178, 58, 44, 0); }
+}
+.result-card {
+    margin-top: 22px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #fffdf6;
+    padding: 18px 18px 16px;
+    display: none;
+}
+.result-card.show { display: block; animation: rise .35s ease; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.result-card .r-title { font-size: 15px; font-weight: 700; letter-spacing: 2px; }
+.result-card .r-title.ok { color: var(--ok); }
+.result-card .r-title.wait { color: var(--gold); }
+.result-card .r-title.help { color: var(--seal); }
+.result-card .r-desc { font-size: 12.5px; color: var(--ink-soft); margin-top: 8px; line-height: 1.8; }
+.result-card .r-order { margin-top: 10px; font-size: 12px; color: var(--ink-faint); word-break: break-all; border-top: 1px dashed var(--line); padding-top: 10px; }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(178,58,44,.2); border-top-color: var(--seal); border-radius: 50%; animation: rot .8s linear infinite; vertical-align: -1px; margin-right: 8px; }
+@keyframes rot { to { transform: rotate(360deg); } }
+footer { text-align: center; color: var(--ink-faint); font-size: 12px; letter-spacing: 3px; margin-top: 64px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <header class="masthead">
+        <div class="brand">
+            <span class="seal-mark">云上<br>博物馆</span>
+            <div>
+                <h1>云上博物馆</h1>
+                <div class="sub">MUSEUM · ONLINE</div>
+            </div>
+        </div>
+        <div class="date-tag">特展预约 · 官方通道</div>
+    </header>
+
+    <section class="hero">
+        <div>
+            <div class="expo-kicker">本期特展 · 联票预约</div>
+            <h2>文明的刻度</h2>
+            <div class="expo-en">THE SCALE OF CIVILIZATION</div>
+        </div>
+        <div class="stamp">特展<br>预约</div>
+    </section>
+
+    <div class="layout">
+        <!-- 左：展览与预约表单 -->
+        <main>
+            <div class="ticket">
+                <div class="ticket-top">
+                    <div class="ticket-name">「文明的刻度」特展联票<small>含特展入场 · 全馆通览 · 语音导览</small></div>
+                    <div class="price-box">
+                        <div class="now"><i>¥</i>99</div>
+                        <div class="was">¥199</div>
+                        <span class="tag">预约制 · 每日限量</span>
+                    </div>
+                </div>
+                <div class="perforation"></div>
+                <div class="ticket-mid">
+                    <span>参观场次 <b id="pickedSlotLabel">请选择</b></span>
+                    <span>预约人编号 <b id="pickedUserId">待填写</b></span>
+                </div>
+                <div class="quota-line">
+                    <span>剩余名额</span>
+                    <span class="quota-num" id="quotaNum">—</span>
+                    <button class="refresh-quota" id="refreshQuotaBtn" type="button">刷新</button>
+                </div>
+            </div>
+
+            <div class="field">
+                <label>选择参观场次</label>
+                <div class="slots">
+                    <div class="slot-card" data-slot="SAT_AM"><span class="slot-day">周六 · 上午</span><span class="slot-time">10:00 — 12:00</span></div>
+                    <div class="slot-card" data-slot="SAT_PM"><span class="slot-day">周六 · 下午</span><span class="slot-time">14:00 — 16:00</span></div>
+                    <div class="slot-card" data-slot="SUN_AM"><span class="slot-day">周日 · 上午</span><span class="slot-time">10:00 — 12:00</span></div>
+                </div>
+            </div>
+
+            <div class="field">
+                <label>预约人编号</label>
+                <input class="visitor-input" id="userIdInput" type="number" min="1" placeholder="请输入你的预约人编号">
+            </div>
+
+            <button class="btn-primary" id="submitBtn" type="button">提交预约申请</button>
+
+            <div class="notice">
+                <b>预约说明：</b>提交后即完成购票，票券立即生效。入馆预约将由工作人员为你跟进办理，
+                如系统自动办理未完成，工作人员会人工保障你的入馆权益，不会影响已购票券使用。
+            </div>
+        </main>
+
+        <!-- 右：预约进度 -->
+        <aside>
+            <div class="progress-panel">
+                <h3><span class="dot"></span>我的预约进度</h3>
+                <ul class="steps" id="steps">
+                    <li data-step="fill"><span class="node">1</span><div class="step-body"><div class="step-title">填写信息</div><div class="step-desc">选择场次并填写预约人编号</div></div></li>
+                    <li data-step="submit"><span class="node">2</span><div class="step-body"><div class="step-title">提交预约</div><div class="step-desc" id="stepSubmitDesc">等待提交</div></div></li>
+                    <li data-step="ticket"><span class="node">3</span><div class="step-body"><div class="step-title">购票成功</div><div class="step-desc" id="stepTicketDesc">票券生效，权益已保障</div></div></li>
+                    <li data-step="visitor"><span class="node">4</span><div class="step-body"><div class="step-title">入馆预约办理</div><div class="step-desc" id="stepVisitorDesc">购票后将自动为你办理</div></div></li>
+                    <li data-step="done"><span class="node">5</span><div class="step-body"><div class="step-title">预约完成</div><div class="step-desc" id="stepDoneDesc">全部办妥后可凭票入馆</div></div></li>
+                </ul>
+                <div class="result-card" id="resultCard">
+                    <div class="r-title" id="resultTitle"></div>
+                    <div class="r-desc" id="resultDesc"></div>
+                    <div class="r-order" id="resultOrder"></div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <footer>云上博物馆 · 参观预约与访客服务</footer>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var API = {
+        quota: '/api/fulfillment/quota',
+        purchase: '/api/fulfillment/tickets',
+        status: '/api/fulfillment/tickets/status'
+    };
+    var STORAGE_KEY = 'museum-reservation-state';
+    var SLOT_LABELS = { SAT_AM: '周六 · 上午', SAT_PM: '周六 · 下午', SUN_AM: '周日 · 上午' };
+
+    var state = {
+        slot: null,
+        userId: null,
+        orderNo: null,
+        status: null,
+        polling: false,
+        pollTimer: null
+    };
+
+    var els = {
+        slotCards: document.querySelectorAll('.slot-card'),
+        userIdInput: document.getElementById('userIdInput'),
+        submitBtn: document.getElementById('submitBtn'),
+        quotaNum: document.getElementById('quotaNum'),
+        refreshQuotaBtn: document.getElementById('refreshQuotaBtn'),
+        pickedSlotLabel: document.getElementById('pickedSlotLabel'),
+        pickedUserId: document.getElementById('pickedUserId'),
+        resultCard: document.getElementById('resultCard'),
+        resultTitle: document.getElementById('resultTitle'),
+        resultDesc: document.getElementById('resultDesc'),
+        resultOrder: document.getElementById('resultOrder'),
+        stepSubmitDesc: document.getElementById('stepSubmitDesc'),
+        stepTicketDesc: document.getElementById('stepTicketDesc'),
+        stepVisitorDesc: document.getElementById('stepVisitorDesc'),
+        stepDoneDesc: document.getElementById('stepDoneDesc')
+    };
+
+    function fetchQuota() {
+        return fetch(API.quota).then(function (resp) { return resp.json(); }).then(function (json) {
+            if (json && json.code === 200) {
+                els.quotaNum.textContent = json.data;
+            }
+        }).catch(function () {});
+    }
+
+    function setStep(step, mode) {
+        var steps = document.querySelectorAll('#steps li');
+        var order = ['fill', 'submit', 'ticket', 'visitor', 'done'];
+        var targetIndex = order.indexOf(step);
+        steps.forEach(function (li) {
+            li.classList.remove('done', 'active', 'failed');
+            var index = order.indexOf(li.getAttribute('data-step'));
+            if (index < targetIndex) { li.classList.add('done'); }
+        });
+        if (mode === 'active') { steps[targetIndex].classList.add('active'); }
+        if (mode === 'failed') { steps[targetIndex].classList.add('failed'); }
+    }
+
+    function renderStatus(status) {
+        if (!status) { return; }
+        state.status = status;
+        state.orderNo = status.orderNo || state.orderNo;
+        state.userId = status.userId || state.userId;
+        state.slot = status.visitSlot || state.slot;
+
+        var fulfillment = status.fulfillmentStatus || '';
+        var retry = status.retryCount || 0;
+        var card = els.resultCard;
+        var title = els.resultTitle;
+        var desc = els.resultDesc;
+
+        card.classList.add('show');
+        els.resultOrder.textContent = '购票订单号：' + state.orderNo;
+
+        if (fulfillment === 'VISITOR_SUCCESS') {
+            stopPolling();
+            setStep('done', 'done');
+            title.className = 'r-title ok';
+            title.textContent = '入馆预约已完成';
+            desc.textContent = '你的票券与入馆预约均已办妥。参观当日请携带有效证件，凭预约人编号入馆。';
+            els.stepDoneDesc.textContent = '全部办妥，凭票入馆';
+            els.stepVisitorDesc.textContent = '办理完成';
+            els.submitBtn.textContent = '预约完成 · 查看我的预约';
+            els.submitBtn.classList.add('settled');
+            els.submitBtn.disabled = false;
+        } else if (fulfillment === 'MANUAL_PENDING') {
+            slowPolling();
+            setStep('visitor', 'active');
+            title.className = 'r-title help';
+            title.textContent = '购票成功 · 工作人员保障办理中';
+            desc.textContent = '票券已生效，无需担心。工作人员正在为你办理入馆预约，完成后本页会自动更新。';
+            els.stepVisitorDesc.textContent = '工作人员正在为你处理';
+        } else if (fulfillment === 'VISITOR_PENDING') {
+            startPolling();
+            setStep('ticket', 'done');
+            setStep('visitor', 'active');
+            title.className = 'r-title wait';
+            title.innerHTML = '<span class="spin"></span>购票成功 · 正在办理入馆预约';
+            desc.textContent = retry > 0
+                ? '系统正在为你继续办理（已尝试 ' + retry + ' 次），请稍候，本页会自动更新。'
+                : '票券已生效，系统正在自动为你办理入馆预约，请稍候。';
+            els.stepVisitorDesc.textContent = retry > 0 ? '系统自动继续办理中' : '自动办理中';
+            els.stepTicketDesc.textContent = '票券生效，权益已保障';
+        }
+    }
+
+    function pollStatus() {
+        if (!state.userId || !state.slot) { stopPolling(); return; }
+        fetch(API.status + '?userId=' + encodeURIComponent(state.userId) + '&visitSlot=' + encodeURIComponent(state.slot))
+            .then(function (resp) { return resp.json(); })
+            .then(function (json) {
+                if (json && json.code === 200 && json.data) {
+                    renderStatus(json.data);
+                }
+            })
+            .catch(function () {});
+    }
+
+    function startPolling() {
+        if (state.polling) { return; }
+        state.polling = true;
+        pollStatus();
+        state.pollTimer = setInterval(pollStatus, 3000);
+    }
+
+    function slowPolling() {
+        stopPolling();
+        state.polling = true;
+        state.pollTimer = setInterval(pollStatus, 6000);
+    }
+
+    function stopPolling() {
+        state.polling = false;
+        if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+    }
+
+    function saveLocal() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                slot: state.slot, userId: state.userId, orderNo: state.orderNo
+            }));
+        } catch (e) {}
+    }
+
+    function restoreLocal() {
+        var raw = null;
+        try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+        if (!raw) { return; }
+        var saved = null;
+        try { saved = JSON.parse(raw); } catch (e) {}
+        if (!saved || !saved.userId || !saved.slot) { return; }
+        state.slot = saved.slot;
+        state.userId = saved.userId;
+        state.orderNo = saved.orderNo;
+        els.userIdInput.value = saved.userId;
+        els.slotCards.forEach(function (card) {
+            if (card.getAttribute('data-slot') === saved.slot) { card.classList.add('selected'); }
+        });
+        els.pickedSlotLabel.textContent = SLOT_LABELS[saved.slot] || saved.slot;
+        els.pickedUserId.textContent = saved.userId;
+        els.submitBtn.textContent = '查看我的预约';
+        setStep('submit', 'done');
+        els.stepSubmitDesc.textContent = '预约申请已提交';
+        pollStatus();
+    }
+
+    function submit() {
+        var userId = els.userIdInput.value.trim();
+        if (!state.slot) { alert('请先选择参观场次'); return; }
+        if (!userId || !/^\d+$/.test(userId)) { alert('请填写正确的预约人编号'); return; }
+
+        state.userId = userId;
+        els.submitBtn.disabled = true;
+        els.submitBtn.textContent = '提交中…';
+        setStep('fill', 'done');
+        setStep('submit', 'active');
+
+        fetch(API.purchase, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: Number(userId), visitSlot: state.slot })
+        }).then(function (resp) { return resp.json(); })
+          .then(function (json) {
+              if (json && json.code === 200 && json.data) {
+                  setStep('submit', 'done');
+                  els.stepSubmitDesc.textContent = '预约申请已提交';
+                  saveLocal();
+                  renderStatus(json.data);
+                  fetchQuota();
+              } else {
+                  els.submitBtn.disabled = false;
+                  els.submitBtn.textContent = '提交预约申请';
+                  setStep('submit', 'failed');
+                  els.stepSubmitDesc.textContent = (json && json.message) || '提交失败，请重试';
+                  alert((json && json.message) || '提交失败，请稍后重试');
+              }
+          })
+          .catch(function () {
+              els.submitBtn.disabled = false;
+              els.submitBtn.textContent = '提交预约申请';
+              setStep('submit', 'failed');
+              els.stepSubmitDesc.textContent = '网络异常，请重试';
+          });
+    }
+
+    els.slotCards.forEach(function (card) {
+        card.addEventListener('click', function () {
+            if (state.orderNo && state.slot !== card.getAttribute('data-slot')) {
+                alert('本预约已锁定场次，如需变更请联系工作人员');
+                return;
+            }
+            els.slotCards.forEach(function (c) { c.classList.remove('selected'); });
+            card.classList.add('selected');
+            state.slot = card.getAttribute('data-slot');
+            els.pickedSlotLabel.textContent = SLOT_LABELS[state.slot];
+            if (state.userId) { saveLocal(); }
+        });
+    });
+
+    els.userIdInput.addEventListener('input', function () {
+        if (state.orderNo) {
+            if (els.userIdInput.value !== String(state.userId)) {
+                els.userIdInput.value = String(state.userId);
+                alert('本预约已锁定预约人，如需变更请联系工作人员');
+            }
+            return;
+        }
+        els.pickedUserId.textContent = els.userIdInput.value.trim() || '待填写';
+    });
+
+    els.submitBtn.addEventListener('click', submit);
+    els.refreshQuotaBtn.addEventListener('click', function () {
+        els.quotaNum.textContent = '…';
+        fetchQuota();
+    });
+
+    fetchQuota();
+    restoreLocal();
+})();
+</script>
+</body>
+</html>

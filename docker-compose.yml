@@ -21,11 +21,12 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
       # 初始化脚本按文件名数字前缀顺序执行（仅首次创建数据卷时生效，已有数据卷不会重跑）
-      # 顺序设计：01 建 ticket 体系与 user → 02 重建 stock/stock_order/user/order_record → 03 MQ 日志表 → 04 幂等唯一索引
+      # 顺序设计：01 建 ticket 体系与 user → 02 重建 stock/stock_order/user/order_record → 03 MQ 日志表 → 04 幂等唯一索引 → 05 购票与访客预约履约体系
       - ./sql/init_ticket_database.sql:/docker-entrypoint-initdb.d/01-init_ticket_database.sql:ro
       - ./sql/miaosha.sql:/docker-entrypoint-initdb.d/02-miaosha.sql:ro
       - ./sql/mq_message_log.sql:/docker-entrypoint-initdb.d/03-mq_message_log.sql:ro
       - ./sql/add_idempotent_index.sql:/docker-entrypoint-initdb.d/04-add_idempotent_index.sql:ro
+      - ./sql/visitor_fulfillment_system.sql:/docker-entrypoint-initdb.d/05-visitor_fulfillment_system.sql:ro
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]

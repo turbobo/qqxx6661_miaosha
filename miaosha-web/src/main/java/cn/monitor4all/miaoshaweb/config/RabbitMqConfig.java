@@ -32,6 +32,11 @@ public class RabbitMqConfig {
     public Queue purchaseDelayedQueue() {
         return new Queue("purchase.delayed.queue");
     }
+
+    @Bean
+    public Queue visitorReservationQueue() {
+        return new Queue("visitor.reservation.queue", true);
+    }
     
     @Bean
     public RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
