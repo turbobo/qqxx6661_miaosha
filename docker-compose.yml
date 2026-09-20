@@ -94,7 +94,7 @@ services:
       SPRING_RABBITMQ_PASSWORD: guest
       # JVM 内存设置（JAVA_TOOL_OPTIONS 由 JVM 自动读取；
       # 注意原 JAVA_OPTS 在 exec 形式 ENTRYPOINT 下不会生效）
-      JAVA_TOOL_OPTIONS: "-Xms1g -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof -Duser.timezone=Asia/Shanghai"
+      JAVA_TOOL_OPTIONS: "-Xms1g -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof -Duser.timezone=Asia/Shanghai -Dlogging.level.cn.monitor4all=OFF"
     depends_on:
       mysql:
         condition: service_healthy

@@ -1,0 +1,25 @@
+# 原生 arm64 JMeter 镜像（colima Apple Silicon 环境专用）
+# 替代 justb4/jmeter（amd64-only，qemu 模拟下 500 线程无法正常工作）
+FROM eclipse-temurin:11-jre
+
+ARG JMETER_VERSION=5.6.3
+
+# 换清华源加速 apt（国内网络直连 Ubuntu 官方源很慢）
+RUN sed -i 's|http://ports.ubuntu.com/ubuntu-ports|https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends tar \
+    && rm -rf /var/lib/apt/lists/*
+
+# 从清华镜像下载 JMeter（apache archive 直连慢）
+RUN wget -q "https://mirrors.tuna.tsinghua.edu.cn/apache/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz" -O /tmp/jmeter.tgz \
+    && tar -xzf /tmp/jmeter.tgz -C /opt \
+    && rm /tmp/jmeter.tgz \
+    && ln -s "/opt/apache-jmeter-${JMETER_VERSION}" /opt/jmeter
+
+ENV JMETER_HOME=/opt/jmeter
+ENV PATH=/opt/jmeter/bin:$PATH
+# 500 线程负载生成所需堆（覆盖 jmeter 脚本默认 -Xms1g -Xmx1g）
+ENV HEAP="-Xms2g -Xmx2g"
+
+WORKDIR /work
+ENTRYPOINT ["jmeter"]
