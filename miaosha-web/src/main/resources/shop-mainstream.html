@@ -120,26 +120,26 @@
 </head>
 <body>
 <nav class="nav">
-    <a href="seckill-shop.html">← 返回方案商城</a>
+    <span class="nav-mark">MUSEUM RESERVATION</span>
     <span class="brand">云上博物馆 · 特展预约通道</span>
-    <span class="nav-mark">ASYNC RESERVATION</span>
+    <span class="nav-mark">官方预约</span>
 </nav>
 <main class="page">
     <section class="hero">
         <div>
-            <div class="eyebrow">Mainstream purchase flow / 01</div>
-            <h1>先领排队凭证，<br>再等一张入馆门票。</h1>
-            <p class="lead">面向高峰预约的完整交互：请求准入、库存预占、异步入队、后台落单、结果确认。页面实际接入当前项目的 RabbitMQ 异步下单与订单轮询接口，并保存排队凭证以支持刷新页面后继续查询。</p>
+            <div class="eyebrow">Special exhibition reservation</div>
+            <h1>预约一场展览，<br>留住一段相遇。</h1>
+            <p class="lead">热门时段预约人数较多。提交预约后，请耐心等待系统处理；我们会在本页为你更新预约结果。</p>
         </div>
-        <div class="target-note"><b>生产目标链路：</b>网关限流 / 风控 → Redis Lua 原子预扣 → MQ 异步削峰 → 消费者落库 → 幂等与对账。<br>本演示后端当前已接入 MQ、Redis 用户去重、结果轮询；Lua 库存预扣接口尚未提供。</div>
+        <div class="target-note"><b>温馨提示：</b>每位访客每个场次限约一张。预约成功后，请按提示前往访客系统完成入馆登记。</div>
     </section>
 
-    <section class="flow" aria-label="抢购处理流程">
-        <article id="stepGate" class="flow-step active"><span class="step-no">01 / GATE</span><strong>请求准入</strong><small>前端防连点，生成排队凭证</small><span class="flow-state">准备中</span></article>
-        <article id="stepReserve" class="flow-step warn"><span class="step-no">02 / RESERVE</span><strong>库存预占</strong><small>生产应由 Redis Lua 原子完成</small><span class="flow-state">接口待接入</span></article>
-        <article id="stepQueue" class="flow-step"><span class="step-no">03 / QUEUE</span><strong>MQ 入队</strong><small>真实调用 RabbitMQ 异步下单</small><span class="flow-state">未提交</span></article>
-        <article id="stepConsume" class="flow-step"><span class="step-no">04 / CONSUME</span><strong>后台落单</strong><small>消费者扣库存、创建订单</small><span class="flow-state">等待处理</span></article>
-        <article id="stepResult" class="flow-step"><span class="step-no">05 / RESULT</span><strong>结果确认</strong><small>轮询直到订单终态</small><span class="flow-state">等待结果</span></article>
+    <section class="flow" aria-label="预约处理进度">
+        <article id="stepGate" class="flow-step active"><span class="step-no">01</span><strong>填写信息</strong><small>选择合适的参观场次</small><span class="flow-state">准备预约</span></article>
+        <article id="stepReserve" class="flow-step"><span class="step-no">02</span><strong>提交预约</strong><small>系统将受理你的申请</small><span class="flow-state">等待提交</span></article>
+        <article id="stepQueue" class="flow-step"><span class="step-no">03</span><strong>排队处理中</strong><small>请勿重复提交申请</small><span class="flow-state">等待处理</span></article>
+        <article id="stepConsume" class="flow-step"><span class="step-no">04</span><strong>确认名额</strong><small>正在为你安排参观名额</small><span class="flow-state">等待确认</span></article>
+        <article id="stepResult" class="flow-step"><span class="step-no">05</span><strong>预约结果</strong><small>完成后可继续入馆登记</small><span class="flow-state">等待结果</span></article>
     </section>
 
     <section class="layout">
@@ -153,41 +153,39 @@
                 </div>
             </div>
             <div class="stock">
-                <div class="stock-row"><span>当前数据库库存</span><span>剩余 <b id="stockNum">--</b> 张</span></div>
+                <div class="stock-row"><span>可预约名额</span><span>剩余 <b id="stockNum">--</b> 张</span></div>
                 <div class="bar"><i id="stockFill"></i></div>
             </div>
             <div class="facts">
-                <div class="fact"><b>1</b><span>每人限购</span></div>
-                <div class="fact"><b>MQ</b><span>异步排队</span></div>
-                <div class="fact"><b>轮询</b><span>结果可恢复</span></div>
+                <div class="fact"><b>1</b><span>每人限约</span></div>
+                <div class="fact"><b>¥99</b><span>特展联票</span></div>
+                <div class="fact"><b>电子票</b><span>预约成功可查</span></div>
             </div>
         </article>
 
         <article class="panel">
             <div class="purchase">
                 <h3>填写预约信息</h3>
-                <p>点击后将生成本次排队凭证；重复点击同一凭证不会再次提交。</p>
+                <p>提交后系统将为你保留本次预约状态，请勿重复提交。</p>
                 <div class="fields">
-                    <div><label for="userId">USER ID</label><input id="userId" type="number" min="1" max="2001" value="1001" inputmode="numeric"></div>
+                    <div><label for="userId">预约人编号</label><input id="userId" type="number" min="1" max="2001" value="1001" inputmode="numeric"></div>
                     <div><label for="visitDate">预约日期</label><select id="visitDate"><option>本周六 · 10:00–12:00</option><option>本周六 · 14:00–16:00</option><option>本周日 · 10:00–12:00</option></select></div>
                 </div>
-                <div id="requestId" class="request">requestId：正在生成…</div>
-                <button id="buyBtn" class="primary" type="button">领取排队凭证并提交预约</button>
+                <button id="buyBtn" class="primary" type="button">提交预约申请</button>
                 <div class="actions">
-                    <button id="queryBtn" class="text-btn" type="button">查询当前结果</button>
-                    <button id="newRequestBtn" class="text-btn" type="button">生成新的请求凭证</button>
-                    <button id="refreshBtn" class="text-btn" type="button">刷新库存</button>
+                    <button id="queryBtn" class="text-btn" type="button">查询预约结果</button>
+                    <button id="refreshBtn" class="text-btn" type="button">刷新名额</button>
                 </div>
             </div>
             <div class="status" aria-live="polite">
-                <div class="status-head"><h3>排队状态</h3><span id="statusPill" class="pill">未提交</span></div>
-                <p id="statusText" class="status-text">准备就绪。提交后本页会在后台持续查询订单处理结果。</p>
+                <div class="status-head"><h3>预约状态</h3><span id="statusPill" class="pill">未提交</span></div>
+                <p id="statusText" class="status-text">准备就绪。提交后本页会为你更新预约处理结果。</p>
                 <ul id="timeline" class="timeline"></ul>
             </div>
         </article>
     </section>
 
-    <aside class="notice"><b>能力边界说明：</b>当前页面真实调用的是 <code>/seckill/stage5/order-with-mq</code> 与 <code>/seckill/stage5/purchase-result</code>。它已实现 MQ 异步削峰、Redis 用户去重和结果轮询；“Redis Lua 预扣库存”和“后端 requestId 幂等”是推荐的生产增强项，当前以可见流程节点标注为待接入，未被前端伪造。</aside>
+    <aside class="notice"><b>预约须知：</b>热门场次可能需要短暂等待。若页面暂未显示结果，请稍后点击“查询预约结果”；预约成功后请尽快完成访客登记。</aside>
 </main>
 <script>
     (function () {
@@ -225,7 +223,6 @@
             node.className = 'flow-step ' + state;
             node.querySelector('.flow-state').textContent = text;
         }
-        function showRequest(data) { $('requestId').textContent = 'requestId：' + data.requestId; }
         function call(path) {
             var started = performance.now();
             return fetch(API_BASE + path).then(function (response) { return response.text(); }).then(function (body) {
@@ -238,7 +235,7 @@
         function refreshStock() {
             call('/seckill/stage4/stock-by-db/' + SID).then(function (result) {
                 var matched = result.body.match(/剩余库存为：(\d+)/);
-                if (!matched) { log('warn', '库存读取失败：' + result.body); return; }
+                if (!matched) { log('warn', '暂时无法刷新可预约名额，请稍后再试。'); return; }
                 var left = parseInt(matched[1], 10);
                 $('stockNum').textContent = left;
                 $('stockFill').style.width = Math.max(1, Math.min(100, left / 100)) + '%';
@@ -251,16 +248,16 @@
                 call('/seckill/stage5/purchase-result?sid=' + SID + '&userId=' + encodeURIComponent(data.userId)).then(function (result) {
                     if (result.body.indexOf('恭喜您') === 0) {
                         data.state = 'SUCCESS'; save(data);
-                        setStep('stepConsume', 'done', '已完成');
+                        setStep('stepConsume', 'done', '名额已确认');
                         setStep('stepResult', 'done', '预约成功');
-                        setPill('success', '预约成功', '订单已完成处理。请在访客系统完成后续登记。');
-                        log('ok', '第 ' + tries + ' 次查询（' + result.ms + 'ms）：' + result.body);
+                        setPill('success', '预约成功', '你的参观名额已确认，请继续完成访客登记。');
+                        log('ok', '预约结果已确认。');
                         refreshStock();
                         return;
                     }
-                    setStep('stepConsume', 'active', '处理中');
-                    setPill('waiting', '排队处理中', '消费者正在处理订单，第 ' + tries + ' 次查询已完成。');
-                    if (tries <= 3 || tries % 4 === 0) { log('', '第 ' + tries + ' 次查询（' + result.ms + 'ms）：' + result.body); }
+                    setStep('stepConsume', 'active', '确认中');
+                    setPill('waiting', '排队处理中', '系统正在为你确认参观名额，请耐心等待。');
+                    if (tries <= 3 || tries % 4 === 0) { log('', '预约仍在处理中，请稍候。'); }
                     poll(Math.min(3000, Math.round(delay * 1.35)), tries + 1);
                 });
             }, delay);
@@ -268,80 +265,67 @@
         function queryCurrent() {
             var data = request();
             $('userId').value = data.userId;
-            if (data.state === 'SUCCESS') { setPill('success', '预约成功', '该排队凭证已完成订单处理。'); return; }
-            if (data.state !== 'QUEUED') { setPill('', '未提交', '请先领取排队凭证并提交预约。'); return; }
+            if (data.state === 'SUCCESS') { setPill('success', '预约成功', '你的预约已确认，请继续完成访客登记。'); return; }
+            if (data.state !== 'QUEUED') { setPill('', '未提交', '请先填写信息并提交预约申请。'); return; }
             stopPolling();
-            setPill('waiting', '查询中', '正在恢复排队查询…');
-            log('', '恢复 requestId=' + data.requestId.slice(0, 14) + '… 的订单查询。');
+            setPill('waiting', '查询中', '正在查询你的预约处理结果…');
+            log('', '正在查询预约处理结果。');
             poll(100, 1);
         }
         function submit() {
             if (isSubmitting) { return; }
             var userId = parseInt($('userId').value, 10);
             if (!userId || userId < 1 || userId > 2001) {
-                setPill('error', '信息有误', '请输入 1 到 2001 范围内的有效 userId。');
+                setPill('error', '信息有误', '请输入有效的预约人编号。');
                 return;
             }
             var data = request();
             if (data.state === 'QUEUED' || data.state === 'SUCCESS') {
-                setPill(data.state === 'SUCCESS' ? 'success' : 'waiting', data.state === 'SUCCESS' ? '预约成功' : '已在排队', '当前排队凭证已提交，系统不会重复发起订单。');
+                setPill(data.state === 'SUCCESS' ? 'success' : 'waiting', data.state === 'SUCCESS' ? '预约成功' : '已在排队', '当前预约申请已提交，请勿重复提交。');
                 queryCurrent();
                 return;
             }
             isSubmitting = true;
             $('buyBtn').disabled = true;
-            $('buyBtn').textContent = '正在写入排队队列…';
+            $('buyBtn').textContent = '正在提交预约申请…';
             data.userId = userId;
             data.state = 'SUBMITTING';
             data.submittedAt = Date.now();
             save(data);
-            setStep('stepGate', 'done', '凭证已生成');
-            setStep('stepQueue', 'active', '入队中');
-            setPill('waiting', '正在提交', '已生成 requestId，正在请求 MQ 异步下单接口。');
-            log('ok', '请求准入通过，requestId=' + data.requestId);
-            log('warn', 'Redis Lua 库存预扣接口尚未接入，当前仅展示该生产目标节点。');
+            setStep('stepGate', 'done', '信息已确认');
+            setStep('stepReserve', 'done', '申请已提交');
+            setStep('stepQueue', 'active', '处理中');
+            setPill('waiting', '正在提交', '正在提交你的预约申请，请稍候。');
+            log('ok', '预约信息已提交，正在为你安排名额。');
             call('/seckill/stage5/order-with-mq?sid=' + SID + '&userId=' + encodeURIComponent(userId)).then(function (result) {
                 isSubmitting = false;
                 $('buyBtn').disabled = false;
-                $('buyBtn').textContent = '领取排队凭证并提交预约';
+                $('buyBtn').textContent = '提交预约申请';
                 if (result.body.indexOf('秒杀请求提交成功') === 0) {
                     data.state = 'QUEUED'; save(data);
-                    setStep('stepQueue', 'done', '已入队');
-                    setStep('stepConsume', 'active', '处理中');
-                    setPill('waiting', '已进入队列', '请求 ' + result.ms + 'ms 返回；后台正在创建订单。');
-                    log('ok', 'MQ 提交成功（' + result.ms + 'ms）：' + result.body);
+                    setStep('stepQueue', 'done', '已受理');
+                    setStep('stepConsume', 'active', '确认中');
+                    setPill('waiting', '申请已受理', '你的预约申请已提交，正在为你确认名额。');
+                    log('ok', '预约申请已受理，正在确认参观名额。');
                     poll(400, 1);
                 } else {
                     data.state = 'READY'; save(data);
-                    setStep('stepQueue', '', '提交失败');
-                    setPill('error', '未能入队', result.body);
-                    log('fail', 'MQ 提交失败（' + result.ms + 'ms）：' + result.body);
+                    setStep('stepQueue', '', '未能受理');
+                    setPill('error', '暂未受理', '该场次暂时无法受理预约，请稍后再试或查询已有预约。');
+                    log('fail', '暂未能受理本次预约申请。');
                 }
             });
         }
-        function newRequest() {
-            stopPolling();
-            var data = { requestId: uuid(), userId: parseInt($('userId').value, 10) || 1001, state: 'READY', submittedAt: 0 };
-            save(data); showRequest(data);
-            setStep('stepGate', 'active', '准备中');
-            setStep('stepQueue', '', '未提交');
-            setStep('stepConsume', '', '等待处理');
-            setStep('stepResult', '', '等待结果');
-            setPill('', '未提交', '已生成新的请求凭证，可再次提交预约。');
-            log('', '已生成新的 requestId。');
-        }
         function initialise() {
             var data = request();
-            showRequest(data);
             $('userId').value = data.userId;
-            log('', '页面已就绪，排队凭证已写入浏览器本地存储。');
+            log('', '页面已就绪，可开始填写预约信息。');
             refreshStock();
             if (data.state === 'QUEUED') { queryCurrent(); }
-            if (data.state === 'SUCCESS') { setPill('success', '预约成功', '该排队凭证已完成订单处理。'); setStep('stepResult', 'done', '预约成功'); }
+            if (data.state === 'SUCCESS') { setPill('success', '预约成功', '你的预约已确认，请继续完成访客登记。'); setStep('stepResult', 'done', '预约成功'); }
         }
         $('buyBtn').addEventListener('click', submit);
         $('queryBtn').addEventListener('click', queryCurrent);
-        $('newRequestBtn').addEventListener('click', newRequest);
         $('refreshBtn').addEventListener('click', refreshStock);
         document.addEventListener('visibilitychange', function () { if (document.hidden) { stopPolling(); } else { queryCurrent(); } });
         initialise();
