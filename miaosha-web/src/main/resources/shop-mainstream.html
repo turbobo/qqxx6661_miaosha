@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云上博物馆 · 完整抢购通道</title>
+    <style>
+        :root {
+            --ink: #10221f;
+            --ink-soft: #263b36;
+            --paper: #f5f0e6;
+            --paper-deep: #e9e0d0;
+            --jade: #167261;
+            --jade-light: #a7d8c7;
+            --gold: #bf8a37;
+            --red: #a83e32;
+            --line: rgba(16, 34, 31, .14);
+            --muted: #66756f;
+            --success: #147354;
+            --warning: #9a6614;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh; color: var(--ink); background: var(--paper);
+            font-family: "Noto Serif SC", "Songti SC", STSong, serif;
+        }
+        body::before {
+            content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .28;
+            background-image: radial-gradient(rgba(16, 34, 31, .2) .65px, transparent .65px);
+            background-size: 5px 5px; mix-blend-mode: multiply;
+        }
+        .nav {
+            min-height: 62px; padding: 0 5vw; display: flex; align-items: center; gap: 18px;
+            background: var(--ink); color: var(--paper); position: relative; z-index: 1;
+        }
+        .nav a { color: var(--jade-light); text-decoration: none; font-family: "PingFang SC", sans-serif; font-size: 13px; }
+        .nav a:hover { color: #fff; }
+        .brand { flex: 1; text-align: center; letter-spacing: .15em; font-size: 15px; }
+        .nav-mark { color: var(--gold); font-size: 12px; letter-spacing: .12em; }
+        .page { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 48px 0 72px; position: relative; z-index: 0; }
+        .eyebrow { color: var(--jade); font: 700 12px/1 "PingFang SC", sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+        .hero { display: grid; grid-template-columns: 1.22fr .78fr; gap: 34px; align-items: end; margin-bottom: 32px; }
+        h1 { margin: 12px 0 14px; font-size: clamp(34px, 5vw, 58px); line-height: 1.08; font-weight: 700; letter-spacing: .03em; }
+        .lead { max-width: 690px; color: var(--ink-soft); font-size: 16px; line-height: 1.9; }
+        .target-note { border-left: 3px solid var(--gold); padding: 14px 0 14px 18px; color: var(--muted); font: 13px/1.8 "PingFang SC", sans-serif; }
+        .target-note b { color: var(--ink); }
+        .flow { display: grid; grid-template-columns: repeat(5, 1fr); overflow: hidden; border: 1px solid var(--line); background: rgba(255,255,255,.35); }
+        .flow-step { min-height: 125px; padding: 18px 16px; border-right: 1px solid var(--line); position: relative; }
+        .flow-step:last-child { border: 0; }
+        .flow-step::after { content: "→"; position: absolute; right: -8px; top: 46px; color: var(--gold); z-index: 1; font: 20px/1 sans-serif; }
+        .flow-step:last-child::after { display: none; }
+        .step-no { display: block; color: var(--gold); font: 700 11px/1 "PingFang SC", sans-serif; letter-spacing: .12em; }
+        .flow-step strong { display: block; margin: 10px 0 5px; font-size: 17px; }
+        .flow-step small { color: var(--muted); font: 12px/1.55 "PingFang SC", sans-serif; }
+        .flow-state { display: inline-block; margin-top: 10px; padding: 3px 7px; color: var(--muted); background: rgba(16,34,31,.06); border-radius: 999px; font: 11px/1 "PingFang SC", sans-serif; }
+        .flow-step.active .flow-state { color: #fff; background: var(--jade); }
+        .flow-step.done .flow-state { color: #075941; background: var(--jade-light); }
+        .flow-step.warn .flow-state { color: #754c0b; background: #f4deb5; }
+        .layout { display: grid; grid-template-columns: 1.05fr .95fr; gap: 28px; margin-top: 28px; }
+        .panel { border: 1px solid var(--line); background: rgba(255,255,255,.42); box-shadow: 0 20px 50px rgba(16,34,31,.08); }
+        .product { padding: 28px; }
+        .product-top { display: flex; gap: 23px; align-items: center; }
+        .seal { width: 112px; height: 112px; flex: 0 0 112px; border: 2px solid var(--red); color: var(--red); display: grid; place-items: center; border-radius: 50%; transform: rotate(-10deg); position: relative; font-size: 33px; }
+        .seal::before, .seal::after { position: absolute; font: 700 10px/1 "PingFang SC", sans-serif; letter-spacing: .12em; }
+        .seal::before { content: "MUSEUM"; top: 18px; }
+        .seal::after { content: "预约凭证"; bottom: 18px; }
+        h2 { margin: 0 0 6px; font-size: 27px; }
+        .sub { color: var(--muted); font: 13px/1.65 "PingFang SC", sans-serif; }
+        .price { margin: 18px 0 8px; color: var(--red); font: 700 32px/1 "PingFang SC", sans-serif; }
+        .price span { margin-left: 8px; color: #8d938e; font-size: 13px; font-weight: 400; text-decoration: line-through; }
+        .stock { margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
+        .stock-row { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font: 13px/1 "PingFang SC", sans-serif; }
+        .stock-row b { color: var(--ink); font-size: 16px; }
+        .bar { height: 8px; margin-top: 10px; overflow: hidden; background: var(--paper-deep); }
+        .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--jade), var(--jade-light)); transition: width .45s ease; }
+        .facts { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 25px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+        .fact { padding: 14px 8px; text-align: center; border-right: 1px solid var(--line); }
+        .fact:last-child { border: 0; }
+        .fact b { display: block; font: 700 17px/1.3 "PingFang SC", sans-serif; }
+        .fact span { color: var(--muted); font: 11px/1.6 "PingFang SC", sans-serif; }
+        .purchase { padding: 28px; }
+        .purchase h3 { margin: 0 0 6px; font-size: 22px; }
+        .purchase > p { margin: 0 0 22px; color: var(--muted); font: 13px/1.7 "PingFang SC", sans-serif; }
+        label { display: block; margin-bottom: 7px; color: var(--ink-soft); font: 700 12px/1 "PingFang SC", sans-serif; letter-spacing: .05em; }
+        .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        input, select { width: 100%; padding: 12px 13px; border: 1px solid var(--line); border-radius: 0; background: rgba(255,255,255,.58); color: var(--ink); outline: none; font: 14px "PingFang SC", sans-serif; }
+        input:focus, select:focus { border-color: var(--jade); box-shadow: 0 0 0 3px rgba(22,114,97,.12); }
+        .request { margin: 17px 0; padding: 11px 13px; color: var(--jade); background: rgba(167,216,199,.28); border-left: 3px solid var(--jade); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+        .primary { width: 100%; border: 0; padding: 15px; cursor: pointer; color: var(--paper); background: var(--jade); font: 700 16px/1 "PingFang SC", sans-serif; letter-spacing: .16em; transition: transform .15s, background .15s; }
+        .primary:hover { background: #0f5d4e; transform: translateY(-1px); }
+        .primary:disabled { cursor: wait; opacity: .65; transform: none; }
+        .actions { display: flex; gap: 12px; margin-top: 12px; }
+        .text-btn { flex: 1; border: 1px solid var(--line); padding: 10px; cursor: pointer; background: transparent; color: var(--ink-soft); font: 12px "PingFang SC", sans-serif; }
+        .text-btn:hover { border-color: var(--jade); color: var(--jade); }
+        .status { padding: 24px 28px; border-top: 1px solid var(--line); }
+        .status-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .status h3 { margin: 0; font-size: 18px; }
+        .pill { padding: 5px 9px; color: var(--muted); background: rgba(16,34,31,.07); border-radius: 99px; font: 700 11px/1 "PingFang SC", sans-serif; }
+        .pill.waiting { color: #805513; background: #f5e5c7; }
+        .pill.success { color: #075941; background: var(--jade-light); }
+        .pill.error { color: #8c281d; background: #f5ceca; }
+        .status-text { margin: 14px 0 0; color: var(--muted); font: 13px/1.7 "PingFang SC", sans-serif; }
+        .timeline { margin-top: 18px; padding: 0; list-style: none; max-height: 235px; overflow: auto; border-top: 1px solid var(--line); }
+        .timeline li { position: relative; padding: 12px 0 12px 19px; border-bottom: 1px dashed var(--line); color: var(--muted); font: 12px/1.55 "PingFang SC", sans-serif; }
+        .timeline li::before { content: ""; position: absolute; top: 18px; left: 1px; width: 7px; height: 7px; border-radius: 50%; background: #aeb8b3; }
+        .timeline li.ok::before { background: var(--success); }
+        .timeline li.warn::before { background: var(--gold); }
+        .timeline li.fail::before { background: var(--red); }
+        .timeline time { display: inline-block; min-width: 76px; color: #9aa39e; font-family: ui-monospace, monospace; }
+        .notice { margin-top: 28px; padding: 18px 20px; border: 1px solid rgba(191,138,55,.35); background: rgba(247,231,196,.45); color: #704b11; font: 13px/1.8 "PingFang SC", sans-serif; }
+        .notice b { color: #4d330a; }
+        @media (max-width: 860px) {
+            .hero, .layout { grid-template-columns: 1fr; }
+            .flow { grid-template-columns: 1fr; }
+            .flow-step { min-height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+            .flow-step::after { content: "↓"; top: auto; bottom: -12px; right: 50%; }
+        }
+        @media (max-width: 480px) { .page { width: min(100% - 28px, 1180px); padding-top: 30px; } .fields { grid-template-columns: 1fr; } .product-top { align-items: flex-start; } .seal { width: 82px; height: 82px; flex-basis: 82px; font-size: 24px; } .seal::before, .seal::after { display: none; } }
+    </style>
+</head>
+<body>
+<nav class="nav">
+    <a href="seckill-shop.html">← 返回方案商城</a>
+    <span class="brand">云上博物馆 · 特展预约通道</span>
+    <span class="nav-mark">ASYNC RESERVATION</span>
+</nav>
+<main class="page">
+    <section class="hero">
+        <div>
+            <div class="eyebrow">Mainstream purchase flow / 01</div>
+            <h1>先领排队凭证，<br>再等一张入馆门票。</h1>
+            <p class="lead">面向高峰预约的完整交互：请求准入、库存预占、异步入队、后台落单、结果确认。页面实际接入当前项目的 RabbitMQ 异步下单与订单轮询接口，并保存排队凭证以支持刷新页面后继续查询。</p>
+        </div>
+        <div class="target-note"><b>生产目标链路：</b>网关限流 / 风控 → Redis Lua 原子预扣 → MQ 异步削峰 → 消费者落库 → 幂等与对账。<br>本演示后端当前已接入 MQ、Redis 用户去重、结果轮询；Lua 库存预扣接口尚未提供。</div>
+    </section>
+
+    <section class="flow" aria-label="抢购处理流程">
+        <article id="stepGate" class="flow-step active"><span class="step-no">01 / GATE</span><strong>请求准入</strong><small>前端防连点，生成排队凭证</small><span class="flow-state">准备中</span></article>
+        <article id="stepReserve" class="flow-step warn"><span class="step-no">02 / RESERVE</span><strong>库存预占</strong><small>生产应由 Redis Lua 原子完成</small><span class="flow-state">接口待接入</span></article>
+        <article id="stepQueue" class="flow-step"><span class="step-no">03 / QUEUE</span><strong>MQ 入队</strong><small>真实调用 RabbitMQ 异步下单</small><span class="flow-state">未提交</span></article>
+        <article id="stepConsume" class="flow-step"><span class="step-no">04 / CONSUME</span><strong>后台落单</strong><small>消费者扣库存、创建订单</small><span class="flow-state">等待处理</span></article>
+        <article id="stepResult" class="flow-step"><span class="step-no">05 / RESULT</span><strong>结果确认</strong><small>轮询直到订单终态</small><span class="flow-state">等待结果</span></article>
+    </section>
+
+    <section class="layout">
+        <article class="panel product">
+            <div class="product-top">
+                <div class="seal" aria-hidden="true">票</div>
+                <div>
+                    <h2>「文明的刻度」特展联票</h2>
+                    <p class="sub">周末限定 · 单人单日限约 1 张 · 预约成功后请前往访客系统完成入馆登记</p>
+                    <div class="price">¥99 <span>¥199</span></div>
+                </div>
+            </div>
+            <div class="stock">
+                <div class="stock-row"><span>当前数据库库存</span><span>剩余 <b id="stockNum">--</b> 张</span></div>
+                <div class="bar"><i id="stockFill"></i></div>
+            </div>
+            <div class="facts">
+                <div class="fact"><b>1</b><span>每人限购</span></div>
+                <div class="fact"><b>MQ</b><span>异步排队</span></div>
+                <div class="fact"><b>轮询</b><span>结果可恢复</span></div>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="purchase">
+                <h3>填写预约信息</h3>
+                <p>点击后将生成本次排队凭证；重复点击同一凭证不会再次提交。</p>
+                <div class="fields">
+                    <div><label for="userId">USER ID</label><input id="userId" type="number" min="1" max="2001" value="1001" inputmode="numeric"></div>
+                    <div><label for="visitDate">预约日期</label><select id="visitDate"><option>本周六 · 10:00–12:00</option><option>本周六 · 14:00–16:00</option><option>本周日 · 10:00–12:00</option></select></div>
+                </div>
+                <div id="requestId" class="request">requestId：正在生成…</div>
+                <button id="buyBtn" class="primary" type="button">领取排队凭证并提交预约</button>
+                <div class="actions">
+                    <button id="queryBtn" class="text-btn" type="button">查询当前结果</button>
+                    <button id="newRequestBtn" class="text-btn" type="button">生成新的请求凭证</button>
+                    <button id="refreshBtn" class="text-btn" type="button">刷新库存</button>
+                </div>
+            </div>
+            <div class="status" aria-live="polite">
+                <div class="status-head"><h3>排队状态</h3><span id="statusPill" class="pill">未提交</span></div>
+                <p id="statusText" class="status-text">准备就绪。提交后本页会在后台持续查询订单处理结果。</p>
+                <ul id="timeline" class="timeline"></ul>
+            </div>
+        </article>
+    </section>
+
+    <aside class="notice"><b>能力边界说明：</b>当前页面真实调用的是 <code>/seckill/stage5/order-with-mq</code> 与 <code>/seckill/stage5/purchase-result</code>。它已实现 MQ 异步削峰、Redis 用户去重和结果轮询；“Redis Lua 预扣库存”和“后端 requestId 幂等”是推荐的生产增强项，当前以可见流程节点标注为待接入，未被前端伪造。</aside>
+</main>
+<script>
+    (function () {
+        var API_BASE = location.protocol === 'file:' ? 'http://localhost:8081' : '';
+        var SID = 17;
+        var STORAGE_KEY = 'miaosha-mainstream-reservation';
+        var pollTimer = null;
+        var isSubmitting = false;
+        var $ = function (id) { return document.getElementById(id); };
+
+        function uuid() {
+            if (window.crypto && window.crypto.randomUUID) { return window.crypto.randomUUID(); }
+            return 'req-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+        }
+        function now() { return new Date().toLocaleTimeString('zh-CN', { hour12: false }); }
+        function request() {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {
+                requestId: uuid(), userId: 1001, state: 'READY', submittedAt: 0
+            };
+        }
+        function save(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+        function log(type, text) {
+            var item = document.createElement('li');
+            item.className = type || '';
+            item.textContent = now() + ' ' + text;
+            $('timeline').prepend(item);
+        }
+        function setPill(type, text, detail) {
+            $('statusPill').className = 'pill ' + (type || '');
+            $('statusPill').textContent = text;
+            $('statusText').textContent = detail;
+        }
+        function setStep(id, state, text) {
+            var node = $(id);
+            node.className = 'flow-step ' + state;
+            node.querySelector('.flow-state').textContent = text;
+        }
+        function showRequest(data) { $('requestId').textContent = 'requestId：' + data.requestId; }
+        function call(path) {
+            var started = performance.now();
+            return fetch(API_BASE + path).then(function (response) { return response.text(); }).then(function (body) {
+                return { body: body, ms: Math.round(performance.now() - started) };
+            }).catch(function (error) { return { body: '请求异常：' + error.message, ms: 0 }; });
+        }
+        function stopPolling() {
+            if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+        }
+        function refreshStock() {
+            call('/seckill/stage4/stock-by-db/' + SID).then(function (result) {
+                var matched = result.body.match(/剩余库存为：(\d+)/);
+                if (!matched) { log('warn', '库存读取失败：' + result.body); return; }
+                var left = parseInt(matched[1], 10);
+                $('stockNum').textContent = left;
+                $('stockFill').style.width = Math.max(1, Math.min(100, left / 100)) + '%';
+            });
+        }
+        function poll(delay, tries) {
+            var data = request();
+            if (data.state !== 'QUEUED') { return; }
+            pollTimer = setTimeout(function () {
+                call('/seckill/stage5/purchase-result?sid=' + SID + '&userId=' + encodeURIComponent(data.userId)).then(function (result) {
+                    if (result.body.indexOf('恭喜您') === 0) {
+                        data.state = 'SUCCESS'; save(data);
+                        setStep('stepConsume', 'done', '已完成');
+                        setStep('stepResult', 'done', '预约成功');
+                        setPill('success', '预约成功', '订单已完成处理。请在访客系统完成后续登记。');
+                        log('ok', '第 ' + tries + ' 次查询（' + result.ms + 'ms）：' + result.body);
+                        refreshStock();
+                        return;
+                    }
+                    setStep('stepConsume', 'active', '处理中');
+                    setPill('waiting', '排队处理中', '消费者正在处理订单，第 ' + tries + ' 次查询已完成。');
+                    if (tries <= 3 || tries % 4 === 0) { log('', '第 ' + tries + ' 次查询（' + result.ms + 'ms）：' + result.body); }
+                    poll(Math.min(3000, Math.round(delay * 1.35)), tries + 1);
+                });
+            }, delay);
+        }
+        function queryCurrent() {
+            var data = request();
+            $('userId').value = data.userId;
+            if (data.state === 'SUCCESS') { setPill('success', '预约成功', '该排队凭证已完成订单处理。'); return; }
+            if (data.state !== 'QUEUED') { setPill('', '未提交', '请先领取排队凭证并提交预约。'); return; }
+            stopPolling();
+            setPill('waiting', '查询中', '正在恢复排队查询…');
+            log('', '恢复 requestId=' + data.requestId.slice(0, 14) + '… 的订单查询。');
+            poll(100, 1);
+        }
+        function submit() {
+            if (isSubmitting) { return; }
+            var userId = parseInt($('userId').value, 10);
+            if (!userId || userId < 1 || userId > 2001) {
+                setPill('error', '信息有误', '请输入 1 到 2001 范围内的有效 userId。');
+                return;
+            }
+            var data = request();
+            if (data.state === 'QUEUED' || data.state === 'SUCCESS') {
+                setPill(data.state === 'SUCCESS' ? 'success' : 'waiting', data.state === 'SUCCESS' ? '预约成功' : '已在排队', '当前排队凭证已提交，系统不会重复发起订单。');
+                queryCurrent();
+                return;
+            }
+            isSubmitting = true;
+            $('buyBtn').disabled = true;
+            $('buyBtn').textContent = '正在写入排队队列…';
+            data.userId = userId;
+            data.state = 'SUBMITTING';
+            data.submittedAt = Date.now();
+            save(data);
+            setStep('stepGate', 'done', '凭证已生成');
+            setStep('stepQueue', 'active', '入队中');
+            setPill('waiting', '正在提交', '已生成 requestId，正在请求 MQ 异步下单接口。');
+            log('ok', '请求准入通过，requestId=' + data.requestId);
+            log('warn', 'Redis Lua 库存预扣接口尚未接入，当前仅展示该生产目标节点。');
+            call('/seckill/stage5/order-with-mq?sid=' + SID + '&userId=' + encodeURIComponent(userId)).then(function (result) {
+                isSubmitting = false;
+                $('buyBtn').disabled = false;
+                $('buyBtn').textContent = '领取排队凭证并提交预约';
+                if (result.body.indexOf('秒杀请求提交成功') === 0) {
+                    data.state = 'QUEUED'; save(data);
+                    setStep('stepQueue', 'done', '已入队');
+                    setStep('stepConsume', 'active', '处理中');
+                    setPill('waiting', '已进入队列', '请求 ' + result.ms + 'ms 返回；后台正在创建订单。');
+                    log('ok', 'MQ 提交成功（' + result.ms + 'ms）：' + result.body);
+                    poll(400, 1);
+                } else {
+                    data.state = 'READY'; save(data);
+                    setStep('stepQueue', '', '提交失败');
+                    setPill('error', '未能入队', result.body);
+                    log('fail', 'MQ 提交失败（' + result.ms + 'ms）：' + result.body);
+                }
+            });
+        }
+        function newRequest() {
+            stopPolling();
+            var data = { requestId: uuid(), userId: parseInt($('userId').value, 10) || 1001, state: 'READY', submittedAt: 0 };
+            save(data); showRequest(data);
+            setStep('stepGate', 'active', '准备中');
+            setStep('stepQueue', '', '未提交');
+            setStep('stepConsume', '', '等待处理');
+            setStep('stepResult', '', '等待结果');
+            setPill('', '未提交', '已生成新的请求凭证，可再次提交预约。');
+            log('', '已生成新的 requestId。');
+        }
+        function initialise() {
+            var data = request();
+            showRequest(data);
+            $('userId').value = data.userId;
+            log('', '页面已就绪，排队凭证已写入浏览器本地存储。');
+            refreshStock();
+            if (data.state === 'QUEUED') { queryCurrent(); }
+            if (data.state === 'SUCCESS') { setPill('success', '预约成功', '该排队凭证已完成订单处理。'); setStep('stepResult', 'done', '预约成功'); }
+        }
+        $('buyBtn').addEventListener('click', submit);
+        $('queryBtn').addEventListener('click', queryCurrent);
+        $('newRequestBtn').addEventListener('click', newRequest);
+        $('refreshBtn').addEventListener('click', refreshStock);
+        document.addEventListener('visibilitychange', function () { if (document.hidden) { stopPolling(); } else { queryCurrent(); } });
+        initialise();
+    }());
+</script>
+<!-- 完整抢购页面 -->
+</body>
+</html>
